@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: ersatz-service
+  namespace: media
+  # annotations:
+  #   metallb.universe.tf/address-pool: "worker-02-ip"
+  #   external-dns.alpha.kubernetes.io/hostname: biggs.dog
+spec:
+  externalTrafficPolicy: Local
+  type: LoadBalancer
+  selector:
+    app: ersatz
+  ports:
+    - name: ersatz-port
+      port: 8409
+      protocol: TCP
+      targetPort: 8409
+      nodePort: 30409

@@ -1,0 +1,42 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: victoria-logs-collector
+  namespace: flux-system
+spec:
+  targetNamespace: observability
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: victoria-logs-collector
+  path: ./clusters/cluster0/kubernetes/apps/observability/victoria-logs/victoria-logs-collector
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: victoria-logs-single
+  namespace: flux-system
+spec:
+  targetNamespace: observability
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: victoria-logs-single
+  path: ./clusters/cluster0/kubernetes/apps/observability/victoria-logs/victoria-logs-single
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+
+

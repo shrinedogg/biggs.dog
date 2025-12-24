@@ -1,0 +1,10 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: control-ips
+  namespace: metallb-system
+spec:
+  addresses:
+  # The IP addresses that MetalLB will hand out for services in the 'control-plane' role.
+  - 192.168.2.30/32
+  - 192.168.2.31/32

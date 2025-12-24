@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - metallb-repo.yaml
+  - ingress-nginx-repo.yaml
+  - cnpg-repo.yaml
+  - victoria-metrics-repo.yaml
+  - nfd-repo.yaml
+  - k8s-gateway-repo.yaml
+  - cert-manager-repo.yaml
+  - external-secrets-repo.yaml
+  - onepass-repo.yaml
+  - grafana-operator-repo.yaml
+  - rook-ceph-repo.yaml
+  - volsync-repo.yaml
+  - snapshot-controller-repo.yaml
+  - cilium-repo.yaml
+  - openebs-repo.yaml
+  - nfs-driver-repo.yaml

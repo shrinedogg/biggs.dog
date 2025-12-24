@@ -1,0 +1,19 @@
+kind: Service
+apiVersion: v1
+metadata:
+  name: emby-service
+  namespace: media
+  # annotations:
+    # metallb.universe.tf/address-pool: "worker-01ip"
+    # external-dns.alpha.kubernetes.io/hostname: biggs.dog
+spec:
+  selector:
+    app: emby
+#  externalTrafficPolicy: Local
+  ports:
+    - name: emby
+      protocol: TCP
+      port: 8096
+      targetPort: 8096
+    #  nodePort: 30096
+#  type: NodePort

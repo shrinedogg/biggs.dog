@@ -1,0 +1,50 @@
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+    name: b2-backup-emby
+    namespace: media
+spec:
+    secretStoreRef:
+        kind: ClusterSecretStore
+        name: onepassword-connect
+    target:
+        name: b2-backup-emby
+        creationPolicy: Owner
+    data:
+        - secretKey: B2_ACCOUNT_ID
+          remoteRef:
+            key: b2-backup-emby
+            property: keyID
+        - secretKey: B2_ACCOUNT_KEY
+          remoteRef:
+            key: b2-backup-emby
+            property: applicationKey
+        - secretKey: RESTIC_REPOSITORY
+          remoteRef:
+            key: b2-backup-emby
+            property: repository
+        - secretKey: RESTIC_PASSWORD
+          remoteRef:
+            key: biggs-dogg-restic-pass
+            property: password
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+   name: emby-backup-source
+   namespace: source
+spec:
+   sourcePVC: emby-config
+   trigger:
+      schedule: "0 */12 * * *"  # Every hour
+   restic:
+     pruneIntervalDays: 60  # Retain backups for 60 days
+     repository: b2-backup-emby
+     retain:
+       hourly: 2
+       daily: 2
+       weekly: 1
+       monthly: 1
+       yearly: 1
+     copyMethod: Clone

@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: biggs
+  namespace: gregbob
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: biggs.biggs.dog
+spec:
+  ingressClassName: external
+  rules:
+  - host: biggs.biggs.dog
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend: 
+          service:
+            name: biggs-service
+            port:
+              number: 8080

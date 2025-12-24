@@ -1,0 +1,113 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: booklore
+  name: booklore
+  namespace: media
+spec:
+  template:
+    metadata:
+      labels:
+        app: booklore
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-03
+      containers:
+        - name: mariadb
+          image: lscr.io/linuxserver/mariadb:11.4.8
+          imagePullPolicy: Always
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          - name: MYSQL_DATABASE
+            value: "booklore"
+          - name: MYSQL_USER
+            valueFrom:
+              secretKeyRef:
+                name: booklore-user-password
+                key: username
+          - name: MYSQL_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: booklore-user-password
+                key: password
+          - name: MYSQL_ROOT_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: booklore-user-password
+                key: root-password
+          volumeMounts:
+          - name: mariadb-config
+            mountPath: /config
+          resources:
+            requests:
+              memory: 300Mi
+              cpu: 150m
+            limits:
+              memory: 1500Mi
+              cpu: 500m
+        - name: booklore
+          image: ghcr.io/booklore-app/booklore:latest
+          imagePullPolicy: Always
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          - name: BOOKLORE_PORT
+            value: "6060"
+          - name: DATABASE_URL
+            value: "jdbc:mariadb://127.0.0.1:3306/booklore"
+          - name: DATABASE_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: booklore-user-password
+                key: username
+          - name: DATABASE_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: booklore-user-password
+                key: password
+          ports:
+          - name: booklore-port
+            containerPort: 6060
+            protocol: TCP
+          volumeMounts:
+          - name: booklore-data
+            mountPath: /app/data
+          - name: booklore-bookdrop-pvc
+            mountPath: /bookdrop
+          - name: books
+            mountPath: /ebooks
+          resources:
+            requests:
+              memory: 500Mi
+              cpu: 150m
+            limits:
+              memory: 4Gi
+              cpu: "2"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: mariadb-config
+        persistentVolumeClaim:
+          claimName: "booklore-mariadb-pvc"
+      - name: booklore-data
+        persistentVolumeClaim:
+          claimName: "booklore-data-pvc"
+      - name: booklore-bookdrop-pvc
+        persistentVolumeClaim:
+          claimName: "booklore-bookdrop-pvc"
+      - name: books
+        persistentVolumeClaim:
+          claimName: media-zfs-pvc
+  selector:
+    matchLabels:
+      app: booklore

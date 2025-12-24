@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: cwa
+  name: cwa
+  namespace: media
+spec:
+  template:
+    metadata:
+      labels:
+        app: cwa
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-03
+      containers:
+        - image: crocodilestick/calibre-web-automated:dev
+          imagePullPolicy: Always
+          name: cwa
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          # - name: NETWORK_SHARE_MODE
+          #   value: "true"
+          - name: CWA_PORT_OVERRIDE
+            value: "8083"
+          ports:
+          - name: cwa-port
+            containerPort: 8083
+            protocol: TCP
+          volumeMounts:
+          - name: cwa-config
+            mountPath: /config
+          - name: cwa-library-pvc
+            mountPath: /calibre-library
+          - name: cwa-ingest-cache-pvc
+            mountPath: /cwa-book-ingest
+          - name: cwa-plugins-pvc
+            mountPath: /config/.config/calibre/plugins
+          resources:
+            requests:
+              memory: 500Mi
+              cpu: 150m
+            limits:
+              memory: 2Gi
+              cpu: "2"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: cwa-config
+        persistentVolumeClaim:
+          claimName: "cwa-config"
+      - name: cwa-library-pvc
+        persistentVolumeClaim:
+          claimName: "cwa-library-pvc"
+      - name: cwa-ingest-cache-pvc  
+        persistentVolumeClaim:
+          claimName: "cwa-ingest-cache-pvc"
+      - name: cwa-plugins-pvc
+        persistentVolumeClaim:
+          claimName: "cwa-plugins-pvc"
+  selector:
+    matchLabels:
+      app: cwa

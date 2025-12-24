@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ersatz
+  name: ersatz
+  namespace: media
+spec:
+  template:
+    metadata:
+      labels:
+        app: ersatz
+    spec:
+      nodeSelector:
+        #gpu: intel
+        kubernetes.io/hostname: worker-02
+      containers:
+        # - image: jasongdove/ersatztv:latest
+        - image: jasongdove/ersatztv:develop
+          imagePullPolicy: Always
+          name: ersatz
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          #- name: ELASTICSEARCH__URI
+          #  value: "http://eck-system.eck-1-es-http.cluster.local"
+          #- name: Serilog__MinimumLevel
+          #  value: "Debug"
+          ports:
+            - name: ersatz-port
+              containerPort: 8409
+              protocol: TCP
+          volumeMounts:
+          - name: ersatz-config
+            mountPath: /root/.local/share/ersatztv
+          - name: ersatz-media
+            mountPath: /media
+          resources:
+            limits:
+              gpu.intel.com/i915: "1"
+              memory: 12Gi
+              cpu: "6"
+            requests:
+              gpu.intel.com/i915: "1"
+              memory: 6Gi
+              cpu: "2"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: ersatz-config
+        persistentVolumeClaim:
+          claimName: ersatz-config-pvc
+      - name: ersatz-media
+        persistentVolumeClaim:
+         claimName: media-zfs-pvc
+  selector:
+    matchLabels:
+      app: ersatz

@@ -1,0 +1,66 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg
+  namespace: flux-system
+spec:
+  targetNamespace: cnpg-system
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: cnpg
+  path: ./clusters/cluster0/kubernetes/apps/databases/cnpg/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-databases
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cnpg-secrets
+    - name: rook-ceph-cluster
+  targetNamespace: cnpg-system
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: cnpg-databases
+  path: ./clusters/cluster0/kubernetes/apps/databases/cnpg/databases
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-secrets
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cnpg
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: cnpg-secrets
+  targetNamespace: cnpg-system
+  path: ./clusters/cluster0/kubernetes/apps/databases/cnpg/secrets
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+

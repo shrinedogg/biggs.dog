@@ -1,0 +1,24 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app onepassword-connect
+  namespace: flux-system
+spec:
+  targetNamespace: external-secrets
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/external-secrets/onepassword-connect/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: false
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+  decryption:
+    provider: sops
+    secretRef:
+      name: sops-age

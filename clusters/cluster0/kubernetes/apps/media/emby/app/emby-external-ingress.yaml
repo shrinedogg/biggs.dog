@@ -1,0 +1,20 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: emby
+  namespace: media
+  annotations:
+    external-dns.alpha.kubernetes.io/hostname: emby.biggs.dog
+spec:
+  ingressClassName: external
+  rules:
+  - host: emby.biggs.dog
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend: 
+          service:
+            name: emby-service
+            port:
+              number: 8096

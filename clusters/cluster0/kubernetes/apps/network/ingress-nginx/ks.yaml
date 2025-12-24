@@ -1,0 +1,42 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app ingress-nginx
+  namespace: flux-system
+spec:
+  targetNamespace: kube-system
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/network/ingress-nginx/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app certificates
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cert-manager
+  targetNamespace: cert-manager
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/network/ingress-nginx/certificates
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m

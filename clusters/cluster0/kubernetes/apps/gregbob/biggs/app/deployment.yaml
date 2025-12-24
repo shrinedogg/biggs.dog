@@ -1,0 +1,35 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: biggs
+  name: biggs
+  namespace: gregbob
+spec:
+  template:
+    metadata:
+      labels:
+        app: biggs
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-03
+      containers:
+        - image: szkud/biggslanding:latest
+          imagePullPolicy: Always
+          name: biggs
+          ports:
+          - name: biggs-port
+            containerPort: 8080
+            protocol: TCP
+          resources:
+            requests:
+              memory: 350Mi
+              cpu: 10m
+            limits:
+              memory: 450Mi
+              cpu: 350m
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: biggs  

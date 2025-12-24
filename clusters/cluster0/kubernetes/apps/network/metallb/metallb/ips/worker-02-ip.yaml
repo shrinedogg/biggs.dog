@@ -1,0 +1,9 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: worker-02-ip
+  namespace: metallb-system
+spec:
+  addresses:
+  # The IP addresses that MetalLB will hand out for services in the 'control-plane' role.
+  - 192.168.2.28/32

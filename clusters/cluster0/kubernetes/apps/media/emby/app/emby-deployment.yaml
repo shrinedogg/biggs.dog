@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emby
+  namespace: media
+  labels:
+    app: emby
+spec:
+  selector:
+    matchLabels:
+      app: emby
+  template:
+    metadata:
+      labels:
+        app: emby
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-01
+      containers:
+        - name: emby
+          image: emby/embyserver:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8096
+              name: emby
+          env:
+            - name: GID
+              value: "1000"
+            - name: UID
+              value: "1000"
+          volumeMounts:
+            - name: emby-config
+              mountPath: /config
+            - name: emby-media-zfs-pvc
+              mountPath: /media
+            - name: emby-transcode
+              mountPath: /transcode
+          resources:
+            limits:
+              gpu.intel.com/i915: "1"
+              memory: 18Gi
+              cpu: "6"
+            requests:
+              gpu.intel.com/i915: "1"
+              memory: 10Gi
+              cpu: "1"
+      volumes:
+        - name: emby-transcode
+          emptyDir:
+            sizeLimit: 30Gi
+        - name: emby-config
+          persistentVolumeClaim:
+            claimName: emby-config
+        - name: emby-media-zfs-pvc
+          persistentVolumeClaim:
+            claimName: media-zfs-pvc

@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: kavita
+  name: kavita
+  namespace: media
+spec:
+  template:
+    metadata:
+      labels:
+        app: kavita
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: worker-03
+      containers:
+        - image: jvmilazz0/kavita:latest
+          imagePullPolicy: Always
+          name: kavita
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          - name: PUID
+            value: "1000"
+          - name: PGID
+            value: "1000"
+          ports:
+          - name: kavita-port
+            containerPort: 5000
+            protocol: TCP
+          volumeMounts:
+          - name: kavita-config
+            mountPath: /kavita/config
+          - name: media-zfs-pvc
+            mountPath: /media
+          resources:
+            requests:
+              memory: 350Mi
+              cpu: 75m
+            limits:
+              memory: 1500Mi
+              cpu: 1500m
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: kavita-config
+        persistentVolumeClaim:
+          claimName: "kavita-config"
+      - name: media-zfs-pvc
+        persistentVolumeClaim:
+          claimName: media-zfs-pvc
+  selector:
+    matchLabels:
+      app: kavita
