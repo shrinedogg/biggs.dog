@@ -1,4 +1,3 @@
 .wip/
 .sops*
 age.agekey
-authenticated_origin_pull_ca.pem

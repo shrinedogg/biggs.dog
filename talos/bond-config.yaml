@@ -1,0 +1,26 @@
+apiVersion: v1alpha1
+kind: BondConfig
+name: bond.int # Name of the bond link (interface) to be created.
+# Names of the links (interfaces) on which the bond will be created.
+links:
+    - enp1s2
+    - enp1s2
+bondMode: 802.3ad # Bond mode.
+miimon: 100 # Link monitoring frequency in milliseconds.
+updelay: 200 # The time, in milliseconds, to wait before enabling a slave after a link recovery has been detected.
+downdelay: 200 # The time, in milliseconds, to wait before disabling a slave after a link failure has been detected.
+xmitHashPolicy: layer3+4 # Selects the transmit hash policy to use for slave selection.
+lacpRate: fast # LACPDU frames periodic transmission rate.
+adActorSysPrio: 65535 # Actor system priority for 802.3ad.
+resendIGMP: 1 # The number of times IGMP packets should be resent.
+packetsPerSlave: 1 # The number of packets to transmit through a slave before moving to the next one.
+# Configure addresses to be statically assigned to the link.
+addresses:
+    - address: 10.15.0.3/16 # IP address to be assigned to the link.
+# Configure routes to be statically created via the link.
+routes:
+    - destination: 10.0.0.0/8 # The route's destination as an address prefix.
+      gateway: 10.15.0.1 # The route's gateway (if empty, creates link scope route).
+
+# Override the hardware (MAC) address of the link.
+hardwareAddr: 6e:78:0e:8e:ae:9d
