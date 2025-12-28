@@ -1,0 +1,85 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openebs
+  namespace: openebs-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: openebs
+      version: 4.4.0
+      sourceRef:
+        kind: HelmRepository
+        name: openebs
+        namespace: flux-system
+  values:
+    alloy:
+      enabled: false
+
+    openebs-crds:
+      csi:
+        volumeSnapshots:
+          enabled: false # snapshot-controller manages those CRDs
+
+    localpv-provisioner:
+      localpv:
+        basePath: /var/openebs/local
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+      hostpathClass:
+        name: openebs-hostpath
+      analytics:
+        enabled: false
+      helperPod:
+        image:
+          registry: quay.io/
+
+    zfs-localpv:
+      enabled: true
+      zfsController:
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+      zfsNode:
+        nodeSelector:
+          kubernetes.io/hostname: control-01
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+      analytics:
+        enabled: false
+      zfs:
+        bin: /sbin/zfs
+      crds:
+        csi:
+          volumeSnapshots:
+            enabled: false
+
+    loki:
+      enabled: false
+
+    lvm-localpv:
+      enabled: false
+
+    mayastor:
+      enabled: false
+
+    minio:
+      enabled: false
+
+    engines:
+      local:
+        lvm:
+          enabled: false
+        zfs:
+          enabled: true
+      replicated:
+        mayastor:
+          enabled: false

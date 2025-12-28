@@ -4,7 +4,7 @@ metadata:
   name: media-zfs-pvc
   namespace: media
 spec:
-  storageClassName: nfs
+  storageClassName: zfs
   accessModes:
     - ReadWriteMany
   resources:
