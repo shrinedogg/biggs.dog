@@ -23,7 +23,7 @@ spec:
     type: kubernetes
     size: medium
     multitenant: false
-    networkPolicy: true
+    networkPolicy: false
     domain: "cluster.local"
   # storage:
   #   class: "host-path"
