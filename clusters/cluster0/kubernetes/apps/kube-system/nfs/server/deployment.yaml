@@ -6,13 +6,13 @@ metadata:
   name: nfs
   namespace: media
 spec:
+  selector:
+    matchLabels:
+      app: nfs
   template:
     metadata:
       labels:
         app: nfs
-  selector:
-    matchLabels:
-      app: nfs
     spec:
       nodeSelector:
         kubernetes.io/hostname: control-01
@@ -21,17 +21,21 @@ spec:
           imagePullPolicy: Always
           name: nfs-server
           env:
-          - name: NFS_THREADS
-            value: "32"
-          - name:  SHARED_DIRECTORY
-            value: "nfs-share"
+            - name: NFS_THREADS
+              value: "32"
+            - name: SHARED_DIRECTORY
+              value: "nfs-share"
           ports:
-          - name: nfs-port
-            containerPort: 2049
-            protocol: TCP
+            - name: nfs-port
+              containerPort: 2049
+              protocol: TCP
           volumeMounts:
-          - name: media
-            mountPath: /nfs-share
+            - name: media
+              mountPath: /nfs-share
+          securityContext:
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            privileged: true
           # resources:
           #   requests:
           #     memory: 1Gi
@@ -39,13 +43,9 @@ spec:
           #   limits:
           #     memory: 2Gi
           #     cpu: 650m
-      securityContext:
-        allowPrivilegeEscalation: true
-        readOnlyRootFilesystem: false
-        privileged: true
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
-      - name: media
-        persistentVolumeClaim:
-          claimName: "media-zfs-pvc"
+        - name: media
+          persistentVolumeClaim:
+            claimName: "media-zfs-pvc"
