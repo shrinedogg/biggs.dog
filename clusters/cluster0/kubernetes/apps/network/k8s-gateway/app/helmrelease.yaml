@@ -24,8 +24,8 @@ spec:
   uninstall:
     keepHistory: false
   values:
-    nodeSelector:
-      kubernetes.io/hostname: control-01
+    # nodeSelector:
+    #   kubernetes.io/hostname: control-01
     watchedResources: ["Ingress", "Service"]
     domain: biggs.dog
     # fallthrough:

@@ -11,8 +11,8 @@ spec:
       labels:
         app: booklore
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: worker-03
+      # nodeSelector:
+      #   kubernetes.io/hostname: worker-03
       containers:
         - name: mariadb
           image: lscr.io/linuxserver/mariadb:11.4.8

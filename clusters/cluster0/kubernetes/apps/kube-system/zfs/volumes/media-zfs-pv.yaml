@@ -28,13 +28,3 @@ spec:
               values:
                 - control-01
   persistentVolumeReclaimPolicy: Retain
-  # storageClassName: nfs
-  # volumeMode: Filesystem
-  # mountOptions:
-  #   - hard
-  #   - noatime
-  #   - nconnect=16
-  #   - nfsvers=4.2
-  # nfs:
-  #   path: /
-  #   server: 192.168.2.30

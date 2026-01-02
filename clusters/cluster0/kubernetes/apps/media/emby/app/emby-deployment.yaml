@@ -15,7 +15,8 @@ spec:
         app: emby
     spec:
       nodeSelector:
-        kubernetes.io/hostname: worker-01
+        intel.feature.node.kubernetes.io/gpu: "true"      
+        # kubernetes.io/hostname: worker-01
       containers:
         - name: emby
           image: emby/embyserver:latest
@@ -39,7 +40,7 @@ spec:
             limits:
               gpu.intel.com/i915: "1"
               memory: 18Gi
-              cpu: "6"
+              cpu: "4"
             requests:
               gpu.intel.com/i915: "1"
               memory: 10Gi

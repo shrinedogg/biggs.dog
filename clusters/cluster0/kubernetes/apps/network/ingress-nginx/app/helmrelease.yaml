@@ -27,8 +27,8 @@ spec:
     controller:
       replicaCount: 2
       allowSnippetAnnotations: true
-      nodeSelector:
-        kubernetes.io/hostname: control-01
+      # nodeSelector:
+      #   kubernetes.io/hostname: control-01
       extraEnvs:
         - name: TZ
           value: "${TZ}"

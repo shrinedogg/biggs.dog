@@ -11,8 +11,8 @@ spec:
       labels:
         app: biggs
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: worker-03
+      # nodeSelector:
+      #   kubernetes.io/hostname: worker-03
       containers:
         - image: szkud/biggslanding:latest
           imagePullPolicy: Always

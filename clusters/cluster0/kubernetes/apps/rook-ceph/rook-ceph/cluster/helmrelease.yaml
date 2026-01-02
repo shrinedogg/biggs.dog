@@ -77,13 +77,16 @@ spec:
         nodes:
           - name: worker-01
             devices:
-              - name: /dev/mapper/vgroot-lvceph
+              - name: /dev/nvme0n1
           - name: worker-02
             devices:
-              - name: /dev/mapper/vgroot-lvceph
+              - name: /dev/nvme0n1
           - name: worker-03
             devices:
-              - name: /dev/mapper/vgroot-lvceph
+              - name: /dev/nvme0n1
+          - name: worker-04
+            devices:
+              - name: /dev/nvme0n1
         config:
           osdsPerDevice: "1"
 

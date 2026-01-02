@@ -10,14 +10,14 @@ resources:
   - ./ersatz/ks.yaml
   # - ./homarr/ks.yaml
   # - ./jellyfin/ks.yaml
-  - ./kavita/ks.yaml
+  # - ./kavita/ks.yaml
   # - ./radarr/ks.yaml
   # - ./readarr/ks.yaml
   # - ./sabnzbd/ks.yaml
   # - ./sonarr/ks.yaml
   # - ./prowlarr/ks.yaml
   # - ./ombi/ks.yaml
-  - ./cwa/ks.yaml
+  # - ./cwa/ks.yaml
   - ./emby/ks.yaml
   - ./media-storage/ks.yaml
   - ./booklore/ks.yaml

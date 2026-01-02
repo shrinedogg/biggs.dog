@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nfs
+  name: nfs
+  namespace: media
+spec:
+  template:
+    metadata:
+      labels:
+        app: nfs
+  selector:
+    matchLabels:
+      app: nfs
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: control-01
+      containers:
+        - image: quay.io/aminvakil/alpine-nfs-server:latest
+          imagePullPolicy: Always
+          name: nfs-server
+          env:
+          - name: NFS_THREADS
+            value: "32"
+          - name:  SHARED_DIRECTORY
+            value: "nfs-share"
+          ports:
+          - name: nfs-port
+            containerPort: 2049
+            protocol: TCP
+          volumeMounts:
+          - name: media
+            mountPath: /nfs-share
+          # resources:
+          #   requests:
+          #     memory: 1Gi
+          #     cpu: 150m
+          #   limits:
+          #     memory: 2Gi
+          #     cpu: 650m
+      securityContext:
+        allowPrivilegeEscalation: true
+        readOnlyRootFilesystem: false
+        privileged: true
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: media
+        persistentVolumeClaim:
+          claimName: "media-zfs-pvc"
