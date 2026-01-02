@@ -58,10 +58,11 @@ spec:
           runAsNonRoot: false
         securityContext:
           privileged: true
+        encrKeysDir: /var/openebs/keys
       analytics:
         enabled: false
       zfs:
-        bin: /sbin/zfs
+        bin: /usr/local/sbin/zfs
       crds:
         csi:
           volumeSnapshots:
