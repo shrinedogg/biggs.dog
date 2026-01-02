@@ -53,6 +53,11 @@ spec:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
+        kubeletDir: /var/lib/kubelet
+        podSecurityContext:
+          runAsNonRoot: false
+        securityContext:
+          privileged: true
       analytics:
         enabled: false
       zfs:
