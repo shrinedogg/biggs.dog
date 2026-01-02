@@ -26,7 +26,7 @@ spec:
 
     localpv-provisioner:
       localpv:
-        basePath: /var/openebs/local
+        basePath: /var/mnt/host-path
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists

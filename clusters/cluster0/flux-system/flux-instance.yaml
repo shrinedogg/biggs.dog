@@ -25,9 +25,9 @@ spec:
     multitenant: false
     networkPolicy: true
     domain: "cluster.local"
-  storage:
-    class: "host-path"
-    size: "10Gi"
+  # storage:
+  #   class: "host-path"
+  #   size: "10Gi"
   kustomize:
     patches:
       - target:
