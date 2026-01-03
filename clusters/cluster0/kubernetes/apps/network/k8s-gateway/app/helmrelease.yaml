@@ -37,8 +37,9 @@ spec:
     ttl: 60
     service:
       type: LoadBalancer
+      loadBalancerIP: 192.168.2.6
       port: 53
-      externalTrafficPolicy: Local
+      externalTrafficPolicy: Cluster
       useTcp: true
     serviceAccount:
       create: true
