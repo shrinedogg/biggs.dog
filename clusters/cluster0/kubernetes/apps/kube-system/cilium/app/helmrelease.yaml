@@ -32,6 +32,7 @@ spec:
       bbr: true
     bpf:
       datapathMode: netkit
+      lbExternalClusterIP: true  # Allow external access to LB IPs
       masquerade: true
       preallocateMaps: true
     bgpControlPlane:
@@ -94,10 +95,13 @@ spec:
     l2announcements:
       enabled: false
     loadBalancer:
-      acceleration: disabled  # Set to "native" if you have XDP support
+      acceleration: disabled
       algorithm: maglev
-      mode: dsr  # DSR mode for external traffic - more efficient for BGP
+      mode: snat
     localRedirectPolicy: true
+    nodePort:
+      enabled: true
+      bindProtection: true
     operator:
       dashboards:
         enabled: true
