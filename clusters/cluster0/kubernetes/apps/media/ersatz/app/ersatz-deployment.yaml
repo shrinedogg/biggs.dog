@@ -52,7 +52,7 @@ spec:
           claimName: ersatz-config-pvc
       - name: ersatz-media
         persistentVolumeClaim:
-         claimName: media-nfs-pvc
+         claimName: ersatz-nfs-pvc
   selector:
     matchLabels:
       app: ersatz

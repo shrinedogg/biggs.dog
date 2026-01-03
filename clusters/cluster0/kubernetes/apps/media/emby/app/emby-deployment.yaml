@@ -32,7 +32,7 @@ spec:
           volumeMounts:
             - name: emby-config
               mountPath: /config
-            - name: emby-media-nfs-pvc
+            - name: emby-nfs-pvc
               mountPath: /media
             - name: emby-transcode
               mountPath: /transcode
@@ -52,6 +52,6 @@ spec:
         - name: emby-config
           persistentVolumeClaim:
             claimName: emby-config
-        - name: emby-media-nfs-pvc
+        - name: emby-nfs-pvc
           persistentVolumeClaim:
-            claimName: media-nfs-pvc
+            claimName: emby-nfs-pvc

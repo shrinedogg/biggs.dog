@@ -19,5 +19,5 @@ resources:
   # - ./ombi/ks.yaml
   # - ./cwa/ks.yaml
   - ./emby/ks.yaml
-  - ./media-storage/ks.yaml
+  # - ./media-storage/ks.yaml
   - ./booklore/ks.yaml
