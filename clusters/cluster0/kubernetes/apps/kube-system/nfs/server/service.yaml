@@ -6,6 +6,7 @@ metadata:
   namespace: media
 spec:
   type: ClusterIP
+  clusterIP: 10.102.197.173  # Pinned IP for NFS PV references
   selector:
     app: nfs
   ports:

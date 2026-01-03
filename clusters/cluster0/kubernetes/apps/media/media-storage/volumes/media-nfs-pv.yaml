@@ -12,7 +12,7 @@ spec:
   storageClassName: ""  # Empty string for static provisioning
   volumeMode: Filesystem
   nfs:
-    server: nfs.media.svc.cluster.local
+    server: 10.102.197.173  # ClusterIP of nfs service in media namespace
     path: /
   claimRef:
     apiVersion: v1

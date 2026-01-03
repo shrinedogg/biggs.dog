@@ -24,7 +24,7 @@ spec:
     storageClasses:
       - name: nfs
         parameters:
-          server: "nfs.media.svc.cluster.local"
+          server: "10.102.197.173"
           share: "/"
         mountOptions:
           - nfsvers=4.2
