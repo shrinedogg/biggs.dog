@@ -12,7 +12,7 @@ spec:
   storageClassName: ""  # Empty string for static provisioning
   volumeMode: Filesystem
   nfs:
-    server: nfs.kube-system.svc.cluster.local
+    server: nfs.media.svc.cluster.local
     path: /
   claimRef:
     apiVersion: v1
