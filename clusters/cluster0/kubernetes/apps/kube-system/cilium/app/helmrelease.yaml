@@ -94,8 +94,9 @@ spec:
     l2announcements:
       enabled: false
     loadBalancer:
+      acceleration: disabled  # Set to "native" if you have XDP support
       algorithm: maglev
-      mode: snat
+      mode: dsr  # DSR mode for external traffic - more efficient for BGP
     localRedirectPolicy: true
     operator:
       dashboards:
