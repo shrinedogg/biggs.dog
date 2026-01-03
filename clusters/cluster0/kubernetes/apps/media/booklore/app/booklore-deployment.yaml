@@ -107,7 +107,7 @@ spec:
           claimName: "booklore-bookdrop-pvc"
       - name: books
         persistentVolumeClaim:
-          claimName: booklore-nfs-pvc
+          claimName: media-nfs-pvc
   selector:
     matchLabels:
       app: booklore

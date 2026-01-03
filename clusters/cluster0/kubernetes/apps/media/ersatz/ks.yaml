@@ -19,7 +19,5 @@ spec:
   retryInterval: 1m
   timeout: 2m
   dependsOn:
-    - name: rook-ceph-cluster
-    - name: nfs-server
+    - name: media-storage
     - name: emby
-    - name: nfs-csi

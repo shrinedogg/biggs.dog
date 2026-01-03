@@ -7,6 +7,7 @@ resources:
   # - ./media-pv.yaml
   # - ./media-zfs-pvc.yaml
   # Flux-Kustomizations
+  - ./media-storage/ks.yaml  # Shared NFS storage - must come before apps
   - ./ersatz/ks.yaml
   # - ./homarr/ks.yaml
   # - ./jellyfin/ks.yaml
@@ -19,5 +20,4 @@ resources:
   # - ./ombi/ks.yaml
   # - ./cwa/ks.yaml
   - ./emby/ks.yaml
-  # - ./media-storage/ks.yaml
   - ./booklore/ks.yaml
