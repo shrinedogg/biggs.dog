@@ -33,7 +33,7 @@ spec:
             - name: emby-config
               mountPath: /config
             - name: emby-nfs-pvc
-              mountPath: /media
+              mountPath: /nfs-share
             - name: emby-transcode
               mountPath: /transcode
           resources:
