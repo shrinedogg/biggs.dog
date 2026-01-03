@@ -14,8 +14,6 @@ spec:
       labels:
         app: nfs
     spec:
-      nodeSelector:
-        kubernetes.io/hostname: control-01
       containers:
         - image: quay.io/aminvakil/alpine-nfs-server:latest
           imagePullPolicy: Always
@@ -24,7 +22,7 @@ spec:
             - name: NFS_THREADS
               value: "32"
             - name: SHARED_DIRECTORY
-              value: "nfs-share"
+              value: "/nfs-share"
           ports:
             - name: nfs-port
               containerPort: 2049
