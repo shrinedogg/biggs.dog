@@ -31,8 +31,8 @@ spec:
       enabled: true
       bbr: true
     bpf:
-      datapathMode: netkit
-      lbExternalClusterIP: true  # Allow external access to LB IPs
+      datapathMode: veth  # netkit can have issues with external LB traffic
+      lbExternalClusterIP: true
       masquerade: true
       preallocateMaps: true
     bgpControlPlane:
