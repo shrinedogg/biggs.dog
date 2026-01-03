@@ -34,7 +34,7 @@ spec:
           - name: ersatz-config
             mountPath: /root/.local/share/ersatztv
           - name: ersatz-media
-            mountPath: /media
+            mountPath: /nfs-share
           resources:
             limits:
               gpu.intel.com/i915: "1"
