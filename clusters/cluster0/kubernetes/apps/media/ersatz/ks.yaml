@@ -22,4 +22,4 @@ spec:
     - name: rook-ceph-cluster
     - name: nfs-server
     - name: emby
-    - name: media-storage
+    - name: nfs-csi

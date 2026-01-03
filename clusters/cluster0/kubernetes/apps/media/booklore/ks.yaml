@@ -21,4 +21,4 @@ spec:
   dependsOn:
     - name: rook-ceph-cluster
     - name: nfs-server
-    - name: media-storage
+    - name: nfs-csi
