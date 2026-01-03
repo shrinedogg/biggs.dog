@@ -93,11 +93,11 @@ spec:
     kubeProxyReplacement: true
     kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
     l2announcements:
-      enabled: false
+      enabled: true
     loadBalancer:
-      acceleration: native  # XDP - intercepts traffic before kernel routing
+      acceleration: disabled
       algorithm: maglev
-      mode: hybrid
+      mode: snat
     localRedirectPolicy: true
     nodePort:
       enabled: true
