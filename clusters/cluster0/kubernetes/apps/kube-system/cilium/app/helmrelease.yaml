@@ -31,7 +31,7 @@ spec:
       enabled: true
       bbr: true
     bpf:
-      datapathMode: veth  # netkit can have issues with external LB traffic
+      datapathMode: netkit  # netkit can have issues with external LB traffic
       lbExternalClusterIP: true
       masquerade: true
       preallocateMaps: true
@@ -97,7 +97,7 @@ spec:
     loadBalancer:
       acceleration: disabled
       algorithm: maglev
-      mode: snat
+      mode: hybrid  # Hybrid: DSR for external, SNAT for internal
     localRedirectPolicy: true
     nodePort:
       enabled: true
