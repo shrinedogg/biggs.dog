@@ -20,6 +20,6 @@ spec:
   timeout: 2m
   dependsOn:
     - name: rook-ceph-cluster
-    - name: nfs
+    - name: nfs-server
     - name: emby
     - name: media-storage
