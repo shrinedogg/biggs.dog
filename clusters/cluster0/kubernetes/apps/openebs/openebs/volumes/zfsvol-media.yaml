@@ -2,7 +2,7 @@
 apiVersion: zfs.openebs.io/v1
 kind: ZFSVolume
 metadata:
-  name: media-zfs
+  name: media
   finalizers:
     - cluster.local/data-protection
 spec:
@@ -14,5 +14,5 @@ spec:
   poolName: tank
   recordsize: 1M
   shared: "yes"
-  thinProvision: "yes"
+  thinProvision: "no"
   volumeType: DATASET
