@@ -93,15 +93,15 @@ spec:
     kubeProxyReplacement: true
     kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
     l2announcements:
-      enabled: true
+      enabled: false
     loadBalancer:
       acceleration: disabled
       algorithm: maglev
       mode: snat
     localRedirectPolicy: true
-    nodePort:
-      enabled: true
-      bindProtection: true
+    # nodePort:
+    #   enabled: true
+    #   bindProtection: true
     operator:
       dashboards:
         enabled: true
