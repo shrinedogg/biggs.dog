@@ -24,8 +24,8 @@ spec:
     storageClasses:
       - name: nfs
         parameters:
-          server: "192.168.2.30"
-          share: "/tank"
+          server: "nfs.media.svc.cluster.local"
+          share: "/nfs-share"
         mountOptions:
           - nfsvers=4.2
           - nconnect=16
