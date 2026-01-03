@@ -39,7 +39,7 @@ spec:
       type: LoadBalancer
       loadBalancerIP: 192.168.2.6
       port: 53
-      externalTrafficPolicy: Local  # Required for L2 announcements
+      externalTrafficPolicy: Cluster  # Allow any node to forward traffic
       useTcp: true
     serviceAccount:
       create: true
