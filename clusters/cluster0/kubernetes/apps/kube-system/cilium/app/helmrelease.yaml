@@ -95,9 +95,9 @@ spec:
     l2announcements:
       enabled: false
     loadBalancer:
-      acceleration: disabled
+      acceleration: native  # XDP - intercepts traffic before kernel routing
       algorithm: maglev
-      mode: hybrid  # Hybrid: DSR for external, SNAT for internal
+      mode: hybrid
     localRedirectPolicy: true
     nodePort:
       enabled: true
