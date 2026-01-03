@@ -25,7 +25,7 @@ spec:
       - name: nfs
         parameters:
           server: "nfs.media.svc.cluster.local"
-          share: "/nfs-share"
+          share: "/"
         mountOptions:
           - nfsvers=4.2
           - nconnect=16
