@@ -38,8 +38,6 @@ spec:
               readOnly: true
             - name: dev-zfs
               mountPath: /dev/zfs
-            - name: zfs-dataset
-              mountPath: /tank/media
           securityContext:
             privileged: true  # Required for ZFS operations
           resources:
@@ -58,8 +56,4 @@ spec:
           hostPath:
             path: /dev/zfs
             type: CharDevice
-        - name: zfs-dataset
-          hostPath:
-            path: /tank/media
-            type: Directory
       restartPolicy: Always
