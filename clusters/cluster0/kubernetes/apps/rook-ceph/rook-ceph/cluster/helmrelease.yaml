@@ -93,6 +93,7 @@ spec:
     ingress:
       dashboard:
         host:
+          name: "rook-ceph.biggs.dog"
           path: "/"
           pathType: Prefix
         ingressClassName: external
