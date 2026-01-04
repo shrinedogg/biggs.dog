@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nsyncd
+  namespace: media
+  labels:
+    app: nsyncd
+spec:
+  selector:
+    matchLabels:
+      app: nsyncd
+  template:
+    metadata:
+      labels:
+        app: nsyncd
+    spec:
+      containers:
+        - name: nsyncd
+          image: shrinedogg/nsyncd:latest  # Update with your registry path
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: nsyncd-config
+          env:
+            - name: REMOTE_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: nsyncd-secret
+                  key: REMOTE_HOST
+          volumeMounts:
+            - name: ssh-key
+              mountPath: /root/.ssh/id_rsa
+              subPath: id_rsa
+              readOnly: true
+            - name: zfs-pool
+              mountPath: /nfs-share
+          securityContext:
+            privileged: true  # Required for ZFS operations
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+      volumes:
+        - name: ssh-key
+          secret:
+            secretName: nsyncd-secret
+            defaultMode: 0600
+        - name: zfs-pool
+          persistentVolumeClaim:
+            claimName: media-nfs-pvc
+      restartPolicy: Always
