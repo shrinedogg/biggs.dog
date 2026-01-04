@@ -31,6 +31,7 @@ spec:
             - name: ssh-key
               mountPath: /root/.ssh/id_rsa
               subPath: id_rsa
+              readOnly: true
             - name: zfs-pool
               mountPath: /nfs-share
           securityContext:
