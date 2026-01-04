@@ -20,7 +20,7 @@ spec:
         kubernetes.io/hostname: control-01
       containers:
         - name: nsyncd
-          image: shrinedogg/nsyncd:latest  # Update with your registry path
+          image: shrinedogg/nsyncd:no-snap  # Update with your registry path
           imagePullPolicy: Always
           envFrom:
             - configMapRef:
