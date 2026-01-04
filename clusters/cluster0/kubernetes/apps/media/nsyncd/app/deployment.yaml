@@ -17,7 +17,7 @@ spec:
       containers:
         - name: nsyncd
           image: shrinedogg/nsyncd:latest  # Update with your registry path
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           envFrom:
             - configMapRef:
                 name: nsyncd-config
