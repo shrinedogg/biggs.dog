@@ -7,7 +7,7 @@ data:
   REMOTE_USER: "biggs"
   REMOTE_PORT: "20252"
   REMOTE_DATASET: "tank/media"
-  LOCAL_DATASET: "/nfs-share"
+  LOCAL_DATASET: "tank/media"
   SSH_KEY: "/root/.ssh/id_rsa"
   SSH_CIPHER: "chacha20-poly1305@openssh.com"
   MBUFFER_SIZE: "1G"
