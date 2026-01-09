@@ -48,6 +48,8 @@ spec:
           readOnly: true
         - name: kubeletsockets
           mountPath: /var/lib/kubelet/device-plugins
+        - name: cdi
+          mountPath: /var/run/cdi
       volumes:
       - name: devfs
         hostPath:
@@ -61,6 +63,10 @@ spec:
       - name: nfd-source-hooks
         hostPath:
           path: /etc/kubernetes/node-feature-discovery/source.d/
+          type: DirectoryOrCreate
+      - name: cdi
+        hostPath:
+          path: /var/run/cdi
           type: DirectoryOrCreate
       nodeSelector:
         kubernetes.io/arch: amd64
