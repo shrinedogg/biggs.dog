@@ -22,6 +22,14 @@ spec:
           env:
           - name: TZ
             value: "Europe/Helsinki"
+          - name: LIBVA_DRIVER_NAME
+            value: "iHD"
+          - name: LIBVA_DRIVERS_PATH
+            value: "/usr/local/lib/x86_64-linux-gnu/dri"
+          - name: LIBVA_DISPLAY
+            value: "drm"
+          - name: LIBVA_DRM_DEVICE
+            value: "/dev/dri/renderD128"
           #- name: ELASTICSEARCH__URI
           #  value: "http://eck-system.eck-1-es-http.cluster.local"
           #- name: Serilog__MinimumLevel
