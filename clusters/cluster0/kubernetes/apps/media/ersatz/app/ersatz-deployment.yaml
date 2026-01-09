@@ -11,6 +11,7 @@ spec:
       labels:
         app: ersatz
     spec:
+      replicas: 1
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
         # kubernetes.io/hostname: worker-02
