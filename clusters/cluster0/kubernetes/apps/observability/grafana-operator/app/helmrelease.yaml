@@ -27,7 +27,7 @@ spec:
   values:
     ingress:
       enabled: true
-      ingressClassName: "external"
+      ingressClassName: nginx
       hosts:
         - "grafana.biggs.dog"
       tls:

@@ -96,7 +96,7 @@ spec:
           name: "rook-ceph.biggs.dog"
           path: "/"
           pathType: Prefix
-        ingressClassName: external
+        ingressClassName: nginx
         tls:
           enabled: true
           secretName: biggs-dog-tls
