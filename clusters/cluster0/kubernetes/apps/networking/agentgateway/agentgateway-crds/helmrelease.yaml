@@ -9,4 +9,4 @@ spec:
     name: agentgateway-crds
     namespace: flux-system
   interval: 3m
-  values:
+  # values:
