@@ -98,7 +98,8 @@ spec:
           pathType: Prefix
         ingressClassName: nginx
         tls:
-          enabled: true
+        - hosts:
+          - rook-ceph.biggs.dog
           secretName: biggs-dog-tls
 
     cephBlockPools:
