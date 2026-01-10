@@ -30,6 +30,10 @@ spec:
       ingressClassName: "external"
       hosts:
         - "grafana.biggs.dog"
+      tls:
+        - hosts:
+            - "grafana.biggs.dog"
+          secretName: biggs-dog-tls
     deploymentStrategy:
       type: Recreate
     fullnameOverride: grafana

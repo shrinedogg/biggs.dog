@@ -18,3 +18,7 @@ spec:
             name: emby-service
             port:
               number: 8096
+  tls:
+  - hosts:
+    - emby.biggs.dog
+    secretName: biggs-dog-tls

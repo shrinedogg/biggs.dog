@@ -97,6 +97,9 @@ spec:
           path: "/"
           pathType: Prefix
         ingressClassName: external
+        tls:
+          enabled: true
+          secretName: biggs-dog-tls
 
     cephBlockPools:
       - name: ceph-blockpool

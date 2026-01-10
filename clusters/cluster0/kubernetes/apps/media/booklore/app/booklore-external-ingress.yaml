@@ -18,3 +18,7 @@ spec:
             name: booklore-service
             port:
               number: 6060
+  tls:
+  - hosts:
+    - booklore.biggs.dog
+    secretName: biggs-dog-tls

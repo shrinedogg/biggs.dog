@@ -18,3 +18,7 @@ spec:
             name: biggs-service
             port:
               number: 8080
+  tls:
+  - hosts:
+    - biggs.biggs.dog
+    secretName: biggs-dog-tls
