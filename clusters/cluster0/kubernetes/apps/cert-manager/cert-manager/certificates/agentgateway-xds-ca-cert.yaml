@@ -1,0 +1,17 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: agentgateway-xds-ca
+  namespace: networking
+spec:
+  secretName: agentgateway-xds-ca-secret
+  issuerRef:
+    name: agentgateway-xds-root-issuer
+    kind: Issuer
+  isCA: true
+  commonName: agentgateway-xds-ca
+  duration: 1h
+  renewBefore: 5m
+  privateKey:
+    algorithm: RSA
+    size: 2048

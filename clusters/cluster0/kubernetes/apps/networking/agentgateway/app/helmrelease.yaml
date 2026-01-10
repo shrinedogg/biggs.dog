@@ -9,4 +9,8 @@ spec:
     name: agentgateway
     namespace: flux-system
   interval: 3m
-  # values:
+  values:
+    controller:
+      extraEnv:
+        - name: KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES
+          value: "true"

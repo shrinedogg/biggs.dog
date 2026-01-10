@@ -4,7 +4,7 @@ metadata:
   name: wildcard-biggs-dog
   namespace: cert-manager
 spec:
-  secretName: cloudflare-tls
+  secretName: biggs-dog-tls
   dnsNames:
   - "*.biggs.dog"
   - biggs.dog

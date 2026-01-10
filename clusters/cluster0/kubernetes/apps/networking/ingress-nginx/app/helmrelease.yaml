@@ -79,7 +79,7 @@ spec:
         prometheus.io/scrape: "true"
         prometheus.io/port: "10254"
       extraArgs:
-        default-ssl-certificate: "cert-manager/cloudflare-tls"
+        default-ssl-certificate: "cert-manager/biggs-dog-tls"
       #  enable-ssl-passthrough: true
       #topologySpreadConstraints:
       #  - maxSkew: 2
