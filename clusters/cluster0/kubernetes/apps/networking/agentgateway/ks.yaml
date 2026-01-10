@@ -28,6 +28,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/agentgateway-crds
+  prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -49,6 +50,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/app
+  prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
