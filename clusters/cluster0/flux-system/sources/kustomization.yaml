@@ -17,3 +17,7 @@ resources:
   - cilium-repo.yaml
   - openebs-repo.yaml
   - nfs-driver-repo.yaml
+  - gateway-api-crds-git.yaml
+  - agentgateway-crds-oci.yaml
+  - agentgateway-oci.yaml
+  
