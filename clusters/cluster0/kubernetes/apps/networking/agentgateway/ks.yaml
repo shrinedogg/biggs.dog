@@ -2,14 +2,13 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app cert-manager
+  name: &app gateway-api-crds
   namespace: flux-system
 spec:
-  targetNamespace: cert-manager
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/app
+  path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/gateway-api-crds
   prune: true
   sourceRef:
     kind: GitRepository
@@ -22,15 +21,13 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app issuers
+  name: &app agentgateway-crds
   namespace: flux-system
 spec:
-  targetNamespace: cert-manager
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/issuers
-  prune: true
+  path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/agentgateway-crds
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -39,20 +36,19 @@ spec:
   retryInterval: 1m
   timeout: 2m
   dependsOn:
-    - name: cert-manager
+    - name: gateway-api-crds
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app certificates
+  name: &app agentgateway
   namespace: flux-system
 spec:
-  targetNamespace: cert-manager
+  targetNamespace: networking
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/certificates
-  prune: true
+  path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/app
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -61,6 +57,6 @@ spec:
   retryInterval: 1m
   timeout: 2m
   dependsOn:
-    - name: issuers
+    - name: agentgateway-crds
   
 

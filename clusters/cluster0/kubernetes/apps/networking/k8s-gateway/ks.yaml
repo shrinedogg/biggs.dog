@@ -5,11 +5,11 @@ metadata:
   name: &app k8s-gateway
   namespace: flux-system
 spec:
-  targetNamespace: kube-system
+  targetNamespace: networking
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/network/k8s-gateway/app
+  path: ./clusters/cluster0/kubernetes/apps/networking/k8s-gateway/app
   prune: true
   sourceRef:
     kind: GitRepository
