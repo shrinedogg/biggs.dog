@@ -12,5 +12,4 @@ spec:
   values:
     controller:
       extraEnv:
-        - name: KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES
-          value: "true"
+        KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
