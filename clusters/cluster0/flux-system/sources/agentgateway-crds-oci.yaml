@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://ghcr.io/kgateway-dev/charts/agentgateway-crds
   ref:
-    tag: 2.2.0-main
+    tag: "v2.2.0-main"
