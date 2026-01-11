@@ -44,6 +44,27 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: &app ca-certificates
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/ca-certificates
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 3m
+  dependsOn:
+    - name: issuers
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: &app certificates
   namespace: flux-system
 spec:
@@ -58,8 +79,8 @@ spec:
   wait: true
   interval: 3m
   retryInterval: 1m
-  timeout: 2m
+  timeout: 5m
   dependsOn:
-    - name: issuers
+    - name: ca-certificates
   
 
