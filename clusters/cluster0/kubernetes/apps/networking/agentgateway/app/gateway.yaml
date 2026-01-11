@@ -11,10 +11,16 @@ spec:
     name: wildcard-biggs-dog-http
     port: 80
     protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: All
   - hostname: "*.biggs.dog"
     name: wildcard-biggs-dog-https
     port: 443
     protocol: HTTPS
+    allowedRoutes:
+      namespaces:
+        from: All
     tls:
       mode: Terminate
       certificateRefs:
