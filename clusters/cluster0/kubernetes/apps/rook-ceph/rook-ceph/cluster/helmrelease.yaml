@@ -90,17 +90,17 @@ spec:
         config:
           osdsPerDevice: "1"
 
-    ingress:
-      dashboard:
-        host:
-          name: "rook-ceph.biggs.dog"
-          path: "/"
-          pathType: Prefix
-        ingressClassName: nginx
-        tls:
-        - hosts:
-          - rook-ceph.biggs.dog
-          secretName: biggs-dog-tls
+    # ingress:
+    #   dashboard:
+    #     host:
+    #       name: "rook-ceph.biggs.dog"
+    #       path: "/"
+    #       pathType: Prefix
+    #     ingressClassName: nginx
+    #     tls:
+    #     - hosts:
+    #       - rook-ceph.biggs.dog
+    #       secretName: biggs-dog-tls
 
     cephBlockPools:
       - name: ceph-blockpool
