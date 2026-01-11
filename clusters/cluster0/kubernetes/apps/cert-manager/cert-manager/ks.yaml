@@ -79,7 +79,7 @@ spec:
   wait: true
   interval: 3m
   retryInterval: 1m
-  timeout: 5m
+  timeout: 3m
   dependsOn:
     - name: ca-certificates
   
