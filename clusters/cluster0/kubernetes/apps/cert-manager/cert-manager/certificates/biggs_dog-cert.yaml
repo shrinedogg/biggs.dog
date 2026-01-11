@@ -2,7 +2,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: wildcard-biggs-dog
-  namespace: cert-manager
+  namespace: networking
 spec:
   secretName: biggs-dog-tls
   dnsNames:
