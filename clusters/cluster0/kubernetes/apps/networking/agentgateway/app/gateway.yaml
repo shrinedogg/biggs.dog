@@ -1,20 +1,22 @@
+---
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway-proxy
+  name: wildcard-biggs-dog
   namespace: networking
 spec:
   gatewayClassName: agentgateway
   listeners:
-  - protocol: HTTP
+  - hostname: "*.biggs.dog"
+    name: wildcard-biggs-dog-http
     port: 80
-    name: http
-    allowedRoutes:
-      namespaces:
-        from: All
-  - protocol: HTTPS
+    protocol: HTTP
+  - hostname: "*.biggs.dog"
+    name: wildcard-biggs-dog-https
     port: 443
-    name: https
-    allowedRoutes:
-      namespaces:
-        from: All
+    protocol: HTTPS
+    tls:
+      certificateRefs:
+      - group: null
+        kind: null
+        name: biggs-dog-tls
