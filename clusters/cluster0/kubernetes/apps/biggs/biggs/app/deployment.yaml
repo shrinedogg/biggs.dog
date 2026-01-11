@@ -4,15 +4,13 @@ metadata:
   labels:
     app: biggs
   name: biggs
-  namespace: gregbob
+  namespace: biggs
 spec:
   template:
     metadata:
       labels:
         app: biggs
     spec:
-      # nodeSelector:
-      #   kubernetes.io/hostname: worker-03
       containers:
         - image: szkud/biggslanding:latest
           imagePullPolicy: Always
