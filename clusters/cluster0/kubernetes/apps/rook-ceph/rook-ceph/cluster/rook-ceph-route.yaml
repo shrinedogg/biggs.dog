@@ -8,7 +8,8 @@ spec:
   hostnames:
   - rook-ceph.biggs.dog
   parentRefs:
-  - name: rook-ceph
+  - name: wildcard-biggs-dog
+    namespace: networking
   rules:
   - backendRefs:
     - name: rook-ceph-mgr-dashboard

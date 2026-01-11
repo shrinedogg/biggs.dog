@@ -8,7 +8,8 @@ spec:
   hostnames:
   - biggs.biggs.dog
   parentRefs:
-  - name: biggs-dog
+  - name: wildcard-biggs-dog
+    namespace: networking
   rules:
   - backendRefs:
     - name: biggs-service

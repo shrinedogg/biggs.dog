@@ -8,7 +8,8 @@ spec:
   hostnames:
   - emby.biggs.dog
   parentRefs:
-  - name: emby
+  - name: wildcard-biggs-dog
+    namespace: networking
   rules:
   - backendRefs:
     - name: emby-service

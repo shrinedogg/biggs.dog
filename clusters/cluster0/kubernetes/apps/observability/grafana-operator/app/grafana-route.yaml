@@ -8,7 +8,8 @@ spec:
   hostnames:
   - grafana.biggs.dog
   parentRefs:
-  - name: grafana
+  - name: wildcard-biggs-dog
+    namespace: networking
   rules:
   - backendRefs:
     - name: grafana

@@ -8,7 +8,8 @@ spec:
   hostnames:
   - booklore.biggs.dog
   parentRefs:
-  - name: booklore
+  - name: wildcard-biggs-dog
+    namespace: networking
   rules:
   - backendRefs:
     - name: booklore-service
