@@ -26,7 +26,7 @@ spec:
   values:
     # nodeSelector:
     #   kubernetes.io/hostname: control-01
-    watchedResources: ["Ingress", "Service"]
+    watchedResources: ["HTTPRoute"]
     domain: biggs.dog
     # fallthrough:
       # enabled: true
