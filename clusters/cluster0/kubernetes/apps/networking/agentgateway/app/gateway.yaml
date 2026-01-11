@@ -16,7 +16,7 @@ spec:
     port: 443
     protocol: HTTPS
     tls:
+      mode: Terminate
       certificateRefs:
-      - group: null
-        kind: null
+      - kind: Secret
         name: biggs-dog-tls
