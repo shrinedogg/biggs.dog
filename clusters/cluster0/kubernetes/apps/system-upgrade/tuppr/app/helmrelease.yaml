@@ -1,0 +1,11 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tuppr
+  namespace: system-upgrade
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: tuppr
+    namespace: flux-system
+  interval: 3m
