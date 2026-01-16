@@ -5,11 +5,11 @@ metadata:
   name: &app biggs
   namespace: flux-system
 spec:
-  targetNamespace: gregbob
+  targetNamespace: biggs
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/gregbob/biggs/app/
+  path: ./clusters/cluster0/kubernetes/apps/biggs/biggs/app/
   prune: true
   sourceRef:
     kind: GitRepository
