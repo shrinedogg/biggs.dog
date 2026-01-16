@@ -20,4 +20,5 @@ resources:
   - gateway-api-crds-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
+  - tuppr-oci.yaml
   
