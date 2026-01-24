@@ -1,15 +1,18 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: node-feature-discovery
-  namespace: kube-system
+  name: cloudnative-pg
+  namespace: cnpg-system
 spec:
   interval: 3m
   chart:
     spec:
-      chart: node-feature-discovery
-      version: 0.18.3
+      chart: cloudnative-pg
+      version: 0.27.0
       sourceRef:
         kind: HelmRepository
-        name: node-feature-discovery
+        name: cloudnative-pg
         namespace: flux-system
+  values:
+    crds:
+      create: true
