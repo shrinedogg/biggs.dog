@@ -21,5 +21,5 @@ spec:
       memory: 300Mi
       cpu: 150m
   storage:
-    storageClass: local-path
+    storageClass: host-path
     size: 5Gi
