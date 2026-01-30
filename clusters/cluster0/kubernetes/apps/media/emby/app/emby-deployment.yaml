@@ -23,10 +23,9 @@ spec:
     spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"      
-        # kubernetes.io/hostname: worker-01
       containers:
         - name: emby
-          image: emby/embyserver:latest
+          image: emby/embyserver:4.9.3.0
           imagePullPolicy: Always
           ports:
             - containerPort: 8096

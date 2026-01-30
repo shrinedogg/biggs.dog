@@ -20,27 +20,13 @@ spec:
     spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
-        # kubernetes.io/hostname: worker-02
       containers:
-        # - image: jasongdove/ersatztv:latest
-        - image: jasongdove/ersatztv:develop
+        - image: jasongdove/ersatztv:v26.1.1
           imagePullPolicy: Always
           name: ersatz
           env:
           - name: TZ
             value: "Europe/Helsinki"
-          # - name: LIBVA_DRIVER_NAME
-          #   value: "iHD"
-          # - name: LIBVA_DRIVERS_PATH
-          #   value: "/usr/local/lib/x86_64-linux-gnu/dri"
-          # - name: LIBVA_DISPLAY
-          #   value: "drm"
-          # - name: LIBVA_DRM_DEVICE
-          #   value: "/dev/dri/renderD128"
-          # - name: INTEL_MEDIA_RUNTIME
-          #   value: "ONEVPL"
-          #- name: Serilog__MinimumLevel
-          #  value: "Debug"
           ports:
             - name: ersatz-port
               containerPort: 8409

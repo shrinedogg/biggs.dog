@@ -1,3 +1,143 @@
 {
-  "$schema": "https://docs.renovatebot.com/renovate-schema.json"
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "docker:enableMajor",
+    ":disableRateLimiting",
+    ":dependencyDashboard",
+    ":semanticCommits",
+    ":automergeBranch"
+  ],
+  "dependencyDashboardTitle": "Renovate Dashboard 🤖",
+  "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
+  "rebaseWhen": "conflicted",
+  "schedule": ["every weekend"],
+  "flux": {
+    "fileMatch": [
+      "(^|/)clusters/.+\\.ya?ml$"
+    ]
+  },
+  "helm-values": {
+    "fileMatch": [
+      "(^|/)clusters/.+\\.ya?ml$"
+    ]
+  },
+  "kubernetes": {
+    "fileMatch": [
+      "(^|/)clusters/.+\\.ya?ml$",
+      "(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\\.ya?ml$",
+      "(^|/)clusters/.+-deployment\\.ya?ml$"
+    ]
+  },
+  "regexManagers": [
+    {
+      "description": "Process HelmRelease chart versions",
+      "fileMatch": [
+        "(^|/)helmrelease\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "chart:\\s*(?<chart>[\\w-]+)\\s*\\n\\s*version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ],
+      "datasourceTemplate": "helm",
+      "depNameTemplate": "{{chart}}",
+      "versioningTemplate": "helm"
+    },
+    {
+      "description": "Process OCIRepository tags",
+      "fileMatch": [
+        "(^|/)clusters/.+-oci\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "url:\\s*oci://(?<registryUrl>[^\\s]+)/(?<depName>[\\w-]+)\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+      ],
+      "datasourceTemplate": "docker",
+      "versioningTemplate": "docker"
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Flux HelmRelease dependencies",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "commitMessageTopic": "chart {{depName}}"
+    },
+    {
+      "description": "Auto-merge non-major Helm chart updates",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "description": "Group Rook Ceph charts",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackagePatterns": ["^rook-ceph"],
+      "groupName": "rook-ceph"
+    },
+    {
+      "description": "Group VictoriaMetrics charts",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackagePatterns": ["^victoria"],
+      "groupName": "victoria-metrics"
+    },
+    {
+      "description": "Group external-secrets charts",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackagePatterns": ["external-secrets", "connect"],
+      "groupName": "external-secrets"
+    },
+    {
+      "description": "Group observability charts",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackagePatterns": ["grafana", "prometheus"],
+      "groupName": "observability"
+    },
+    {
+      "description": "Semantic versioning for Cilium",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["cilium"],
+      "separateMajorMinor": true
+    },
+    {
+      "description": "Semantic versioning for cert-manager",
+      "matchManagers": ["flux"],
+      "matchDatasources": ["helm"],
+      "matchPackageNames": ["cert-manager"],
+      "separateMajorMinor": true
+    },
+    {
+      "description": "Group media app container images",
+      "matchManagers": ["kubernetes"],
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["clusters/**/media/**"],
+      "groupName": "media-apps"
+    },
+    {
+      "description": "Auto-merge patch updates for media apps",
+      "matchManagers": ["kubernetes"],
+      "matchDatasources": ["docker"],
+      "matchFileNames": ["clusters/**/media/**"],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Process custom Flux HelmRelease chart spec",
+      "fileMatch": [
+        "(^|/)clusters/.+/helmrelease\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "chart:\\s*\\n\\s*spec:\\s*\\n\\s*chart:\\s*(?<depName>[\\w-]+)\\s*\\n\\s*version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?\\s*\\n\\s*sourceRef:\\s*\\n\\s*kind:\\s*HelmRepository\\s*\\n\\s*name:\\s*(?<registryUrl>[\\w-]+)"
+      ],
+      "datasourceTemplate": "helm",
+      "versioningTemplate": "helm"
+    }
+  ]
 }
