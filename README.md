@@ -27,6 +27,7 @@ clusters/
     └── kubernetes/
         └── apps/             # Application deployments
             ├── cert-manager/
+            ├── cnpg/
             ├── external-secrets/
             ├── biggs/
             ├── kube-system/
@@ -34,6 +35,7 @@ clusters/
             ├── networking/
             ├── observability/
             ├── openebs/
+            ├── renovate/
             └── rook-ceph/
 ```
 
@@ -45,6 +47,7 @@ clusters/
 | [Cilium](https://cilium.io/) | CNI with BGP support for LoadBalancer IP advertisement |
 | [k8s-gateway](https://github.com/ori-edge/k8s_gateway) | DNS for Kubernetes services |
 | [Gateway API](https://gateway-api.sigs.k8s.io/) | Kubernetes ingress using Gateway API |
+| [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts |
 
 ### Storage
 | Component | Description |
@@ -55,6 +58,11 @@ clusters/
 | [Snapshot Controller](https://github.com/kubernetes-csi/external-snapshotter) | CSI volume snapshots |
 | NFS CSI Driver | NFS storage provisioner |
 | ZFS | ZFS volume management |
+
+### Database
+| Component | Description |
+|-----------|-------------|
+| [CloudNativePG](https://cloudnative-pg.io/) | PostgreSQL operator for in-cluster databases |
 
 ### Security & Secrets
 | Component | Description |
@@ -76,6 +84,11 @@ clusters/
 |-----------|-------------|
 | [Node Feature Discovery](https://kubernetes-sigs.github.io/node-feature-discovery/) | Hardware feature detection |
 | Intel GPU Plugin | Intel GPU device plugin for hardware acceleration |
+
+### Automation
+| Component | Description |
+|-----------|-------------|
+| [Renovate](https://docs.renovatebot.com/) | Automated dependency updates (HelmRelease chart versions + container images) |
 
 ## 📺 Applications
 
@@ -119,6 +132,11 @@ https://github.com/shrinedogg/biggs.dog.git
 ```
 
 Flux will automatically reconcile the cluster state based on the manifests in `clusters/cluster0/`.
+
+## 🔁 Dependency Updates
+
+Dependency updates are managed by Renovate using the repository config in `renovate.json`.
+It is set up to update Flux `HelmRelease` chart versions (HelmRepository and OCI-based sources) and container images referenced in Kubernetes manifests, including the media stack under `clusters/cluster0/kubernetes/apps/media/`.
 
 ## 📁 App Structure Pattern
 
