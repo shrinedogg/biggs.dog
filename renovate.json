@@ -36,7 +36,7 @@
         "(^|/)clusters/.+-oci\\.ya?ml$"
       ],
       "matchStrings": [
-        "url:\\s*oci://(?<registryUrl>[^\\s]+)/(?<depName>[\\w-]+)\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+        "url:\\s*oci://(?<depName>[^\\s]+)\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
