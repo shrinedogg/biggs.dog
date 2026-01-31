@@ -31,18 +31,6 @@
   },
   "regexManagers": [
     {
-      "description": "Process HelmRelease chart versions",
-      "fileMatch": [
-        "(^|/)helmrelease\\.ya?ml$"
-      ],
-      "matchStrings": [
-        "chart:\\s*(?<chart>[\\w-]+)\\s*\\n\\s*version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
-      ],
-      "datasourceTemplate": "helm",
-      "depNameTemplate": "{{chart}}",
-      "versioningTemplate": "helm"
-    },
-    {
       "description": "Process OCIRepository tags",
       "fileMatch": [
         "(^|/)clusters/.+-oci\\.ya?ml$"
@@ -124,20 +112,6 @@
       "matchFileNames": ["clusters/**/media/**"],
       "matchUpdateTypes": ["patch"],
       "automerge": true
-    }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Process custom Flux HelmRelease chart spec",
-      "fileMatch": [
-        "(^|/)clusters/.+/helmrelease\\.ya?ml$"
-      ],
-      "matchStrings": [
-        "chart:\\s*\\n\\s*spec:\\s*\\n\\s*chart:\\s*(?<depName>[\\w-]+)\\s*\\n\\s*version:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?\\s*\\n\\s*sourceRef:\\s*\\n\\s*kind:\\s*HelmRepository\\s*\\n\\s*name:\\s*(?<registryUrl>[\\w-]+)"
-      ],
-      "datasourceTemplate": "helm",
-      "versioningTemplate": "helm"
     }
   ]
 }
