@@ -59,11 +59,11 @@ spec:
             mountPath: /config
           resources:
             requests:
-              memory: 275Mi
-              cpu: 75m
+              memory: 250Mi
+              cpu: 100m
             limits:
-              memory: 450Mi
-              cpu: 300m
+              memory: 1Gi
+              cpu: 500m
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
