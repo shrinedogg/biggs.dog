@@ -40,11 +40,11 @@ spec:
             limits:
               gpu.intel.com/i915: "1"
               memory: 12Gi
-              cpu: "4"
+              cpu: "6"
             requests:
               gpu.intel.com/i915: "1"
               memory: 6Gi
-              cpu: "2"
+              cpu: "3"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
