@@ -51,11 +51,11 @@ spec:
             mountPath: /config
           resources:
             requests:
-              memory: 300Mi
-              cpu: 150m
+              memory: "768Mi"
+              cpu: "350m"
             limits:
-              memory: 1500Mi
-              cpu: 500m
+              memory: "768Mi"
+              cpu: "350m"
         - name: booklore
           image: ghcr.io/booklore-app/booklore:v1.18.5
           imagePullPolicy: Always
@@ -93,10 +93,10 @@ spec:
             mountPath: /ebooks
           resources:
             requests:
-              memory: 500Mi
-              cpu: 150m
+              memory: "2Gi"
+              cpu: "2"
             limits:
-              memory: 4Gi
+              memory: "2Gi"
               cpu: "2"
       dnsPolicy: ClusterFirst
       restartPolicy: Always

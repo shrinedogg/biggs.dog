@@ -62,15 +62,15 @@ spec:
         mon:
           requests:
             cpu: 35m
-            memory: 512Mi
+            memory: "768Mi"
           limits:
-            memory: 768Mi
+            memory: "768Mi"
         osd:
           requests:
             cpu: 100m
-            memory: 1Gi
+            memory: "2Gi"
           limits:
-            memory: 2Gi
+            memory: "2Gi"
       storage:
         useAllNodes: false
         useAllDevices: false
