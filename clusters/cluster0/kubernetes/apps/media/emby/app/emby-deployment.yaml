@@ -54,7 +54,7 @@ spec:
       volumes:
         - name: emby-transcode
           emptyDir:
-            sizeLimit: 30Gi
+            sizeLimit: 60Gi
         - name: emby-config
           persistentVolumeClaim:
             claimName: emby-config
