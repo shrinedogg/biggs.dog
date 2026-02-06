@@ -10,7 +10,7 @@ spec:
   sourceRef:
     kind: GitRepository
     name: gateway-api-crds
-  path: "./config/crd/standard"
+  path: "./config/crd/experimental"
   prune: true
   wait: false
   timeout: 2m
