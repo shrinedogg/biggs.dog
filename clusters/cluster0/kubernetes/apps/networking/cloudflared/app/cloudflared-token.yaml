@@ -12,8 +12,8 @@ spec:
   data:
   - secretKey: token
     remoteRef: 
-    key: cloudflared-token
-    property: token
+      key: cloudflared-token
+      property: token
 
 
 
