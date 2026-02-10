@@ -18,4 +18,4 @@ resources:
   - gateway-api-crds-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
-  - continuity-oci.yaml
+  - continuwuity-oci.yaml
