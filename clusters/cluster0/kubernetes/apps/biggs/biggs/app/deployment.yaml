@@ -33,6 +33,15 @@ spec:
           - name: biggs-port
             containerPort: 8080
             protocol: TCP
+          volumeMounts:
+            - name: nginx-cache
+              mountPath: /var/cache/nginx
+            - name: nginx-conf
+              mountPath: /etc/nginx/conf.d
+            - name: nginx-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               memory: 350Mi
@@ -42,6 +51,15 @@ spec:
               cpu: 350m
       dnsPolicy: ClusterFirst
       restartPolicy: Always
+      volumes:
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-conf
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
   selector:
     matchLabels:
       app: biggs  
