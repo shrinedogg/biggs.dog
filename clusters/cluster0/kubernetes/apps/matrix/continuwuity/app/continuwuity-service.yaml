@@ -12,3 +12,7 @@ spec:
       port: 6167
       protocol: TCP
       targetPort: 6167
+    - name: continuwuity-federation-port
+      port: 80
+      protocol: TCP
+      targetPort: 80

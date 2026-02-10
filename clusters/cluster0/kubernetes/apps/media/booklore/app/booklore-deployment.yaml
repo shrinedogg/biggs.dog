@@ -18,9 +18,6 @@ spec:
         app: booklore
     spec:
       securityContext:
-        runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -55,13 +52,20 @@ spec:
                 key: root-password
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL
+              add:
+                - SETUID
+                - SETGID
+                - CHOWN
+                - DAC_OVERRIDE
           volumeMounts:
           - name: mariadb-config
             mountPath: /config
+          - name: mariadb-run
+            mountPath: /run
           resources:
             requests:
               memory: "768Mi"
@@ -95,10 +99,14 @@ spec:
                 key: password
           securityContext:
             allowPrivilegeEscalation: false
-            readOnlyRootFilesystem: true
+            readOnlyRootFilesystem: false
             capabilities:
               drop:
                 - ALL
+              add:
+                - SETUID
+                - SETGID
+                - CHOWN
           ports:
           - name: booklore-port
             containerPort: 6060
@@ -120,6 +128,8 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
+      - name: mariadb-run
+        emptyDir: {}
       - name: mariadb-config
         persistentVolumeClaim:
           claimName: "booklore-mariadb-pvc"

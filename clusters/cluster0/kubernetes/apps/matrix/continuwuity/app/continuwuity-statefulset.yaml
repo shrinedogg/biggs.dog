@@ -46,7 +46,10 @@ spec:
           - name: CONTINUWUITY_ALLOW_REGISTRATION
             value: "true"
           - name: CONTINUWUITY_REGISTRATION_TOKEN
-            value: ""
+            valueFrom:
+              secretKeyRef:
+                name: continuwuity-credentials
+                key: token
           - name: CONTINUWUITY_ALLOW_FEDERATION
             value: "true"
           - name: CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES
@@ -65,16 +68,19 @@ spec:
             - name: continuwuity-port
               containerPort: 6167
               protocol: TCP
+            - name: continuwuity-federation-port
+              containerPort: 80
+              protocol: TCP
           volumeMounts:
           - name: continuwuity-data
             mountPath: /data
           resources:
             limits:
-              memory: 4Gi
-              cpu: "2"
+              memory: 3Gi
+              cpu: "1.5"
             requests:
-              memory: 4Gi
-              cpu: "2"
+              memory: 3Gi
+              cpu: "1.5"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
   selector:
@@ -89,3 +95,4 @@ spec:
         resources:
           requests:
             storage: 100Gi
+  

@@ -6,15 +6,15 @@ metadata:
   namespace: matrix
 spec:
   hostnames:
-  - matrix.biggs.dog
+  - biggs.dog
   parentRefs:
   - name: wildcard-biggs-dog
     namespace: networking
   rules:
   - backendRefs:
-    - name: continuwuity
-      port: 6167
+    - name: continuwuity-federation-port
+      port: 80
     matches:
     - path:
         type: PathPrefix
-        value: /
+        value: /.well-known/matrix

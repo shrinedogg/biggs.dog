@@ -55,6 +55,10 @@ spec:
               mountPath: /nfs-share
             - name: emby-transcode
               mountPath: /transcode
+            - name: var-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
           resources:
             limits:
               gpu.intel.com/i915: "1"
@@ -68,6 +72,10 @@ spec:
         - name: emby-transcode
           emptyDir:
             sizeLimit: 60Gi
+        - name: var-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
         - name: emby-config
           persistentVolumeClaim:
             claimName: emby-config
