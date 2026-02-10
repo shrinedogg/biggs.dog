@@ -79,9 +79,9 @@ spec:
           env:
           - name: TZ
             value: "Europe/Helsinki"
-          - name: PUID
+          - name: USER_ID
             value: "1000"
-          - name: PGID
+          - name: GROUP_ID
             value: "1000"
           - name: BOOKLORE_PORT
             value: "6060"
@@ -107,6 +107,7 @@ spec:
                 - SETUID
                 - SETGID
                 - CHOWN
+                - DAC_OVERRIDE
                 - NET_BIND_SERVICE
           ports:
           - name: booklore-port
