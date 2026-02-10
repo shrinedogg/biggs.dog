@@ -12,12 +12,19 @@ spec:
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1
-      minAvailable: 1
   template:
     metadata:
       labels:
         app: booklore
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - name: mariadb
           image: lscr.io/linuxserver/mariadb:11.4.8
@@ -46,6 +53,12 @@ spec:
               secretKeyRef:
                 name: booklore-user-password
                 key: root-password
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           volumeMounts:
           - name: mariadb-config
             mountPath: /config
@@ -80,6 +93,12 @@ spec:
               secretKeyRef:
                 name: booklore-user-password
                 key: password
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
           - name: booklore-port
             containerPort: 6060

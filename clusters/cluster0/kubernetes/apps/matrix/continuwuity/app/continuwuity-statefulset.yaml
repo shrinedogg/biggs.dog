@@ -1,0 +1,91 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app: continuwuity
+  name: continuwuity
+  namespace: matrix
+spec:
+  serviceName: continuwuity-service
+  replicas: 4
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: continuwuity
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: NotIn
+                values:
+                - control-01
+      containers:
+        - image: ghcr.io/continuwuity/continuwuity
+          imagePullPolicy: Always
+          name: continuwuity
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          - name: CONTINUWUITY_SERVER_NAME
+            value: "the_bridge"
+          - name: CONTINUWUITY_MAX_REQUEST_SIZE
+            value: "2800000"
+          - name: CONTINUWUITY_ALLOW_REGISTRATION
+            value: "true"
+          - name: CONTINUWUITY_REGISTRATION_TOKEN
+            value: ""
+          - name: CONTINUWUITY_ALLOW_FEDERATION
+            value: "true"
+          - name: CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES
+            value: "true"
+          - name: CONTINUWUITY_TRUSTED_SERVERS
+            value: '["matrix.org"]'
+          - name: CONTINUWUITY_ADDRESS
+            value: "0.0.0.0"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: continuwuity-port
+              containerPort: 6167
+              protocol: TCP
+          volumeMounts:
+          - name: continuwuity-data
+            mountPath: /data
+          resources:
+            limits:
+              memory: 4Gi
+              cpu: "2"
+            requests:
+              memory: 4Gi
+              cpu: "2"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+  selector:
+    matchLabels:
+      app: continuwuity
+  volumeClaimTemplates:
+    - metadata:
+        name: continuwuity-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: host-path
+        resources:
+          requests:
+            storage: 100Gi

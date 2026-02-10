@@ -12,7 +12,6 @@ spec:
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 1
-      minAvailable: 1
   selector:
     matchLabels:
       app: emby
@@ -21,12 +20,26 @@ spec:
       labels:
         app: emby
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       nodeSelector:
-        intel.feature.node.kubernetes.io/gpu: "true"      
+        intel.feature.node.kubernetes.io/gpu: "true"
       containers:
         - name: emby
           image: emby/embyserver:4.10.0.2
           imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - containerPort: 8096
               name: emby

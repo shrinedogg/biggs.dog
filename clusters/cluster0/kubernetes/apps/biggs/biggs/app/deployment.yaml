@@ -11,10 +11,24 @@ spec:
       labels:
         app: biggs
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - image: szkud/biggslanding:latest
           imagePullPolicy: Always
           name: biggs
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
           - name: biggs-port
             containerPort: 8080
