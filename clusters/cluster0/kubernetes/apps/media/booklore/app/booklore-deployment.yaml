@@ -51,7 +51,7 @@ spec:
                 name: booklore-user-password
                 key: root-password
           securityContext:
-            allowPrivilegeEscalation: false
+            allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false
             capabilities:
               drop:
