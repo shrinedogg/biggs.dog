@@ -98,7 +98,7 @@ spec:
                 name: booklore-user-password
                 key: password
           securityContext:
-            allowPrivilegeEscalation: false
+            allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false
             capabilities:
               drop:
@@ -107,6 +107,7 @@ spec:
                 - SETUID
                 - SETGID
                 - CHOWN
+                - NET_BIND_SERVICE
           ports:
           - name: booklore-port
             containerPort: 6060
