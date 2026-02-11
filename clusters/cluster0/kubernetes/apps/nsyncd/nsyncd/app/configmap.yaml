@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: nsyncd-config
-  namespace: media
+  namespace: nsyncd
 data:
   REMOTE_USER: "biggs"
   REMOTE_PORT: "20252"

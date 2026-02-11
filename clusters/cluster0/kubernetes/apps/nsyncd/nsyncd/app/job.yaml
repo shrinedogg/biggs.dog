@@ -2,12 +2,12 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: nsyncd
-  namespace: media
+  namespace: nsyncd
   labels:
     app: nsyncd
 spec:
-  schedule: "*/15 * * * *"  # Every 15 minutes
-  concurrencyPolicy: Forbid  # Don't run if previous job still running
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 1
   failedJobsHistoryLimit: 3
   jobTemplate:
@@ -19,7 +19,6 @@ spec:
             app: nsyncd
         spec:
           restartPolicy: OnFailure
-          # Required for ZFS access on the host
           hostPID: true
           nodeSelector:
             kubernetes.io/hostname: control-01
@@ -44,7 +43,7 @@ spec:
                 - name: dev-zfs
                   mountPath: /dev/zfs
               securityContext:
-                privileged: true  # Required for ZFS operations
+                privileged: true
               resources:
                 requests:
                   memory: "512Mi"
