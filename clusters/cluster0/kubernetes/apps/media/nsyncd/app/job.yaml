@@ -1,0 +1,62 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: nsyncd
+  namespace: media
+  labels:
+    app: nsyncd
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app: nsyncd
+        spec:
+          restartPolicy: OnFailure
+          hostPID: true
+          nodeSelector:
+            kubernetes.io/hostname: control-01
+          containers:
+            - name: nsyncd
+              image: shrinedogg/nsyncd:1.3.0
+              imagePullPolicy: Always
+              envFrom:
+                - configMapRef:
+                    name: nsyncd-config
+              env:
+                - name: REMOTE_HOST
+                  valueFrom:
+                    secretKeyRef:
+                      name: nsyncd-secret
+                      key: REMOTE_HOST
+              volumeMounts:
+                - name: ssh-key
+                  mountPath: /root/.ssh/id_rsa
+                  subPath: id_rsa
+                  readOnly: true
+                - name: dev-zfs
+                  mountPath: /dev/zfs
+              securityContext:
+                privileged: true
+              resources:
+                requests:
+                  memory: "512Mi"
+                  cpu: "250m"
+                limits:
+                  memory: "2Gi"
+                  cpu: "1000m"
+          volumes:
+            - name: ssh-key
+              secret:
+                secretName: nsyncd-secret
+                defaultMode: 0600
+            - name: dev-zfs
+              hostPath:
+                path: /dev/zfs
+                type: CharDevice

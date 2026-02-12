@@ -1,0 +1,20 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: continuwuity
+  namespace: matrix
+spec:
+  hostnames:
+  - matrix.biggs.dog
+  parentRefs:
+  - name: wildcard-biggs-dog
+    namespace: networking
+  rules:
+  - backendRefs:
+    - name: continuwuity
+      port: 6167
+    matches:
+    - path:
+        type: PathPrefix
+        value: /

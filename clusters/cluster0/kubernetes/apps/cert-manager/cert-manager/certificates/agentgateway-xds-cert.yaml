@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: agentgateway-xds-cert
+  namespace: networking
+spec:
+  secretName: agentgateway-xds-cert
+  issuerRef:
+    name: agentgateway-xds-ca-issuer
+    kind: Issuer
+  isCA: false
+  dnsNames:
+  - agentgateway
+  - agentgateway.networking
+  - agentgateway.networking.svc
+  - agentgateway.networking.svc.cluster.local
+  duration: 1h
+  renewBefore: 5m
+  privateKey:
+    algorithm: RSA
+    size: 2048

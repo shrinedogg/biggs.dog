@@ -1,0 +1,20 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: emby
+  namespace: media
+spec:
+  hostnames:
+  - emby.biggs.dog
+  parentRefs:
+  - name: wildcard-biggs-dog
+    namespace: networking
+  rules:
+  - backendRefs:
+    - name: emby-service
+      port: 8096
+    matches:
+    - path:
+        type: PathPrefix
+        value: /

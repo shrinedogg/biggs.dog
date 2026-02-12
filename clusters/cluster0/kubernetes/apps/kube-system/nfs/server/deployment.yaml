@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: nfs
+  name: nfs
+  namespace: media
+spec:
+  selector:
+    matchLabels:
+      app: nfs
+  template:
+    metadata:
+      labels:
+        app: nfs
+    spec:
+      containers:
+        - image: quay.io/aminvakil/alpine-nfs-server:latest
+          imagePullPolicy: Always
+          name: nfs-server
+          env:
+            - name: NFS_THREADS
+              value: "32"
+            - name: SHARED_DIRECTORY
+              value: "nfs-share"
+          ports:
+            - name: nfs-port
+              containerPort: 2049
+              protocol: TCP
+          volumeMounts:
+            - name: media
+              mountPath: /nfs-share
+          securityContext:
+            allowPrivilegeEscalation: true
+            readOnlyRootFilesystem: false
+            privileged: true
+          # resources:
+          #   requests:
+          #     memory: 1Gi
+          #     cpu: 150m
+          #   limits:
+          #     memory: 2Gi
+          #     cpu: 650m
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+        - name: media
+          persistentVolumeClaim:
+            claimName: "media-zfs-pvc"

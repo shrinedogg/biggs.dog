@@ -1,0 +1,25 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-renovate
+  namespace: cnpg-system
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      database: renovate
+      owner: renovate
+      dataChecksums: true
+      secret:
+        name: renovate-user-password
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  resources:
+    requests:
+      memory: 300Mi
+      cpu:  150m
+    limits:
+      memory: 300Mi
+      cpu: 150m
+  storage:
+    storageClass: host-path
+    size: 5Gi

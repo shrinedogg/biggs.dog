@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emby
+  namespace: media
+  labels:
+    app: emby
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app: emby
+  template:
+    metadata:
+      labels:
+        app: emby
+    spec:
+      securityContext:
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      nodeSelector:
+        intel.feature.node.kubernetes.io/gpu: "true"
+      containers:
+        - name: emby
+          image: emby/embyserver:4.10.0.2
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - SETUID
+                - SETGID
+                - CHOWN
+                - DAC_OVERRIDE
+          ports:
+            - containerPort: 8096
+              name: emby
+          env:
+            - name: GID
+              value: "1000"
+            - name: UID
+              value: "1000"
+          volumeMounts:
+            - name: emby-config
+              mountPath: /config
+            - name: media-nfs
+              mountPath: /nfs-share
+            - name: emby-transcode
+              mountPath: /transcode
+            - name: var-run
+              mountPath: /var/run
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              gpu.intel.com/i915: "1"
+              memory: 4Gi
+              cpu: "2"
+            requests:
+              gpu.intel.com/i915: "1"
+              memory: 4Gi
+              cpu: "2"
+      volumes:
+        - name: emby-transcode
+          emptyDir:
+            sizeLimit: 60Gi
+        - name: var-run
+          emptyDir: {}
+        - name: tmp
+          emptyDir: {}
+        - name: emby-config
+          persistentVolumeClaim:
+            claimName: emby-config
+        - name: media-nfs
+          persistentVolumeClaim:
+            claimName: media-nfs-pvc

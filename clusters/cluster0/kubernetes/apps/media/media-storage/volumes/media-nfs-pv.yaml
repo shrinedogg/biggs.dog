@@ -1,0 +1,25 @@
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: media-nfs-pv
+spec:
+  accessModes:
+    - ReadWriteMany
+  capacity:
+    storage: 116Ti
+  mountOptions:
+    - nfsvers=4.2
+    - hard
+    - noatime
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""  # Empty string for static provisioning
+  volumeMode: Filesystem
+  nfs:
+    server: 10.102.197.173  # ClusterIP of nfs service in media namespace
+    path: /
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: media-nfs-pvc
+    namespace: media

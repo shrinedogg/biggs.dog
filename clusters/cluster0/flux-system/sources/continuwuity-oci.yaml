@@ -1,0 +1,11 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: continuwuity
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/continuwuity/continuwuity
+  ref:
+    tag: "v0.5.4"

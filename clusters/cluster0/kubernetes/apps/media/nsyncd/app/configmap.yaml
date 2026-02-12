@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nsyncd-config
+  namespace: media
+data:
+  REMOTE_USER: "biggs"
+  REMOTE_PORT: "20252"
+  REMOTE_DATASET: "tank/media"
+  LOCAL_DATASET: "tank/media"
+  SSH_KEY: "/root/.ssh/id_rsa"
+  SSH_CIPHER: "chacha20-poly1305@openssh.com"
+  MBUFFER_SIZE: "1G"
+  MAX_RETRIES: "3"
+  RUN_ON_START: "true"

@@ -1,0 +1,18 @@
+---
+apiVersion: zfs.openebs.io/v1
+kind: ZFSVolume
+metadata:
+  name: media
+  finalizers:
+    - cluster.local/data-protection
+spec:
+  capacity: "127543348822016"
+  compression: "lz4"
+  dedup: "off"
+  fsType: zfs
+  ownerNodeID: control-01
+  poolName: tank
+  recordsize: 1M
+  shared: "yes"
+  thinProvision: "no"
+  volumeType: DATASET

@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: ersatz
+  name: ersatz
+  namespace: media
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+      minAvailable: 1
+  template:
+    metadata:
+      labels:
+        app: ersatz
+    spec:
+      nodeSelector:
+        intel.feature.node.kubernetes.io/gpu: "true"
+      containers:
+        - image: jasongdove/ersatztv:v26.2.0
+          imagePullPolicy: Always
+          name: ersatz
+          env:
+          - name: TZ
+            value: "Europe/Helsinki"
+          ports:
+            - name: ersatz-port
+              containerPort: 8409
+              protocol: TCP
+          volumeMounts:
+          - name: ersatz-config
+            mountPath: /root/.local/share/ersatztv
+          - name: ersatz-media
+            mountPath: /nfs-share
+          resources:
+            limits:
+              gpu.intel.com/i915: "1"
+              memory: 8Gi
+              cpu: "3"
+            requests:
+              gpu.intel.com/i915: "1"
+              memory: 8Gi
+              cpu: "3"
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      volumes:
+      - name: ersatz-config
+        persistentVolumeClaim:
+          claimName: ersatz-config-pvc
+      - name: ersatz-media
+        persistentVolumeClaim:
+          claimName: media-nfs-pvc
+  selector:
+    matchLabels:
+      app: ersatz
