@@ -13,6 +13,12 @@ spec:
     metadata:
       labels:
         app: nfs
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
     spec:
       containers:
         - image: quay.io/aminvakil/alpine-nfs-server:latest
@@ -34,13 +40,18 @@ spec:
             allowPrivilegeEscalation: true
             readOnlyRootFilesystem: false
             privileged: true
-          # resources:
-          #   requests:
-          #     memory: 1Gi
-          #     cpu: 150m
-          #   limits:
-          #     memory: 2Gi
-          #     cpu: 650m
+          lifecycle: 
+            preStop:
+              exec:command:
+                command: ["/bin/sh", "-c", "echo \"Stopping NFS server gracefully...\"; exportfs -uav; sleep 5"]
+          terminationGracePeriodSeconds: 30
+          resources:
+            requests:
+              memory: 12Mi
+              cpu: 25m
+            limits:
+              memory: 12Mi
+              cpu: 25m
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
