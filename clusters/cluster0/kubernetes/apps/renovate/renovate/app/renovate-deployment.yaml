@@ -12,7 +12,7 @@ spec:
         app: renovate
     spec:
       containers:
-        - image: ghcr.io/mend/renovate-ce:13.5.0
+        - image: ghcr.io/mend/renovate-ce:13.6.0
           imagePullPolicy: Always
           name: renovate
           env:
