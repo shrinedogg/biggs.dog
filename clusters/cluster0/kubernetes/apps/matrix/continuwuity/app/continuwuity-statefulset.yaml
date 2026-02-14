@@ -39,6 +39,8 @@ spec:
           env:
           - name: TZ
             value: "Europe/Helsinki"
+          - name: CONDUWUIT_PORT
+            value: "8080"
           - name: CONDUWUIT_DATABASE_PATH
             value: "/data"
           - name: CONDUWUIT_DATABASE_BACKUP_PATH
@@ -92,10 +94,10 @@ spec:
                 - ALL
           ports:
             - name: uwu-port
-              containerPort: 6167
+              containerPort: 8080
               protocol: TCP
             - name: uwu-fed-port
-              containerPort: 80
+              containerPort: 8080
               protocol: TCP
           volumeMounts:
           - name: continuwuity-data

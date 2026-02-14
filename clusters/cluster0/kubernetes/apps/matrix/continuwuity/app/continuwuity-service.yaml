@@ -8,10 +8,10 @@ spec:
     app: continuwuity
   ports:
     - name: uwu-port
-      port: 6167
+      port: 8080
       protocol: TCP
-      targetPort: 6167
+      targetPort: 8080
     - name: uwu-fed-port
       port: 80
       protocol: TCP
-      targetPort: 80
+      targetPort: 8080
