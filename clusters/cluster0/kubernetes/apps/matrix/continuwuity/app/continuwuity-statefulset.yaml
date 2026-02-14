@@ -16,7 +16,6 @@ spec:
         app: continuwuity
     spec:
       securityContext:
-        runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
@@ -113,8 +112,6 @@ spec:
             mountPath: /data
           - name: continuwuity-backup
             mountPath: /backup
-          - name: tmp
-            mountPath: /tmp
           resources:
             limits:
               memory: 3Gi
@@ -122,9 +119,6 @@ spec:
             requests:
               memory: 3Gi
               cpu: "1.5"
-      volumes:
-        - name: tmp
-          emptyDir: {}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
   selector:
