@@ -39,6 +39,12 @@ spec:
           env:
           - name: TZ
             value: "Europe/Helsinki"
+          - name: CONDUWUIT_DATABASE_PATH
+            value: "/data"
+          - name: CONDUWUIT_DATABASE_BACKUP_PATH
+            value: "/backup"
+          - name: CONDUWUIT_DATABASE_BACKUPS_TO_KEEP
+            value: "1"
           - name: CONDUWUIT_QUERY_TRUSTED_KEY_SERVERS_FIRST
             value: "false"
           - name: CONDUWUIT_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
@@ -94,6 +100,8 @@ spec:
           volumeMounts:
           - name: continuwuity-data
             mountPath: /data
+          - name: continuwuity-backup
+            mountPath: /backup
           resources:
             limits:
               memory: 3Gi
@@ -112,6 +120,14 @@ spec:
       spec:
         accessModes: ["ReadWriteOnce"]
         storageClassName: host-path
+        resources:
+          requests:
+            storage: 100Gi
+    - metadata:
+        name: continuwuity-backup
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: ceph-block
         resources:
           requests:
             storage: 100Gi
