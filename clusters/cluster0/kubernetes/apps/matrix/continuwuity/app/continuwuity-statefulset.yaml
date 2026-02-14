@@ -7,7 +7,7 @@ metadata:
   namespace: matrix
 spec:
   serviceName: continuwuity-service
-  replicas: 4
+  replicas: 1
   updateStrategy:
     type: RollingUpdate
   template:
