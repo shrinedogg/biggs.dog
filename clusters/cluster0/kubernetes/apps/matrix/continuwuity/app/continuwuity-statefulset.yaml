@@ -85,10 +85,10 @@ spec:
               drop:
                 - ALL
           ports:
-            - name: continuwuity-port
+            - name: uwu-port
               containerPort: 6167
               protocol: TCP
-            - name: continuwuity-federation-port
+            - name: uwu-fed-port
               containerPort: 80
               protocol: TCP
           volumeMounts:

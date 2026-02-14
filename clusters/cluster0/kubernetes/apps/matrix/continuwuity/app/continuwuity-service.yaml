@@ -7,11 +7,11 @@ spec:
   selector:
     app: continuwuity
   ports:
-    - name: continuwuity-port
+    - name: uwu-port
       port: 6167
       protocol: TCP
       targetPort: 6167
-    - name: continuwuity-federation-port
+    - name: uwu-fed-port
       port: 80
       protocol: TCP
       targetPort: 80
