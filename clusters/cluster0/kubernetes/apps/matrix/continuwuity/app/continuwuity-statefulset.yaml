@@ -33,7 +33,7 @@ spec:
                 values:
                 - control-01
       containers:
-        - image: ghcr.io/continuwuity/continuwuity
+        - image: ghcr.io/continuwuity/continuwuity:main
           imagePullPolicy: Always
           name: continuwuity
           env:
