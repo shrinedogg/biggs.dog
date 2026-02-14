@@ -61,7 +61,11 @@ spec:
             value: |
               ["matrix.org"]
           - name: CONTINUWUITY_SERVER_NAME
-            value: "matrix.biggs.dog"
+            value: "biggs.dog"
+          - name: CONTINUWUITY_WELL_KNOWN_CLIENT
+            value: "https://matrix.biggs.dog"
+          - name: CONTINUWUITY_WELL_KNOWN_SERVER
+            value: "matrix.biggs.dog:443"
           - name: CONTINUWUITY_MAX_REQUEST_SIZE
             value: "28000000"
           - name: CONTINUWUITY_ALLOW_REGISTRATION
