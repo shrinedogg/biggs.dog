@@ -96,11 +96,25 @@ spec:
             - name: uwu-port
               containerPort: 8080
               protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /_matrix/federation/v1/version
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /_matrix/federation/v1/version
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 30
           volumeMounts:
           - name: continuwuity-data
             mountPath: /data
           - name: continuwuity-backup
             mountPath: /backup
+          - name: tmp
+            mountPath: /tmp
           resources:
             limits:
               memory: 3Gi
@@ -108,6 +122,9 @@ spec:
             requests:
               memory: 3Gi
               cpu: "1.5"
+      volumes:
+        - name: tmp
+          emptyDir: {}
       dnsPolicy: ClusterFirst
       restartPolicy: Always
   selector:
