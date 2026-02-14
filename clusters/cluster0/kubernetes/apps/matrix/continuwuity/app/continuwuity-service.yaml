@@ -4,7 +4,6 @@ metadata:
   name: continuwuity-service
   namespace: matrix
 spec:
-  externalTrafficPolicy: Local
   selector:
     app: continuwuity
   ports:
