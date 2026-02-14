@@ -2,9 +2,9 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: booklore
-  name: booklore
-  namespace: media
+    app: livekit
+  name: livekit
+  namespace: matrix
 spec:
   replicas: 1
   strategy:
@@ -15,7 +15,7 @@ spec:
   template:
     metadata:
       labels:
-        app: booklore
+        app: livekit
     spec:
       securityContext:
         runAsNonRoot: true
@@ -26,7 +26,7 @@ spec:
           type: RuntimeDefault
       automountServiceAccountToken: false
       containers:
-        - name: mariadb
+        - name: livekit
           image: livekit/livekit-server:v1.9.11
           imagePullPolicy: Always
           env:
@@ -44,7 +44,7 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-          - name: mariadb-config
+          - name: livekit-config
             mountPath: /config
           resources:
             requests:

@@ -5,7 +5,7 @@ resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
   # Flux-Kustomizations
-  # - ./continuwuity/ks.yaml
+  - ./continuwuity/ks.yaml
   # - ./livekit/ks.yaml
 
   

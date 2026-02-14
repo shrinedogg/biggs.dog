@@ -12,7 +12,7 @@ spec:
     namespace: networking
   rules:
   - backendRefs:
-    - name: continuwuity
+    - name: continuwuity-service
       port: 6167
     matches:
     - path:

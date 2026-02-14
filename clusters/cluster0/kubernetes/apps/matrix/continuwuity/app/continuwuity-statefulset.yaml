@@ -39,10 +39,23 @@ spec:
           env:
           - name: TZ
             value: "Europe/Helsinki"
+          - name: CONDUWUIT_QUERY_TRUSTED_KEY_SERVERS_FIRST
+            value: "false"
+          - name: CONDUWUIT_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
+            value: "false"
+          - name: CONDUWUIT_FORBIDDEN_REMOTE_SERVER_NAMES
+            value: |
+              ["matrix.org"]
+          - name: CONDUWUIT_FORBIDDEN_REMOTE_ROOM_DIRECTORY_SERVER_NAMES
+            value: |
+              ["matrix.org"]
+          - name: CONDUWUIT_URL_PREVIEW_DOMAIN_EXPLICIT_DENYLIST
+            value: |
+              ["matrix.org"]
           - name: CONTINUWUITY_SERVER_NAME
             value: "the_bridge"
           - name: CONTINUWUITY_MAX_REQUEST_SIZE
-            value: "2800000"
+            value: "28000000"
           - name: CONTINUWUITY_ALLOW_REGISTRATION
             value: "true"
           - name: CONTINUWUITY_REGISTRATION_TOKEN
@@ -50,14 +63,21 @@ spec:
               secretKeyRef:
                 name: continuwuity-credentials
                 key: token
+          - name: CONDUWUIT_EMERGENCY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: continuwuity-credentials
+                key: CONDUWUIT_EMERGENCY_PASSWORD
           - name: CONTINUWUITY_ALLOW_FEDERATION
             value: "true"
           - name: CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES
-            value: "true"
-          - name: CONTINUWUITY_TRUSTED_SERVERS
-            value: '["matrix.org"]'
+            value: "false"
           - name: CONTINUWUITY_ADDRESS
             value: "0.0.0.0"
+          - name: NEW_USER_DISPLAYNAME_SUFFIX
+            value: ""
+          - name: ALLOW_LEGACY_MEDIA
+            value: "true"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

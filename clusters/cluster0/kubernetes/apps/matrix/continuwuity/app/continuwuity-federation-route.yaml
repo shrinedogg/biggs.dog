@@ -12,5 +12,5 @@ spec:
     namespace: networking
   rules:
   - backendRefs:
-    - name: continuwuity-federation-port
+    - name: continuwuity-service
       port: 80
