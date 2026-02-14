@@ -17,4 +17,7 @@ spec:
     matches:
     - path:
         type: PathPrefix
-        value: /
+        value: /_continuwuity/
+    - path:
+        type: PathPrefix
+        value: /_matrix

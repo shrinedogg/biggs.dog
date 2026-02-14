@@ -96,9 +96,6 @@ spec:
             - name: uwu-port
               containerPort: 8080
               protocol: TCP
-            - name: uwu-fed-port
-              containerPort: 8080
-              protocol: TCP
           volumeMounts:
           - name: continuwuity-data
             mountPath: /data
