@@ -86,8 +86,8 @@ spec:
             value: "false"
           - name: CONTINUWUITY_ADDRESS
             value: "0.0.0.0"
-          - name: NEW_USER_DISPLAYNAME_SUFFIX
-            value: "(biggs.dog)"
+          - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
+            value: ""
           - name: ALLOW_LEGACY_MEDIA
             value: "true"
           securityContext:
