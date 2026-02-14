@@ -53,7 +53,7 @@ spec:
             value: |
               ["matrix.org"]
           - name: CONTINUWUITY_SERVER_NAME
-            value: "the_bridge"
+            value: "matrix.biggs.dog"
           - name: CONTINUWUITY_MAX_REQUEST_SIZE
             value: "28000000"
           - name: CONTINUWUITY_ALLOW_REGISTRATION
