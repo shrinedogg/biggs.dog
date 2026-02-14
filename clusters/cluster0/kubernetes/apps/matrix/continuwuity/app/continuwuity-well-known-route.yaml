@@ -10,6 +10,7 @@ spec:
   parentRefs:
   - name: wildcard-biggs-dog
     namespace: networking
+    sectionName: biggs-dog-https
   rules:
   - backendRefs:
     - name: continuwuity-service

@@ -22,6 +22,7 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       automountServiceAccountToken: false
+      enableServiceLinks: false
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
@@ -96,16 +97,14 @@ spec:
               containerPort: 8080
               protocol: TCP
           readinessProbe:
-            httpGet:
-              path: /_matrix/federation/v1/version
+            tcpSocket:
               port: 8080
-            initialDelaySeconds: 5
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /_matrix/federation/v1/version
+            tcpSocket:
               port: 8080
-            initialDelaySeconds: 15
+            initialDelaySeconds: 30
             periodSeconds: 30
           volumeMounts:
           - name: continuwuity-data

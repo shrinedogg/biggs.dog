@@ -26,3 +26,22 @@ spec:
       certificateRefs:
       - kind: Secret
         name: biggs-dog-tls
+  - hostname: "biggs.dog"
+    name: biggs-dog-http
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: All
+  - hostname: "biggs.dog"
+    name: biggs-dog-https
+    port: 443
+    protocol: HTTPS
+    allowedRoutes:
+      namespaces:
+        from: All
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - kind: Secret
+        name: biggs-dog-tls
