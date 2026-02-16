@@ -16,7 +16,7 @@ spec:
     spec:
       initContainers:
       - name: intel-gpu-initcontainer
-        image: intel/intel-gpu-initcontainer:0.34.1
+        image: intel/intel-gpu-initcontainer:0.35.0
         imagePullPolicy: Always
         securityContext:
           readOnlyRootFilesystem: true
