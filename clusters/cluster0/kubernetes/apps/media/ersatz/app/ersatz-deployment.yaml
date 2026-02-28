@@ -21,7 +21,7 @@ spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
-        - image: jasongdove/ersatztv:v26.2.0
+        - image: jasongdove/ersatztv:v26.3.0
           imagePullPolicy: Always
           name: ersatz
           env:
