@@ -74,7 +74,7 @@ spec:
               memory: "768Mi"
               cpu: "350m"
         - name: booklore
-          image: ghcr.io/booklore-app/booklore:v2.0.4
+          image: ghcr.io/booklore-app/booklore:v2.0.5
           imagePullPolicy: Always
           env:
           - name: TZ
