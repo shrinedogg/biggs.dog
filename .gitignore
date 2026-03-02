@@ -2,3 +2,4 @@
 .talos/
 .sops*
 age.agekey
+bootstrap-flux.sh

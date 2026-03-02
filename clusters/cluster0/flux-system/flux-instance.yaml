@@ -8,7 +8,7 @@ metadata:
     fluxcd.controlplane.io/reconcileTimeout: "10m"
 spec:
   distribution:
-    version: "2.x"
+    version: "2.8.1"
     registry: "ghcr.io/fluxcd"
     artifact: "oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests"
   components:
@@ -16,18 +16,12 @@ spec:
     - kustomize-controller
     - helm-controller
     - notification-controller
-    # - image-reflector-controller
-    # - image-automation-controller
-    # - source-watcher
   cluster:
     type: kubernetes
     size: medium
     multitenant: false
     networkPolicy: false
     domain: "cluster.local"
-  # storage:
-  #   class: "host-path"
-  #   size: "10Gi"
   kustomize:
     patches:
       - target:
@@ -47,3 +41,5 @@ spec:
     url: "https://github.com/shrinedogg/biggs.dog.git"
     ref: "refs/heads/main"
     path: "clusters/cluster0"
+    provider: github
+    pullSecret: "flux-system"
