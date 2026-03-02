@@ -24,7 +24,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: mariadb
-          image: lscr.io/linuxserver/mariadb:11.4.8
+          image: lscr.io/linuxserver/mariadb:11.4.9
           imagePullPolicy: Always
           env:
           - name: TZ
