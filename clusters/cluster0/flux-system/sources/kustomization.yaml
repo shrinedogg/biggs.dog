@@ -19,3 +19,4 @@ resources:
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
   - continuwuity-oci.yaml
+  - dragonfly-oci.yaml
