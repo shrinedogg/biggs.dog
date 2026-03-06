@@ -20,3 +20,4 @@ resources:
   - agentgateway-oci.yaml
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
+  - jitsi-repo.yaml
