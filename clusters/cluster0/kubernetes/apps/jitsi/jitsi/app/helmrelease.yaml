@@ -14,7 +14,7 @@ spec:
         name: jitsi
         namespace: flux-system
   values:
-    publicDomain: "https://jitsi.biggs.dog"
+    publicURL: "https://jitsi.biggs.dog"
     service:
       type: ClusterIP
       port: 80
