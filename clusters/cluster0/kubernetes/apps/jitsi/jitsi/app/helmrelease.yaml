@@ -1,0 +1,135 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: jitsi
+  namespace: jitsi
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: jitsi
+      version: v2.12.1
+      sourceRef:
+        kind: HelmRepository
+        name: jitsi
+        namespace: flux-system
+  values:
+    publicDomain: "https://jitsi.biggs.dog"
+    service:
+      type: ClusterIP
+      port: 80
+    websockets:
+      colibri:
+        enabled: false
+      xmpp:
+        enabled: false
+        # enabled: true
+
+    web:
+      image:
+        repository: ghcr.io/jitsi-contrib/hardened-images/web
+
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      extraVolumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+
+      extraVolumeMounts:
+        - name: run
+          mountPath: /run
+        - name: tmp
+          mountPath: /tmp
+
+      ingress:
+        enabled: false
+
+    prosody:
+      image:
+        repository: ghcr.io/jitsi-contrib/hardened-images/prosody
+
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      extraVolumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: storage
+          emptyDir:
+            sizeLimit: 32Mi
+
+      extraVolumeMounts:
+        - name: run
+          mountPath: /run
+        - name: tmp
+          mountPath: /tmp
+        - name: storage
+          mountPath: /var/lib/prosody
+
+    jicofo:
+      image:
+        repository: ghcr.io/jitsi-contrib/hardened-images/jicofo
+
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      extraVolumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+
+      extraVolumeMounts:
+        - name: run
+          mountPath: /run
+        - name: tmp
+          mountPath: /tmp
+
+    jvb:
+      image:
+        repository: ghcr.io/jitsi-contrib/hardened-images/jvb
+
+      securityContext:
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      extraVolumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 32Mi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 32Mi
+
+      extraVolumeMounts:
+        - name: run
+          mountPath: /run
+        - name: tmp
+          mountPath: /tmp
+
+      # xmpp:
+      #   existingSecretName: "jvb-user-password"
+
+      service:
+        enabled: true
+
+      # publicIPs:
+      #  - 1.2.3.4
