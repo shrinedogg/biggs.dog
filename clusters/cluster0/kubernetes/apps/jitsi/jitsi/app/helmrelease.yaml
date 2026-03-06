@@ -130,6 +130,8 @@ spec:
 
       service:
         enabled: true
+        type: LoadBalancer
+        externalTrafficPolicy: Cluster
 
-      # publicIPs:
-      #  - 1.2.3.4
+      publicIPs:
+       - 192.168.2.9
