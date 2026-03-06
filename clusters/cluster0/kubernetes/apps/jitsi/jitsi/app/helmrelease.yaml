@@ -7,7 +7,7 @@ spec:
   interval: 3m
   chart:
     spec:
-      chart: jitsi
+      chart: jitsi-meet
       version: 2.12.1
       sourceRef:
         kind: HelmRepository
