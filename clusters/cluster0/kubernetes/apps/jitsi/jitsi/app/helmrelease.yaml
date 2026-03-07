@@ -15,6 +15,7 @@ spec:
         namespace: flux-system
   values:
     publicURL: "https://jitsi.biggs.dog"
+    turnHost: "turn.biggs.dog"
     tz: Europe/Helsinki
     service:
       type: ClusterIP
@@ -144,5 +145,26 @@ spec:
         externalTrafficPolicy: Cluster
         annotations:
           io.cilium/lb-ipam-ips: "192.168.2.9"
+      useInternalStun: true
       publicIPs:
        - 192.168.2.9
+    coturn:
+      enabled: true
+      replicaCount: 1
+      image:
+        repository: coturn/coturn
+        tag: "4.9"
+      turns:
+        enabled: true
+        certificate:
+          create: true
+          issuerRef:
+            name: letsencrypt-prod
+            kind: ClusterIssuer
+            group: cert-manager.io
+      service:
+        type: LoadBalancer
+        annotations:
+          io.cilium/lb-ipam-ips: "192.168.2.10"
+      allowedPeerIPs:
+        - "10.244.0.0-10.244.255.255"
