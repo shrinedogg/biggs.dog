@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+    name: prosody-register-users
+    namespace: jitsi
+data:
+    20-register-users: |
+        #!/bin/bash
+        # Register users from JITSI_USERS env var (format: user:password,user2:password2)
+        if [ -n "${JITSI_USERS}" ]; then
+          IFS=',' read -ra USERS <<< "${JITSI_USERS}"
+          for entry in "${USERS[@]}"; do
+            IFS=':' read -r username password <<< "${entry}"
+            if [ -n "${username}" ] && [ -n "${password}" ]; then
+              prosodyctl --config /config/prosody.cfg.lua register "${username}" "${XMPP_DOMAIN:-meet.jitsi}" "${password}"
+            fi
+          done
+        fi
