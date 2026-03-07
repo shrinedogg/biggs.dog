@@ -5,8 +5,6 @@ metadata:
   namespace: jitsi
 spec:
   interval: 3m
-  upgrade:
-    force: true
   chart:
     spec:
       chart: jitsi-meet
@@ -66,6 +64,9 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
+        - name: prosody-lib
+          emptyDir:
+            sizeLimit: 16Mi
         - name: extra-config
           configMap:
             name: prosody-register-configmap
@@ -75,6 +76,8 @@ spec:
           mountPath: /run
         - name: tmp
           mountPath: /tmp
+        - name: prosody-lib
+          mountPath: /var/lib/prosody
         - name: extra-config
           mountPath: /etc/cont-init.d/15-disable-tls
           subPath: 15-disable-tls
@@ -123,8 +126,6 @@ spec:
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-      # xmpp:
-      #   existingSecretName: "jvb-user-password"
       service:
         enabled: true
         type: LoadBalancer
