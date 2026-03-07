@@ -15,6 +15,7 @@ spec:
         namespace: flux-system
   values:
     publicURL: "https://jitsi.biggs.dog"
+    tz: Europe/Helsinki
     service:
       type: ClusterIP
       port: 80
@@ -23,7 +24,6 @@ spec:
         enabled: false
       xmpp:
         enabled: false
-        # enabled: true
     enableAuth: true
     enableGuests: false
     web:
@@ -71,6 +71,10 @@ spec:
           mountPath: /tmp
         - name: storage
           mountPath: /var/lib/prosody
+      persistence:
+        enabled: true
+        size: 3Gi
+        storageClassName: ceph-block
     jicofo:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/jicofo
