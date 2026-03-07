@@ -5,6 +5,8 @@ metadata:
   namespace: jitsi
 spec:
   interval: 3m
+  upgrade:
+    force: true
   chart:
     spec:
       chart: jitsi-meet
@@ -50,20 +52,6 @@ spec:
     prosody:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/prosody
-      custom:
-        contInit:
-          _10_config: |
-            #!/bin/bash
-            # Register users from JITSI_USERS env var (format: user:password,user2:password2)
-            if [ -n "${JITSI_USERS}" ]; then
-              IFS=',' read -ra USERS <<< "${JITSI_USERS}"
-              for entry in "${USERS[@]}"; do
-                IFS=':' read -r username password <<< "${entry}"
-                if [ -n "${username}" ] && [ -n "${password}" ]; then
-                  prosodyctl --config /config/prosody.cfg.lua register "${username}" "${XMPP_DOMAIN:-meet.jitsi}" "${password}"
-                fi
-              done
-            fi
       extraEnvFrom:
         - secretRef:
             name: jitsi-users
@@ -78,11 +66,18 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
+        - name: register-users
+          configMap:
+            name: prosody-register-configmap
+            defaultMode: 0755
       extraVolumeMounts:
         - name: run
           mountPath: /run
         - name: tmp
           mountPath: /tmp
+        - name: register-users
+          mountPath: /etc/cont-init.d/20-register-users
+          subPath: 20-register-users
       persistence:
         enabled: true
         size: 3Gi
