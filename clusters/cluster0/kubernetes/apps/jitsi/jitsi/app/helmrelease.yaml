@@ -78,16 +78,11 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
-        - name: storage
-          emptyDir:
-            sizeLimit: 32Mi
       extraVolumeMounts:
         - name: run
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-        - name: storage
-          mountPath: /var/lib/prosody
       persistence:
         enabled: true
         size: 3Gi
