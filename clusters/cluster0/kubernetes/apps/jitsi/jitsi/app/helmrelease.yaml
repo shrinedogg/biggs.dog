@@ -24,16 +24,15 @@ spec:
       xmpp:
         enabled: false
         # enabled: true
-
+    enableAuth: true
+    enableGuests: false
     web:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/web
-
       securityContext:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
         runAsUser: 1000
-
       extraVolumes:
         - name: run
           emptyDir:
@@ -41,25 +40,20 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
-
       extraVolumeMounts:
         - name: run
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-
       ingress:
         enabled: false
-
     prosody:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/prosody
-
       securityContext:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
         runAsUser: 1000
-
       extraVolumes:
         - name: run
           emptyDir:
@@ -70,7 +64,6 @@ spec:
         - name: storage
           emptyDir:
             sizeLimit: 32Mi
-
       extraVolumeMounts:
         - name: run
           mountPath: /run
@@ -78,16 +71,13 @@ spec:
           mountPath: /tmp
         - name: storage
           mountPath: /var/lib/prosody
-
     jicofo:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/jicofo
-
       securityContext:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
         runAsUser: 1000
-
       extraVolumes:
         - name: run
           emptyDir:
@@ -95,22 +85,18 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
-
       extraVolumeMounts:
         - name: run
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-
     jvb:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/jvb
-
       securityContext:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
         runAsUser: 1000
-
       extraVolumes:
         - name: run
           emptyDir:
@@ -118,20 +104,18 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
-
       extraVolumeMounts:
         - name: run
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-
       # xmpp:
       #   existingSecretName: "jvb-user-password"
-
       service:
         enabled: true
         type: LoadBalancer
         externalTrafficPolicy: Cluster
-
+        annotations:
+          io.cilium/lb-ipam-ips: "192.168.2.9"
       publicIPs:
        - 192.168.2.9
