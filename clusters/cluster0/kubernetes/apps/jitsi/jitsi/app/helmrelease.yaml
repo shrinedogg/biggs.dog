@@ -66,7 +66,7 @@ spec:
         - name: tmp
           emptyDir:
             sizeLimit: 32Mi
-        - name: register-users
+        - name: extra-config
           configMap:
             name: prosody-register-configmap
             defaultMode: 0755
@@ -75,7 +75,10 @@ spec:
           mountPath: /run
         - name: tmp
           mountPath: /tmp
-        - name: register-users
+        - name: extra-config
+          mountPath: /etc/cont-init.d/15-disable-tls
+          subPath: 15-disable-tls
+        - name: extra-config
           mountPath: /etc/cont-init.d/20-register-users
           subPath: 20-register-users
       persistence:
