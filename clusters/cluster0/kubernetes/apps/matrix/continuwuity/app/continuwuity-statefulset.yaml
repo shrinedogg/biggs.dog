@@ -29,9 +29,9 @@ spec:
             nodeSelectorTerms:
             - matchExpressions:
               - key: kubernetes.io/hostname
-                operator: NotIn
+                operator: In
                 values:
-                - control-01
+                - worker-01
       containers:
         - image: ghcr.io/continuwuity/continuwuity:main
           imagePullPolicy: Always
