@@ -82,8 +82,20 @@ spec:
           mountPath: /etc/cont-init.d/15-disable-tls
           subPath: 15-disable-tls
         - name: extra-config
-          mountPath: /etc/cont-init.d/20-register-users
-          subPath: 20-register-users
+          mountPath: /etc/s6-overlay/scripts/register-custom-users
+          subPath: 75-register-custom-users
+        - name: extra-config
+          mountPath: /etc/s6-overlay/s6-rc.d/75-register-custom-users/type
+          subPath: oneshot-type
+        - name: extra-config
+          mountPath: /etc/s6-overlay/s6-rc.d/75-register-custom-users/up
+          subPath: oneshot-up
+        - name: extra-config
+          mountPath: /etc/s6-overlay/s6-rc.d/75-register-custom-users/dependencies.d/70-register-setup
+          subPath: empty
+        - name: extra-config
+          mountPath: /etc/s6-overlay/s6-rc.d/user/contents.d/75-register-custom-users
+          subPath: empty
       persistence:
         enabled: true
         size: 3Gi

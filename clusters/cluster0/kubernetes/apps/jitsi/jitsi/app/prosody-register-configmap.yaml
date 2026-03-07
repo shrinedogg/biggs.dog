@@ -13,15 +13,21 @@ data:
           sed -i 's/c2s_require_encryption\s*=\s*true/c2s_require_encryption = false/' "${CONFIG}"
           sed -i 's/s2s_require_encryption\s*=\s*true/s2s_require_encryption = false/' "${CONFIG}"
         fi
-    20-register-users: |
-        #!/bin/bash
-        # Register users from JITSI_USERS env var (format: user:password,user2:password2)
+    75-register-custom-users: |
+        #!/command/with-contenv bash
+        # Register custom users from JITSI_USERS env var (format: user:password,user2:password2)
+        # This runs as an s6 oneshot after prosody is ready (after 70-register-setup)
+        PROSODY_CFG="/run/prosody/config/prosody.cfg.lua"
         if [ -n "${JITSI_USERS}" ]; then
           IFS=',' read -ra USERS <<< "${JITSI_USERS}"
           for entry in "${USERS[@]}"; do
             IFS=':' read -r username password <<< "${entry}"
             if [ -n "${username}" ] && [ -n "${password}" ]; then
-              prosodyctl --config /config/prosody.cfg.lua register "${username}" "${XMPP_DOMAIN:-meet.jitsi}" "${password}"
+              echo "[register-custom-users] Registering ${username}@${XMPP_DOMAIN:-meet.jitsi}"
+              prosodyctl --config "${PROSODY_CFG}" shell user create "${username}@${XMPP_DOMAIN:-meet.jitsi}" "${password}"
             fi
           done
         fi
+    oneshot-type: "oneshot"
+    oneshot-up: "/etc/s6-overlay/scripts/register-custom-users"
+    empty: ""
