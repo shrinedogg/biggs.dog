@@ -21,9 +21,9 @@ spec:
       port: 80
     websockets:
       colibri:
-        enabled: false
+        enabled: true
       xmpp:
-        enabled: false
+        enabled: true
     enableAuth: true
     enableGuests: false
     web:
