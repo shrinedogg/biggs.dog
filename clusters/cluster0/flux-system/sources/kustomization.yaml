@@ -21,3 +21,4 @@ resources:
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
   - jitsi-repo.yaml
+  - barman-oci.yaml
