@@ -1,0 +1,19 @@
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: barman-object-store
+spec:
+  configuration:
+    destinationPath: s3://biggs-dog/
+    endpointURL: http://s3.eu-central-003.backblazeb2.com
+    s3Credentials:
+      accessKeyId:
+        name: object-store-secret
+        key: ACCESS_KEY_ID
+      secretAccessKey:
+        name: object-store-secret
+        key: SECRET_ACCESS_KEY
+    wal:
+      compression: bzip2
+      maxParallel: 4
+  retentionPolicy: 7d
