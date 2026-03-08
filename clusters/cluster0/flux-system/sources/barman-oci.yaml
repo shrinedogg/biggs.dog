@@ -6,6 +6,9 @@ metadata:
   name: plugin-barman-cloud
   namespace: flux-system
 spec:
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
   interval: 1h
   url: oci://ghcr.io/cloudnative-pg/charts/plugin-barman-cloud
   ref:
