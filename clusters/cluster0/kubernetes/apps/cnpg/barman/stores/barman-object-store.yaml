@@ -11,7 +11,7 @@ spec:
       value: when_required
   configuration:
     destinationPath: s3://biggs-dog/
-    endpointURL: http://s3.eu-central-003.backblazeb2.com
+    endpointURL: https://s3.eu-central-003.backblazeb2.com
     s3Credentials:
       accessKeyId:
         name: object-store-secret
