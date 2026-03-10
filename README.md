@@ -26,11 +26,16 @@ clusters/
     │   └── sources/          # HelmRepository and OCIRepository definitions
     └── kubernetes/
         └── apps/             # Application deployments
+            ├── affine/
+            ├── biggs/
             ├── cert-manager/
             ├── cnpg/
+            ├── dragonfly/
             ├── external-secrets/
-            ├── biggs/
+            ├── jitsi/
             ├── kube-system/
+            ├── manticore/
+            ├── matrix/
             ├── media/
             ├── networking/
             ├── observability/
@@ -48,6 +53,7 @@ clusters/
 | [k8s-gateway](https://github.com/ori-edge/k8s_gateway) | DNS for Kubernetes services |
 | [Gateway API](https://gateway-api.sigs.k8s.io/) | Kubernetes ingress using Gateway API |
 | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts |
+| [Cloudflared](https://github.com/cloudflare/cloudflared) | Cloudflare Tunnel for external access |
 
 ### Storage
 | Component | Description |
@@ -63,6 +69,8 @@ clusters/
 | Component | Description |
 |-----------|-------------|
 | [CloudNativePG](https://cloudnative-pg.io/) | PostgreSQL operator for in-cluster databases |
+| [Barman Cloud](https://pgbarman.org/) | CNPG plugin for PostgreSQL backup and recovery |
+| [Dragonfly](https://www.dragonflydb.io/) | Redis-compatible in-memory datastore |
 
 ### Security & Secrets
 | Component | Description |
@@ -97,6 +105,14 @@ clusters/
 - **Booklore** - Book management
 - **Ersatz** - Custom media service
 - **Nsyncd** - Synchronization service
+
+### Communication
+- **Jitsi Meet** - Self-hosted video conferencing
+- **Continuwuity** - Matrix homeserver (Conduwuit fork)
+
+### Productivity
+- **AFFiNE** - Collaborative knowledge base and workspace
+- **Manticore Search** - Full-text search engine (used by AFFiNE)
 
 ### Other
 - **biggs** - Personal application
