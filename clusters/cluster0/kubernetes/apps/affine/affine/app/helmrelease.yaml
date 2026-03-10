@@ -24,7 +24,7 @@ spec:
       gateway:
         enabled: true
         # Name of the Gateway resource to attach to (required when enabled).
-        name: "agentgateway"
+        name: "wildcard-biggs-dog"
         # Namespace of the Gateway resource. Defaults to the same namespace as the HTTPRoute.
         namespace: "networking"
         # sectionName targets a specific listener on the Gateway (optional).
