@@ -22,3 +22,4 @@ resources:
   - dragonfly-oci.yaml
   - jitsi-repo.yaml
   - barman-oci.yaml
+  - affine-oci.yaml
