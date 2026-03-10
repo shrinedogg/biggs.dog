@@ -45,7 +45,7 @@ spec:
         secretUsernameField: "username"
         secretPasswordField: "password"
         user: ""
-        host: "cnpg-affine-rw.cnpg.svc.cluster.local"
+        host: "cnpg-affine-rw.cnpg-system.svc.cluster.local"
         port: "5432"
         name: "affine"
         password: ""
