@@ -58,7 +58,7 @@ spec:
       indexer:
         enabled: true
         provider: ""
-        endpoint: ""
+        endpoint: "http://manticore.manticore.svc.cluster.local:9308"
         apiKey: ""
       docService:
         name: "affine-doc"

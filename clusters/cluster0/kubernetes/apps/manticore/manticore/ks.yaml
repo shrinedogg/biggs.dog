@@ -2,22 +2,19 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app affine
+  name: &app manticore
   namespace: flux-system
 spec:
-  dependsOn:
-    - name: cnpg-databases
-    - name: manticore
-  targetNamespace: affine
+  targetNamespace: manticore
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/affine/affine/app
+  path: ./clusters/cluster0/kubernetes/apps/manticore/manticore/app
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
-  wait: true
+  wait: false
   interval: 3m
   retryInterval: 1m
   timeout: 2m

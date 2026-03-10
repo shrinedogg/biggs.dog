@@ -23,3 +23,4 @@ resources:
   - jitsi-repo.yaml
   - barman-oci.yaml
   - affine-oci.yaml
+  - manticore-repo.yaml
