@@ -20,5 +20,5 @@ resources:
   # - ./ombi/ks.yaml
   # - ./cwa/ks.yaml
   - ./emby/ks.yaml
-  - ./booklore/ks.yaml
+  # - ./booklore/ks.yaml
   - ./nsyncd/ks.yaml
