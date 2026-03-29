@@ -154,15 +154,6 @@ spec:
       image:
         repository: coturn/coturn
         tag: "4.9"
-      securityContext:
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop:
-            - ALL
-        seccompProfile:
-          type: RuntimeDefault
-        runAsNonRoot: true
-        runAsUser: 1000
       turns:
         enabled: true
         certificate:
