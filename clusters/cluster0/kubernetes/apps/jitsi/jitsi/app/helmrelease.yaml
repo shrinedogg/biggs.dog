@@ -30,6 +30,17 @@ spec:
     web:
       image:
         repository: ghcr.io/jitsi-contrib/hardened-images/web
+      service:
+        type: ClusterIP
+        port: 8000
+      livenessProbe:
+        httpGet:
+          path: /
+          port: 8000
+      readinessProbe:
+        httpGet:
+          path: /
+          port: 8000
       securityContext:
         readOnlyRootFilesystem: true
         runAsNonRoot: true
