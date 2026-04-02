@@ -158,7 +158,7 @@ spec:
           io.cilium/lb-ipam-ips: "192.168.2.9"
       useInternalStun: true
       publicIPs:
-       - 192.168.2.9
+        - 192.168.2.9
     coturn:
       enabled: true
       replicaCount: 1
@@ -179,3 +179,10 @@ spec:
           io.cilium/lb-ipam-ips: "192.168.2.10"
       allowedPeerIPs:
         - "10.244.0.0-10.244.255.255"
+      extraVolumes:
+        - name: run
+          emptyDir:
+            sizeLimit: 32Mi
+      extraVolumeMounts:
+        - name: run
+          mountPath: /var/run
