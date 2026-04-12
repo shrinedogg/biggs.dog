@@ -27,69 +27,69 @@ spec:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
             nodeSelectorTerms:
-            - matchExpressions:
-              - key: kubernetes.io/hostname
-                operator: In
-                values:
-                - worker-01
+              - matchExpressions:
+                  - key: kubernetes.io/hostname
+                    operator: In
+                    values:
+                      - worker-01
       containers:
         - image: ghcr.io/continuwuity/continuwuity:main
           imagePullPolicy: Always
           name: continuwuity
           env:
-          - name: CONTINUWUITY_PORT
-            value: "8080"
-          - name: CONTINUWUITY_DATABASE_PATH
-            value: "/data"
-          - name: CONTINUWUITY_DATABASE_BACKUP_PATH
-            value: "/backup"
-          - name: CONTINUWUITY_DATABASE_BACKUPS_TO_KEEP
-            value: "1"
-          - name: CONTINUWUITY_ROCKSDB_PARALLELISM_THREADS
-            value: "4"
-          - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
-            value: "false"
-          - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
-            value: "false"
-          - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
-            value: |
-              ["matrix.org"]
-          - name: CONTINUWUITY_FORBIDDEN_REMOTE_ROOM_DIRECTORY_SERVER_NAMES
-            value: |
-              ["matrix.org"]
-          - name: CONTINUWUITY_URL_PREVIEW_DOMAIN_EXPLICIT_DENYLIST
-            value: |
-              ["matrix.org"]
-          - name: CONTINUWUITY_SERVER_NAME
-            value: "biggs.dog"
-          - name: CONTINUWUITY_WELL_KNOWN__CLIENT
-            value: "https://matrix.biggs.dog"
-          - name: CONTINUWUITY_WELL_KNOWN__SERVER
-            value: "matrix.biggs.dog:443"
-          - name: CONTINUWUITY_MAX_REQUEST_SIZE
-            value: "28000000"
-          - name: CONTINUWUITY_ALLOW_REGISTRATION
-            value: "true"
-          - name: CONTINUWUITY_REGISTRATION_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: continuwuity-credentials
-                key: token
-          # - name: CONTINUWUITY_EMERGENCY_PASSWORD
-          #   valueFrom:
-          #     secretKeyRef:
-          #       name: continuwuity-credentials
-          #       key: CONTINUWUITY_EMERGENCY_PASSWORD
-          - name: CONTINUWUITY_ALLOW_FEDERATION
-            value: "true"
-          - name: CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES
-            value: "false"
-          - name: CONTINUWUITY_ADDRESS
-            value: "0.0.0.0"
-          - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
-            value: ""
-          - name: ALLOW_LEGACY_MEDIA
-            value: "true"
+            - name: CONTINUWUITY_PORT
+              value: "8080"
+            - name: CONTINUWUITY_DATABASE_PATH
+              value: "/data"
+            - name: CONTINUWUITY_DATABASE_BACKUP_PATH
+              value: "/backup"
+            - name: CONTINUWUITY_DATABASE_BACKUPS_TO_KEEP
+              value: "1"
+            - name: CONTINUWUITY_ROCKSDB_PARALLELISM_THREADS
+              value: "4"
+            - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
+              value: "false"
+            - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
+              value: "false"
+            - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
+              value: |
+                ["matrix.org"]
+            - name: CONTINUWUITY_FORBIDDEN_REMOTE_ROOM_DIRECTORY_SERVER_NAMES
+              value: |
+                ["matrix.org"]
+            - name: CONTINUWUITY_URL_PREVIEW_DOMAIN_EXPLICIT_DENYLIST
+              value: |
+                ["matrix.org"]
+            - name: CONTINUWUITY_SERVER_NAME
+              value: "biggs.dog"
+            - name: CONTINUWUITY_WELL_KNOWN__CLIENT
+              value: "https://matrix.biggs.dog"
+            - name: CONTINUWUITY_WELL_KNOWN__SERVER
+              value: "matrix.biggs.dog:443"
+            - name: CONTINUWUITY_MAX_REQUEST_SIZE
+              value: "1280000000"
+            - name: CONTINUWUITY_ALLOW_REGISTRATION
+              value: "true"
+            - name: CONTINUWUITY_REGISTRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: continuwuity-credentials
+                  key: token
+            # - name: CONTINUWUITY_EMERGENCY_PASSWORD
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: continuwuity-credentials
+            #       key: CONTINUWUITY_EMERGENCY_PASSWORD
+            - name: CONTINUWUITY_ALLOW_FEDERATION
+              value: "true"
+            - name: CONTINUWUITY_ALLOW_CHECK_FOR_UPDATES
+              value: "false"
+            - name: CONTINUWUITY_ADDRESS
+              value: "0.0.0.0"
+            - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
+              value: ""
+            - name: ALLOW_LEGACY_MEDIA
+              value: "true"
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -111,10 +111,10 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
           volumeMounts:
-          - name: continuwuity-data
-            mountPath: /data
-          - name: continuwuity-backup
-            mountPath: /backup
+            - name: continuwuity-data
+              mountPath: /data
+            - name: continuwuity-backup
+              mountPath: /backup
           resources:
             limits:
               memory: 3Gi
@@ -144,4 +144,3 @@ spec:
         resources:
           requests:
             storage: 100Gi
-  
