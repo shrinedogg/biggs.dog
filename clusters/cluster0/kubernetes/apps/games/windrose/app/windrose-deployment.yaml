@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: windrose
+  name: windrose
+  namespace: games
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+      minAvailable: 1
+  template:
+    metadata:
+      labels:
+        app: windrose
+    spec:
+      nodeSelector:
+        intel.feature.node.kubernetes.io/gpu: "true"
+      containers:
+        - image: mornedhels/windrose-server:stable-proton
+          imagePullPolicy: Always
+          name: windrose
+          env:
+            - name: TZ
+              value: "Europe/Helsinki"
+            - name: PGID
+              value: "1000"
+            - name: PUID
+              value: "1000"
+            - name: UPDATE_CRON
+              value: "*/30 * * * *"
+            - name: SERVER_USER_SELECTED_REGION
+              value: "EU"
+            - name: SERVER_MAX_PLAYER_COUNT
+              value: "4"
+            - name: SERVER_NAME
+              value: "The_Bridge"
+            - name: SERVER_PASSWORD
+              value: "friendship!"
+            - name: WORLD_NAME
+              value: "1769"
+          ports:
+            - name: windrose-tcp-port
+              containerPort: 7777
+              protocol: TCP
+            - name: windrose-udp-port
+              containerPort: 7777
+              protocol: UDP
+          volumeMounts:
+            - name: windrose-data
+              mountPath: /opt/windrose
+          resources:
+            limits:
+              memory: 8Gi
+              device/ntsync: 1
+            requests:
+              memory: 8Gi
+              device/ntsync: 1
+      restartPolicy: Always
+      volumes:
+        - name: windrose-data
+          persistentVolumeClaim:
+            claimName: windrose-data
+  selector:
+    matchLabels:
+      app: windrose
