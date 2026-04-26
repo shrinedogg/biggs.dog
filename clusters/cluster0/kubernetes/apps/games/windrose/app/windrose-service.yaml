@@ -9,11 +9,11 @@ spec:
   selector:
     app: windrose
   ports:
-    - name: windrose-tcp-port
+    - name: windrose-tcp
       port: 7777
       protocol: TCP
       targetPort: 7777
-    - name: windrose-udp-port
+    - name: windrose-udp
       port: 7777
       protocol: UDP
       targetPort: 7777
