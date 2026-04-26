@@ -55,9 +55,9 @@ spec:
               mountPath: /opt/windrose
           resources:
             limits:
-              memory: 8Gi
+              memory: 12Gi
             requests:
-              memory: 8Gi
+              memory: 12Gi
       restartPolicy: Always
       volumes:
         - name: windrose-data
