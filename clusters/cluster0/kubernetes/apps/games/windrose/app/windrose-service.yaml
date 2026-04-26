@@ -4,7 +4,6 @@ metadata:
   name: windrose-service
   namespace: games
 spec:
-  externalTrafficPolicy: Local
   type: LoadBalancer
   selector:
     app: windrose
