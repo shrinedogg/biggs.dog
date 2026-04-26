@@ -65,6 +65,7 @@ spec:
         - name: windrose-data
           persistentVolumeClaim:
             claimName: windrose-data
+          storageClassName: ceph-block
   selector:
     matchLabels:
       app: windrose
