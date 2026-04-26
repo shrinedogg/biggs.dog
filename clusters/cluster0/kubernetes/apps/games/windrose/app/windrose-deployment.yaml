@@ -56,10 +56,8 @@ spec:
           resources:
             limits:
               memory: 8Gi
-              device/ntsync: 1
             requests:
               memory: 8Gi
-              device/ntsync: 1
       restartPolicy: Always
       volumes:
         - name: windrose-data
