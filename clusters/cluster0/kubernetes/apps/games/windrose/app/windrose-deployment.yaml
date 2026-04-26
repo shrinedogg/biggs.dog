@@ -21,12 +21,10 @@ spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
-        - image: mornedhels/windrose-server:stable-wine
+        - image: mornedhels/windrose-server:stable-proton
           imagePullPolicy: Always
           name: windrose
           env:
-            - name: TZ
-              value: "Europe/Helsinki"
             - name: PGID
               value: "1000"
             - name: PUID
@@ -35,10 +33,12 @@ spec:
               value: "true"
             - name: UPDATE_CRON
               value: "*/30 * * * *"
+            - name: SERVER_DIRECT_CONNECTION_SERVER_ADDRESS
+              value: "87.92.48.51"
             - name: SERVER_MAX_PLAYER_COUNT
               value: "4"
             - name: SERVER_NAME
-              value: "The_Bridge"
+              value: "TheBridge"
             - name: SERVER_PASSWORD
               value: "friendship!"
             - name: WORLD_NAME
