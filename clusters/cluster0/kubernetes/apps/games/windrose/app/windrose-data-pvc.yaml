@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: windrose-config
+  namespace: games
+  labels:
+    app: windrose
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 40G
+  storageClassName: ceph-block
