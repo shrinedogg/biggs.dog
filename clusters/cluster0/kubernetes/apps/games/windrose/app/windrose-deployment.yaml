@@ -35,8 +35,6 @@ spec:
               value: "true"
             - name: UPDATE_CRON
               value: "*/30 * * * *"
-            - name: SERVER_USER_SELECTED_REGION
-              value: "EU"
             - name: SERVER_MAX_PLAYER_COUNT
               value: "4"
             - name: SERVER_NAME
