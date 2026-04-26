@@ -7,4 +7,4 @@ resources:
   # Flux-Kustomizations
   - ./agentgateway/ks.yaml
   - ./k8s-gateway/ks.yaml
-  - ./cloudflared/ks.yaml
+  # - ./cloudflared/ks.yaml
