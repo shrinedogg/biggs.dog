@@ -31,6 +31,8 @@ spec:
               value: "1000"
             - name: PUID
               value: "1000"
+            - name: SERVER_USE_DIRECT_CONNECTION
+              value: "true"
             - name: UPDATE_CRON
               value: "*/30 * * * *"
             - name: SERVER_USER_SELECTED_REGION
