@@ -25,10 +25,6 @@ spec:
           imagePullPolicy: Always
           name: windrose
           env:
-            - name: PGID
-              value: "1000"
-            - name: PUID
-              value: "1000"
             - name: SERVER_USE_DIRECT_CONNECTION
               value: "true"
             - name: UPDATE_CRON
@@ -38,7 +34,7 @@ spec:
             - name: SERVER_MAX_PLAYER_COUNT
               value: "4"
             - name: SERVER_NAME
-              value: "TheBridge"
+              value: "The Bridge"
             - name: SERVER_PASSWORD
               value: "friendship!"
             - name: WORLD_NAME
