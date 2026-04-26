@@ -62,9 +62,9 @@ spec:
               device/ntsync: 1
       restartPolicy: Always
       volumes:
-        - name: windrose-data-pvc
+        - name: windrose-data
           persistentVolumeClaim:
-            claimName: windrose-data
+            claimName: windrose-data-pvc
   selector:
     matchLabels:
       app: windrose
