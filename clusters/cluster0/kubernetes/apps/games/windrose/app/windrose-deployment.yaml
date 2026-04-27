@@ -21,7 +21,7 @@ spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
-        - image: mornedhels/windrose-server:stable-proton
+        - image: mornedhels/windrose-server:stable-wine
           imagePullPolicy: Always
           name: windrose
           env:
