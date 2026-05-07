@@ -22,9 +22,10 @@ spec:
     windroseDedicatedServer:
       port: 28050
       volumeStorageSize: "5Gi"
-      existingSecret: windrose-secret
+      existingSecret: "windrose-secret"
     instances:
       - name: "The Bridge"
+        password: ""
         inviteCode: "$$!1769!$$"
         maxPlayerCount: "4"
         userSelectedRegion: "EU"
