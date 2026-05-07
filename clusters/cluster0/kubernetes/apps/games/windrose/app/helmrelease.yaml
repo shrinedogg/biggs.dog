@@ -22,7 +22,7 @@ spec:
     windroseDedicatedServer:
       port: 28050
       volumeStorageSize: "5Gi"
-      existingSecret: "windrose-secret"
+      existingSecret: windrose-secret
     instances:
       - name: "The Bridge"
         inviteCode: "$$!1769!$$"
