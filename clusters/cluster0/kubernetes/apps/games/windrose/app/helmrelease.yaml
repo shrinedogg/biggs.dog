@@ -23,8 +23,6 @@ spec:
       port: 28050
       volumeStorageSize: "5Gi"
       existingSecret: "windrose-secret"
-      # You can choose to run multiple instances of Windrose dedicated servers here.
-      # For a new instance add another entry to this list.
     instances:
       - name: "The Bridge"
         inviteCode: "$$!1769!$$"
@@ -33,3 +31,6 @@ spec:
         service:
           type: LoadBalancer
           externalTrafficPolicy: Cluster
+          metadata:
+            labels: {}
+            annotations: {}
