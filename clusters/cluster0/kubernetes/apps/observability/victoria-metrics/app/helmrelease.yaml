@@ -62,8 +62,12 @@ spec:
       serviceMonitor:
         enabled: true
       operator:
-        # -- By default, operator converts prometheus-operator objects.
-        disable_prometheus_converter: false
+        # -- Disable conversion of prometheus-operator objects. We don't
+        # install the prometheus-operator CRDs in this cluster, so leaving
+        # the converter enabled causes the operator's cache to fail syncing
+        # for monitoring.coreos.com/v1alpha1 ScrapeConfig and the manager
+        # never starts (loses leader election after the 3m cacheSyncTimeout).
+        disable_prometheus_converter: true
 
     defaultDashboards:
       # -- Enable custom dashboards installation
@@ -329,8 +333,7 @@ spec:
         # -- Enable deployment of ingress for server component
         enabled: false
         # -- Ingress annotations
-        annotations:
-          {}
+        annotations: {}
           # kubernetes.io/ingress.class: nginx
           # kubernetes.io/tls-acme: "true"
         # -- Ingress extra labels
@@ -382,8 +385,7 @@ spec:
                 resources:
                   requests:
                     storage: 10Gi
-          resources:
-            {}
+          resources: {}
             # limits:
             #   cpu: "1"
             #   memory: 1500Mi
@@ -400,8 +402,7 @@ spec:
                 resources:
                   requests:
                     storage: 2Gi
-          resources:
-            {}
+          resources: {}
             # limits:
             #   cpu: "1"
             #   memory: "1000Mi"
@@ -414,8 +415,7 @@ spec:
           port: "8480"
           replicaCount: 2
           extraArgs: {}
-          resources:
-            {}
+          resources: {}
             # limits:
             #   cpu: "1"
             #   memory: 1000Mi
@@ -508,8 +508,7 @@ spec:
           enabled: false
 
           # -- Ingress annotations
-          annotations:
-            {}
+          annotations: {}
             # kubernetes.io/ingress.class: nginx
             # kubernetes.io/tls-acme: "true"
 
@@ -677,8 +676,7 @@ spec:
         enabled: true
 
       # -- (object) Extra alert templates
-      templateFiles:
-        {}
+      templateFiles: {}
         # template_1.tmpl: |-
         #   {{ define "hello" -}}
         #   hello, Victoria!
@@ -692,8 +690,7 @@ spec:
         # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
         # ingressClassName: nginx
         # Values can be templated
-        annotations:
-          {}
+        annotations: {}
           # kubernetes.io/ingress.class: nginx
           # kubernetes.io/tls-acme: "true"
         labels: {}
@@ -738,8 +735,7 @@ spec:
         externalLabels: {}
 
       # -- (object) Extra VMAlert annotation templates
-      templateFiles:
-        {}
+      templateFiles: {}
         # template_1.tmpl: |-
         #   {{ define "hello" -}}
         #   hello, Victoria!
@@ -762,8 +758,7 @@ spec:
         # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
         # ingressClassName: nginx
         # Values can be templated
-        annotations:
-          {}
+        annotations: {}
           # kubernetes.io/ingress.class: nginx
           # kubernetes.io/tls-acme: "true"
         labels: {}
@@ -805,11 +800,11 @@ spec:
           discover_backend_ips: true
           url_map:
             - src_paths:
-                - '{{ .vm.read.path }}/.*'
+                - "{{ .vm.read.path }}/.*"
               url_prefix:
                 - '{{ urlJoin (omit .vm.read "path") }}/'
             - src_paths:
-                - '{{ .vm.write.path }}/.*'
+                - "{{ .vm.write.path }}/.*"
               url_prefix:
                 - '{{ urlJoin (omit .vm.write "path") }}/'
 
@@ -821,8 +816,7 @@ spec:
       # -- VMAgent annotations
       annotations: {}
       # -- Remote write configuration of VMAgent, allowed parameters defined in a [spec](https://docs.victoriametrics.com/operator/api/#vmagentremotewritespec)
-      additionalRemoteWrites:
-        []
+      additionalRemoteWrites: []
         #- url: http://some-remote-write/api/v1/write
       # -- (object) Full spec for VMAgent CRD. Allowed values described [here](https://docs.victoriametrics.com/operator/api/#vmagentspec)
       spec:
@@ -845,8 +839,7 @@ spec:
         # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
         # ingressClassName: nginx
         # Values can be templated
-        annotations:
-          {}
+        annotations: {}
           # kubernetes.io/ingress.class: nginx
           # kubernetes.io/tls-acme: "true"
         labels: {}
@@ -953,8 +946,7 @@ spec:
         # See https://kubernetes.io/blog/2020/04/02/improvements-to-the-ingress-api-in-kubernetes-1.18/#specifying-the-class-of-an-ingress
         # ingressClassName: nginx
         # Values can be templated
-        annotations:
-          {}
+        annotations: {}
           # kubernetes.io/ingress.class: nginx
           # kubernetes.io/tls-acme: "true"
         labels: {}
@@ -988,7 +980,7 @@ spec:
             matchLabels:
               app.kubernetes.io/name: '{{ include "grafana.name" .Subcharts.grafana }}'
           endpoints:
-            - port: '{{ .Values.grafana.service.portName }}'
+            - port: "{{ .Values.grafana.service.portName }}"
 
     # -- prometheus-node-exporter dependency chart configuration. For possible values check [here](https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus-node-exporter/values.yaml)
     prometheus-node-exporter:
