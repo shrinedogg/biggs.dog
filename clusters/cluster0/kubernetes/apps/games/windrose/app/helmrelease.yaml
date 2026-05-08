@@ -24,8 +24,7 @@ spec:
       volumeStorageSize: "5Gi"
       existingSecret: "windrose-secret"
     instances:
-      - name: "The Bridge"
-        password: ""
+      - name: "The_Bridge"
         inviteCode: "$$!1769!$$"
         maxPlayerCount: "4"
         userSelectedRegion: "EU"
