@@ -164,7 +164,7 @@ spec:
       replicaCount: 1
       image:
         repository: coturn/coturn
-        tag: "4.10"
+        tag: "4.11"
       turns:
         enabled: true
         certificate:
