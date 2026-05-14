@@ -1,0 +1,28 @@
+# Optional: create 1Password item "bookboss-oidc" with fields
+# discovery_url, client_id, and client_secret (or remove until ready).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: bookboss-oidc
+  namespace: media
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: bookboss-oidc
+    creationPolicy: Owner
+  data:
+    - secretKey: discovery_url
+      remoteRef:
+        key: bookboss-oidc
+        property: discovery_url
+    - secretKey: client_id
+      remoteRef:
+        key: bookboss-oidc
+        property: client_id
+    - secretKey: client_secret
+      remoteRef:
+        key: bookboss-oidc
+        property: client_secret

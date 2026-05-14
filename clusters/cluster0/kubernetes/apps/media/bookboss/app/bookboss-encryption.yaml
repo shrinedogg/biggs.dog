@@ -1,0 +1,18 @@
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: bookboss-encryption
+  namespace: media
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: bookboss-encryption
+    creationPolicy: Owner
+  data:
+    - secretKey: encryption_secret
+      remoteRef:
+        key: bookboss-encryption-secret
+        property: password

@@ -1,0 +1,117 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: bookboss
+  name: bookboss
+  namespace: media
+spec:
+  replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: bookboss
+  template:
+    metadata:
+      labels:
+        app: bookboss
+    spec:
+      securityContext:
+        runAsUser: 1234
+        runAsGroup: 1234
+        fsGroup: 1234
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      containers:
+        - name: bookboss
+          image: ghcr.io/szinn/bookboss:v0.8.28
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: BOOKBOSS__FRONTEND__BASE_URL
+              value: https://bookboss.biggs.dog
+            - name: BOOKBOSS__FRONTEND__LISTEN_IP
+              value: "0.0.0.0"
+            - name: BOOKBOSS__FRONTEND__LISTEN_PORT
+              value: "8080"
+            - name: BOOKBOSS__LIBRARY__LIBRARY_PATH
+              value: /nfs-share/bookboss/library
+            - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
+              value: /nfs-share/bookboss/bookdrop
+            - name: BOOKBOSS__DATABASE__DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-database-url
+                  key: DATABASE_URL
+            - name: BOOKBOSS__ENCRYPTION_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-encryption
+                  key: encryption_secret
+            - name: BOOKBOSS__METADATA__HARDCOVER_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-metadata
+                  key: HARDCOVER_API_TOKEN
+                  optional: true
+            - name: BOOKBOSS__METADATA__GOOGLEBOOKS_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-metadata
+                  key: GOOGLEBOOKS_API_TOKEN
+                  optional: true
+            - name: BOOKBOSS__OIDC__DISCOVERY_URL
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-oidc
+                  key: discovery_url
+                  optional: true
+            - name: BOOKBOSS__OIDC__CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-oidc
+                  key: client_id
+                  optional: true
+            - name: BOOKBOSS__OIDC__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-oidc
+                  key: client_secret
+                  optional: true
+          volumeMounts:
+            - name: bookboss-config
+              mountPath: /data
+            - name: media-nfs
+              mountPath: /nfs-share/bookboss/library
+              subPath: bookboss/library
+            - name: media-nfs
+              mountPath: /nfs-share/bookboss/bookdrop
+              subPath: bookboss/bookdrop
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        - name: bookboss-config
+          persistentVolumeClaim:
+            claimName: bookboss-config-pvc
+        - name: media-nfs
+          persistentVolumeClaim:
+            claimName: media-nfs-pvc
