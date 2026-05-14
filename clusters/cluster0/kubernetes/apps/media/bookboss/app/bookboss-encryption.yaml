@@ -1,3 +1,4 @@
+# 1Password: item bookboss-encryption-secret (password property → encryption_secret).
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:

@@ -1,4 +1,5 @@
 ---
+# 1Password: item b2-backup-bookboss (keyID, applicationKey, repository); RESTIC_PASSWORD from biggs-dogg-restic-pass.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:

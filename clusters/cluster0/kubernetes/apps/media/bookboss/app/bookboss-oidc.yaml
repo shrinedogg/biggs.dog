@@ -1,5 +1,4 @@
-# Optional: create 1Password item "bookboss-oidc" with fields
-# discovery_url, client_id, and client_secret (or remove until ready).
+# Optional — 1Password item bookboss-oidc (discovery_url, client_id, client_secret); omit item or manifest if unused.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:

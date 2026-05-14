@@ -1,3 +1,4 @@
+# 1Password: item bookboss-user-password (username, password) — must match CNPG bootstrap credentials.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:

@@ -1,5 +1,4 @@
-# Optional: create 1Password item "bookboss-metadata" with fields
-# hardcover_api_token and googlebooks_api_token (or remove this manifest until ready).
+# Optional — 1Password item bookboss-metadata (hardcover_api_token, googlebooks_api_token); omit item or manifest if unused.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
