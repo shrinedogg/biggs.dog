@@ -1,0 +1,49 @@
+---
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: b2-backup-bookboss
+  namespace: media
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: b2-backup-bookboss
+    creationPolicy: Owner
+  data:
+    - secretKey: B2_ACCOUNT_ID
+      remoteRef:
+        key: b2-backup-bookboss
+        property: keyID
+    - secretKey: B2_ACCOUNT_KEY
+      remoteRef:
+        key: b2-backup-bookboss
+        property: applicationKey
+    - secretKey: RESTIC_REPOSITORY
+      remoteRef:
+        key: b2-backup-bookboss
+        property: repository
+    - secretKey: RESTIC_PASSWORD
+      remoteRef:
+        key: biggs-dogg-restic-pass
+        property: password
+---
+apiVersion: volsync.backube/v1alpha1
+kind: ReplicationSource
+metadata:
+  name: bookboss-backup-source
+  namespace: media
+spec:
+  sourcePVC: bookboss-config-pvc
+  trigger:
+    schedule: "0 8 * * *"
+  restic:
+    pruneIntervalDays: 60
+    repository: b2-backup-bookboss
+    retain:
+      daily: 1
+      weekly: 1
+      monthly: 1
+      yearly: 1
+    copyMethod: Clone
