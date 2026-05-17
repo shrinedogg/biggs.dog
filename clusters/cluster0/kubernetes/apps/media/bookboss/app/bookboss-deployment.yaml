@@ -49,9 +49,9 @@ spec:
             - name: BOOKBOSS__FRONTEND__LISTEN_PORT
               value: "8080"
             - name: BOOKBOSS__LIBRARY__LIBRARY_PATH
-              value: /nfs-share/media/books
+              value: /nfs-share/books
             - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
-              value: /nfs-share/media/books/bookdrop
+              value: /nfs-share/books/bookdrop
             - name: BOOKBOSS__DATABASE__DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -90,9 +90,7 @@ spec:
             - name: bookboss-config
               mountPath: /data
             - name: media-nfs
-              mountPath: /nfs-share/media/books
-            - name: media-nfs
-              mountPath: /nfs-share/media/books/bookdrop
+              mountPath: /nfs-share
           resources:
             requests:
               memory: 256Mi
