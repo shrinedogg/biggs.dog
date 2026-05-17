@@ -26,11 +26,12 @@ spec:
   values:
     # nodeSelector:
     #   kubernetes.io/hostname: control-01
-    watchedResources: ["HTTPRoute"]
+    # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)
+    watchedResources: ["HTTPRoute", "Service"]
     domain: biggs.dog
     # fallthrough:
-      # enabled: true
-      # zones: [biggs.dog]
+    # enabled: true
+    # zones: [biggs.dog]
     dnsChallenge:
       enabled: true
       domain: dns01.clouddns.com
@@ -39,7 +40,7 @@ spec:
       type: LoadBalancer
       loadBalancerIP: 192.168.2.6
       port: 53
-      externalTrafficPolicy: Cluster  # Allow any node to forward traffic
+      externalTrafficPolicy: Cluster # Allow any node to forward traffic
       useTcp: true
     serviceAccount:
       create: true

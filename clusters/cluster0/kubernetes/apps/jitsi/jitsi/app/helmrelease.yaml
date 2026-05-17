@@ -158,6 +158,9 @@ spec:
           io.cilium/lb-ipam-ips: "192.168.2.9"
       useInternalStun: true
       publicIPs:
+        # WAN IP — external clients connect directly; requires UDM SE port forward UDP 10000 → 192.168.2.9:10000
+        - 87.92.48.51
+        # LAN service IP — used by Coturn as TURN relay peer to avoid hairpin NAT
         - 192.168.2.9
     coturn:
       enabled: true
@@ -177,8 +180,11 @@ spec:
         type: LoadBalancer
         annotations:
           io.cilium/lb-ipam-ips: "192.168.2.10"
+          # Registers turn.biggs.dog → 192.168.2.10 in k8s-gateway for internal DNS resolution
+          external-dns.alpha.kubernetes.io/hostname: "turn.biggs.dog"
       allowedPeerIPs:
-        - "10.244.0.0-10.244.255.255"
+        - "10.244.0.0-10.244.255.255" # pod CIDR
+        - "192.168.2.0-192.168.2.255" # service/LAN range — allows relay to JVB LB IP 192.168.2.9
       extraVolumes:
         - name: run
           emptyDir:
