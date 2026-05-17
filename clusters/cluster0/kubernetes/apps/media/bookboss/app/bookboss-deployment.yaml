@@ -51,7 +51,7 @@ spec:
             - name: BOOKBOSS__LIBRARY__LIBRARY_PATH
               value: /nfs-share/media/books
             - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
-              value: /nfs-share/media/books/library
+              value: /nfs-share/media/books/bookdrop
             - name: BOOKBOSS__DATABASE__DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -92,7 +92,7 @@ spec:
             - name: media-nfs
               mountPath: /nfs-share/media/books
             - name: media-nfs
-              mountPath: /nfs-share/media/books/library
+              mountPath: /nfs-share/media/books/bookdrop
           resources:
             requests:
               memory: 256Mi
