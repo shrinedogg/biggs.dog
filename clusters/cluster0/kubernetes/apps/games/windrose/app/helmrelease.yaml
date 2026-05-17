@@ -16,9 +16,9 @@ spec:
   values:
     resources:
       limits:
-        memory: 12Gi
+        memory: 15Gi
       requests:
-        memory: 12Gi
+        memory: 15Gi
     windroseDedicatedServer:
       port: 28050
       volumeStorageSize: "5Gi"
