@@ -168,10 +168,10 @@ spec:
       image:
         repository: coturn/coturn
         tag: "4.11"
-      # Preserve the auto-generated auth secret so the Jitsi web app TURN
-      # credentials continue to match after the chart reconciles.
+      # Preserve the Coturn auth secret so Prosody/Jitsi TURN credentials
+      # continue to match after the chart reconciles.
       staticAuth:
-        secret: "Ja2Kt9eHHM"
+        existingSecretName: jitsi-coturn-auth
       # The chart hardcodes tls-listening-port=443 with no override value.
       # Use the custom config escape-hatch to change it to 5349, which does
       # not conflict with the agentgateway (which owns WAN:443).
@@ -184,7 +184,6 @@ spec:
             listening-ip=0.0.0.0
             log-file=stdout
             use-auth-secret
-            static-auth-secret=Ja2Kt9eHHM
             no-multicast-peers
             no-cli
             no-loopback-peers
