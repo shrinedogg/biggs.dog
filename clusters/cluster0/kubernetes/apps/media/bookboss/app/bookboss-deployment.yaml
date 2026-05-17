@@ -74,24 +74,18 @@ spec:
                   name: bookboss-metadata
                   key: GOOGLEBOOKS_API_TOKEN
                   optional: true
-            - name: BOOKBOSS__OIDC__DISCOVERY_URL
-              valueFrom:
-                secretKeyRef:
-                  name: bookboss-oidc
-                  key: discovery_url
-                  optional: true
-            - name: BOOKBOSS__OIDC__CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: bookboss-oidc
-                  key: client_id
-                  optional: true
-            - name: BOOKBOSS__OIDC__CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: bookboss-oidc
-                  key: client_secret
-                  optional: true
+            # - name: BOOKBOSS__OIDC__CLIENT_ID
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: bookboss-oidc
+            #       key: client_id
+            #       optional: true
+            # - name: BOOKBOSS__OIDC__CLIENT_SECRET
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: bookboss-oidc
+            #       key: client_secret
+            #       optional: true
           volumeMounts:
             - name: bookboss-config
               mountPath: /data
