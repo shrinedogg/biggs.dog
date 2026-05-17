@@ -1,0 +1,28 @@
+# 1Password: item bookboss-user-password (username, password) — must match CNPG bootstrap credentials.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: bookboss-database-url
+  namespace: media
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: bookboss-database-url
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        DATABASE_URL: >-
+          postgres://{{ .username | urlquery }}:{{ .password | urlquery }}@cnpg-bookboss-rw.cnpg-system.svc.cluster.local:5432/bookboss
+  data:
+    - secretKey: username
+      remoteRef:
+        key: bookboss-user-password
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: bookboss-user-password
+        property: password

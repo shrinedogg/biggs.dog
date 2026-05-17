@@ -1,0 +1,23 @@
+# Optional — 1Password item bookboss-metadata (hardcover_api_token, googlebooks_api_token); omit item or manifest if unused.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: bookboss-metadata
+  namespace: media
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: bookboss-metadata
+    creationPolicy: Owner
+  data:
+    - secretKey: HARDCOVER_API_TOKEN
+      remoteRef:
+        key: bookboss-metadata
+        property: hardcover_api_token
+    - secretKey: GOOGLEBOOKS_API_TOKEN
+      remoteRef:
+        key: bookboss-metadata
+        property: googlebooks_api_token
