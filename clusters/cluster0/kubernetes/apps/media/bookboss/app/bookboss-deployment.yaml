@@ -49,9 +49,9 @@ spec:
             - name: BOOKBOSS__FRONTEND__LISTEN_PORT
               value: "8080"
             - name: BOOKBOSS__LIBRARY__LIBRARY_PATH
-              value: /nfs-share/books
+              value: /nfs-share/media/books
             - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
-              value: /nfs-share/books/bookdrop
+              value: /nfs-share/media/books/bookdrop
             - name: BOOKBOSS__DATABASE__DATABASE_URL
               valueFrom:
                 secretKeyRef:
