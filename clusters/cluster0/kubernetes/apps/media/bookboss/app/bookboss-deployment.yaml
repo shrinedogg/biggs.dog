@@ -29,7 +29,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: bookboss
-          image: ghcr.io/szinn/bookboss:v0.8.29
+          image: ghcr.io/szinn/bookboss:v0.8.30
           imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
