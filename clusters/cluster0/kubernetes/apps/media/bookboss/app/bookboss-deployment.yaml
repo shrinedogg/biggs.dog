@@ -24,6 +24,8 @@ spec:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
+        runAsNonRoot: true
+        fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
       automountServiceAccountToken: false
@@ -52,6 +54,8 @@ spec:
               value: /library
             - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
               value: /nfs-share/epub
+            - name: RUST_LOG
+              value: "debug"
             - name: BOOKBOSS__DATABASE__DATABASE_URL
               valueFrom:
                 secretKeyRef:
