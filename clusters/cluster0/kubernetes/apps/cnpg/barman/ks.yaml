@@ -1,11 +1,36 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: cnpg-barman-certs
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cert-manager
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: cnpg-barman-certs
+  targetNamespace: cnpg-system
+  path: ./clusters/cluster0/kubernetes/apps/cnpg/barman/certificates/
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # Wait for the CA + leaf Certificates to become Ready (secrets created)
+  # before the plugin HelmRelease rolls its Deployment.
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: cnpg-barman
   namespace: flux-system
 spec:
   dependsOn:
     - name: cnpg-secrets
+    - name: cnpg-barman-certs
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg-barman
@@ -41,4 +66,3 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 2m
-
