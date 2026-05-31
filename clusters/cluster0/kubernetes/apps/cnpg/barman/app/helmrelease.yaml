@@ -13,10 +13,11 @@ spec:
   values:
     crds:
       create: true
-    # The chart's self-signed leaf certs are rejected by cert-manager >= 1.18
-    # (cloudnative-pg/charts#781). We supply barman-cloud-server-tls /
-    # barman-cloud-client-tls ourselves from a real CA chain, reconciled first
-    # by the cnpg-barman-certs Kustomization (../certificates/).
+    # The chart's self-signed leaf certs (isCA: false) are rejected by
+    # cert-manager >= 1.18 (cloudnative-pg/charts#781). We supply
+    # barman-cloud-server-tls / barman-cloud-client-tls ourselves as self-signed
+    # CA certs, reconciled first by the cnpg-barman-certs Kustomization
+    # (../certificates/).
     certificate:
       createServerCertificate: false
       createClientCertificate: false

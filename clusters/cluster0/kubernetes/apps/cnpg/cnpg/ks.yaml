@@ -50,6 +50,9 @@ spec:
   dependsOn:
     - name: cnpg-secrets
     - name: openebs
+    # Clusters use the barman-cloud plugin; the plugin + ObjectStore must exist
+    # (and its TLS be valid) before the Clusters can become healthy.
+    - name: cnpg-barman-object-store
   targetNamespace: cnpg-system
   commonMetadata:
     labels:
@@ -63,5 +66,3 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 2m
-
-

@@ -1,56 +1,34 @@
 ---
-# Replacement TLS for the barman-cloud plugin.
+# Replacement TLS for the barman-cloud plugin (cloudnative-pg/charts#781).
 #
-# The plugin-barman-cloud chart issues its gRPC server/client certs directly
-# from a cert-manager selfSigned Issuer (isCA: false). On cert-manager >= 1.18
-# those self-signed leaves are stamped CA:FALSE, so the CNPG operator's x509
-# verification rejects them with:
-#   "parent certificate cannot sign this kind of certificate ... barman-cloud"
-# See cloudnative-pg/charts#781.
+# The CNPG operator builds its trust pool from the *server* secret's `tls.crt`
+# (not `ca.crt`) and the plugin builds its client trust pool from the *client*
+# secret's `tls.crt`:
+#   operator: RootCAs = serverSecret["tls.crt"];  ServerName = "barman-cloud"
+#   plugin:   ClientCAs = clientSecret["tls.crt"]
+# (see internal/controller/plugin_controller.go and
+#  cnpg-i-machinery pkg/pluginhelper/http/server.go)
 #
-# We instead issue both certs from a real CA (selfSigned root -> CA -> leaves)
-# so each secret's ca.crt is a valid signing authority.
+# Each leaf is therefore used as its own trust anchor, so both certs MUST be
+# self-signed CAs. The chart issues them with `isCA: false`; on cert-manager
+# >= 1.18 that yields BasicConstraints CA:FALSE, which Go rejects with
+# "parent certificate cannot sign this kind of certificate".
+#
+# We re-issue both as self-signed CA certs (isCA: true + `cert sign`) so each
+# can validate itself.
 apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
-  name: barman-cloud-selfsigned-root
+  name: barman-cloud-selfsigned
 spec:
   selfSigned: {}
 ---
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
-  name: barman-cloud-ca
-spec:
-  isCA: true
-  commonName: barman-cloud-ca
-  secretName: barman-cloud-ca
-  duration: 87600h # 10y
-  renewBefore: 8760h # 1y
-  privateKey:
-    algorithm: ECDSA
-    size: 256
-  usages:
-    - cert sign
-    - crl sign
-  issuerRef:
-    name: barman-cloud-selfsigned-root
-    kind: Issuer
-    group: cert-manager.io
----
-apiVersion: cert-manager.io/v1
-kind: Issuer
-metadata:
-  name: barman-cloud-ca-issuer
-spec:
-  ca:
-    secretName: barman-cloud-ca
----
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
   name: barman-cloud-server
 spec:
+  isCA: true
   commonName: barman-cloud
   dnsNames:
     - barman-cloud
@@ -60,12 +38,13 @@ spec:
   secretName: barman-cloud-server-tls
   duration: 2160h
   renewBefore: 360h
-  usages:
-    - server auth
   privateKey:
     rotationPolicy: Always
+  usages:
+    - server auth
+    - cert sign
   issuerRef:
-    name: barman-cloud-ca-issuer
+    name: barman-cloud-selfsigned
     kind: Issuer
     group: cert-manager.io
 ---
@@ -74,15 +53,17 @@ kind: Certificate
 metadata:
   name: barman-cloud-client
 spec:
+  isCA: true
   commonName: barman-cloud-client
   secretName: barman-cloud-client-tls
   duration: 2160h
   renewBefore: 360h
-  usages:
-    - client auth
   privateKey:
     rotationPolicy: Always
+  usages:
+    - client auth
+    - cert sign
   issuerRef:
-    name: barman-cloud-ca-issuer
+    name: barman-cloud-selfsigned
     kind: Issuer
     group: cert-manager.io
