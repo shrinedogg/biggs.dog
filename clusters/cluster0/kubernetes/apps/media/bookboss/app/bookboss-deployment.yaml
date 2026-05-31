@@ -49,9 +49,9 @@ spec:
             - name: BOOKBOSS__FRONTEND__LISTEN_PORT
               value: "8080"
             - name: BOOKBOSS__LIBRARY__LIBRARY_PATH
-              value: /nfs-share/books
+              value: /library
             - name: BOOKBOSS__IMPORT__BOOKDROP_PATH
-              value: /nfs-share/books/bookdrop
+              value: /nfs-share/epub
             - name: BOOKBOSS__DATABASE__DATABASE_URL
               valueFrom:
                 secretKeyRef:
@@ -89,6 +89,8 @@ spec:
           volumeMounts:
             - name: bookboss-config
               mountPath: /data
+            - name: bookboss-library
+              mountPath: /library
             - name: media-nfs
               mountPath: /nfs-share
           resources:
@@ -100,6 +102,9 @@ spec:
         - name: bookboss-config
           persistentVolumeClaim:
             claimName: bookboss-config-pvc
+        - name: bookboss-library
+          persistentVolumeClaim:
+            claimName: bookboss-library-pvc
         - name: media-nfs
           persistentVolumeClaim:
             claimName: media-nfs-pvc
