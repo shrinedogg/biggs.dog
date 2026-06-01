@@ -167,7 +167,7 @@ spec:
       replicaCount: 1
       image:
         repository: coturn/coturn
-        tag: "4.11"
+        tag: "4.12"
       # Preserve the Coturn auth secret so Prosody/Jitsi TURN credentials
       # continue to match after the chart reconciles.
       staticAuth:
