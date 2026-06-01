@@ -31,7 +31,7 @@ spec:
             valueFrom:
               fieldRef:
                 fieldPath: spec.nodeName
-        image: intel/intel-gpu-plugin:0.35.0
+        image: intel/intel-gpu-plugin:0.36.0
         args:
         - -shared-dev-num
         - "4"
