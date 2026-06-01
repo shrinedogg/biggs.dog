@@ -15,12 +15,16 @@ spec:
         namespace: flux-system
   values:
     # The single securityContext/podSecurityContext pair is applied to BOTH the
-    # balancer Deployment and the worker StatefulSet. We apply the user-agnostic
-    # hardening (drop ALL capabilities, no privilege escalation, RuntimeDefault
-    # seccomp). runAsNonRoot/runAsUser are deliberately omitted because the
-    # upstream image's default user is not verified — forcing non-root could block
-    # admission. readOnlyRootFilesystem is not used: searchd writes its pid file
-    # and unix socket under /var/run and the chart exposes no emptyDir hook.
+    # balancer Deployment and the worker StatefulSet. The Manticore images
+    # (manticoresearch/helm-worker|balancer) have no USER directive, so their
+    # entrypoint, supervisord and searchd all run as root. The entrypoint creates
+    # the /etc/ssl/cert.pem CA symlink and writes to manticore-owned data dirs,
+    # which need a few capabilities; dropping ALL of them caused:
+    #   ln: failed to create symbolic link '/etc/ssl/cert.pem': Permission denied
+    # We therefore drop ALL and add back only the minimal set the root entrypoint
+    # needs (file-permission override, ownership, and privilege-dropping caps).
+    # The image is not built to start as non-root, so runAsNonRoot/runAsUser and
+    # readOnlyRootFilesystem are not used.
     podSecurityContext:
       seccompProfile:
         type: RuntimeDefault
@@ -29,6 +33,13 @@ spec:
       capabilities:
         drop:
           - ALL
+        add:
+          - CHOWN
+          - DAC_OVERRIDE
+          - FOWNER
+          - SETGID
+          - SETUID
+          - SETPCAP
       seccompProfile:
         type: RuntimeDefault
     persistence:
