@@ -30,7 +30,7 @@ spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
-        - image: jasongdove/ersatztv:v26.3.0
+        - image: ersatztv/legacy:294a2ff10e5e03911b6efa299dd84993d8e5db5b
           imagePullPolicy: Always
           name: ersatz
           securityContext:
