@@ -24,6 +24,25 @@ spec:
   uninstall:
     keepHistory: false
   values:
+    # CoreDNS listens on container port 1053 (the Service maps 53 -> 1053), so it
+    # can run fully non-root with no added capabilities (NET_BIND_SERVICE is not
+    # required). The chart already forces runAsUser 1000 while secure: true.
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      runAsGroup: 1000
+      fsGroup: 1000
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      runAsNonRoot: true
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
     # nodeSelector:
     #   kubernetes.io/hostname: control-01
     # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)

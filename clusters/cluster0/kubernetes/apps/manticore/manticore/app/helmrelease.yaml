@@ -14,6 +14,23 @@ spec:
         name: manticore
         namespace: flux-system
   values:
+    # The single securityContext/podSecurityContext pair is applied to BOTH the
+    # balancer Deployment and the worker StatefulSet. We apply the user-agnostic
+    # hardening (drop ALL capabilities, no privilege escalation, RuntimeDefault
+    # seccomp). runAsNonRoot/runAsUser are deliberately omitted because the
+    # upstream image's default user is not verified — forcing non-root could block
+    # admission. readOnlyRootFilesystem is not used: searchd writes its pid file
+    # and unix socket under /var/run and the chart exposes no emptyDir hook.
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
     persistence:
       enabled: true
       storageClass: "host-path"

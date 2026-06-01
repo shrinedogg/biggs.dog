@@ -20,6 +20,7 @@ spec:
         spec:
           restartPolicy: OnFailure
           hostPID: true
+          automountServiceAccountToken: false
           nodeSelector:
             kubernetes.io/hostname: control-01
           containers:
@@ -43,7 +44,21 @@ spec:
                 - name: dev-zfs
                   mountPath: /dev/zfs
               securityContext:
-                privileged: true
+                # ZFS send/snapshot operations go through ioctls on the
+                # explicitly-mounted /dev/zfs device, which require CAP_SYS_ADMIN
+                # but not full privileged mode. Drop every other capability and
+                # forbid privilege escalation beyond the granted capability.
+                # NOTE: validate the next scheduled run — if zfs operations fail,
+                # revert to `privileged: true`.
+                privileged: false
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop:
+                    - ALL
+                  add:
+                    - SYS_ADMIN
+                seccompProfile:
+                  type: RuntimeDefault
               resources:
                 requests:
                   memory: "512Mi"

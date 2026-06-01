@@ -141,7 +141,7 @@ spec:
           url: https://raw.githubusercontent.com/dotdc/grafana-dashboards-kubernetes/master/dashboards/k8s-views-global.json
           # gnetId: 15757
           # revision: 43
-          token: ''
+          token: ""
           datasource: VictoriaMetrics
           folder: Kubernetes
         kubernetes-namespaces:
@@ -182,6 +182,19 @@ spec:
           url: https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/grafana/dashboards/request-handling-performance.json
           datasource: VictoriaMetrics
     sidecar:
+      # containerSecurityContext does NOT apply to the sidecars; they read their
+      # own sidecar.securityContext. Defaults already drop ALL caps / disallow
+      # privilege escalation, so we add readOnlyRootFilesystem (sidecars only
+      # write into the provisioning emptyDir mounts).
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
       dashboards:
         enabled: true
         searchNamespace: ALL
@@ -205,3 +218,30 @@ spec:
     testFramework:
       enabled: false
     assertNoLeakedSecrets: false
+    # Grafana's chart ships a secure pod/container context by default (non-root
+    # 472, drop ALL, no privilege escalation, RuntimeDefault seccomp); the only
+    # missing control is readOnlyRootFilesystem, which we enable here. /var/lib/grafana
+    # and /var/lib/grafana-search are already writable mounts; Grafana also needs a
+    # writable /tmp, provided below via an emptyDir.
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 472
+      runAsGroup: 472
+      fsGroup: 472
+      seccompProfile:
+        type: RuntimeDefault
+    containerSecurityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      privileged: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
+    extraVolumeMounts:
+      - name: tmp
+        mountPath: /tmp
+    extraVolumes:
+      - name: tmp
+        emptyDir: {}

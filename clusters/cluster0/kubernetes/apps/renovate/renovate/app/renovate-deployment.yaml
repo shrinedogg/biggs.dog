@@ -11,52 +11,68 @@ spec:
       labels:
         app: renovate
     spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       containers:
         - image: ghcr.io/mend/renovate-ce:14.5.0
           imagePullPolicy: Always
           name: renovate
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           env:
-          - name: MEND_RNV_DATA_HANDLER_TYPE
-            value: postgresql
-          - name: PGPASSWORD
-            valueFrom:
-              secretKeyRef:
-                name: renovate-user-password
-                key: password
-          - name: PGDATABASE
-            valueFrom:
-              secretKeyRef:
-                name: renovate-user-password
-                key: username
-          - name: PGUSER
-            value: renovate
-          - name: PGPORT
-            value: "5432"
-          - name: PGHOST
-            value: cnpg-renovate-rw.cnpg-system.svc.cluster.local
-          - name: MEND_RNV_PLATFORM
-            value: github
-          - name: MEND_RNV_GITHUB_APP_KEY
-            valueFrom:
-              secretKeyRef:
-                name: renovate-github-key
-                key: private-key
-          - name: MEND_RNV_GITHUB_APP_ID
-            valueFrom:
-              secretKeyRef:
-                name: renovate-github-secret
-                key: app-id
-          - name: MEND_RNV_ACCEPT_TOS
-            value: "y"
-          - name: MEND_RNV_LICENSE_KEY
-            value: "eyJsaW1pdCI6IjEwIn0=.30440220457941b71ea8eb345c729031718b692169f0ce2cf020095fd328812f4d7d5bc1022022648d1a29e71d486f89f27bdc8754dfd6df0ddda64a23155000a61a105da2a1"
+            - name: MEND_RNV_DATA_HANDLER_TYPE
+              value: postgresql
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: renovate-user-password
+                  key: password
+            - name: PGDATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: renovate-user-password
+                  key: username
+            - name: PGUSER
+              value: renovate
+            - name: PGPORT
+              value: "5432"
+            - name: PGHOST
+              value: cnpg-renovate-rw.cnpg-system.svc.cluster.local
+            - name: MEND_RNV_PLATFORM
+              value: github
+            - name: MEND_RNV_GITHUB_APP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: renovate-github-key
+                  key: private-key
+            - name: MEND_RNV_GITHUB_APP_ID
+              valueFrom:
+                secretKeyRef:
+                  name: renovate-github-secret
+                  key: app-id
+            - name: MEND_RNV_ACCEPT_TOS
+              value: "y"
+            - name: MEND_RNV_LICENSE_KEY
+              value: "eyJsaW1pdCI6IjEwIn0=.30440220457941b71ea8eb345c729031718b692169f0ce2cf020095fd328812f4d7d5bc1022022648d1a29e71d486f89f27bdc8754dfd6df0ddda64a23155000a61a105da2a1"
           ports:
-          - name: renovate
-            containerPort: 8080
-            protocol: TCP
+            - name: renovate
+              containerPort: 8080
+              protocol: TCP
           volumeMounts:
-          - name: renovate-config
-            mountPath: /config
+            - name: renovate-config
+              mountPath: /config
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               memory: 250Mi
@@ -67,9 +83,14 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
-      - name: renovate-config
-        persistentVolumeClaim:
-          claimName: "renovate-config"
+        - name: renovate-config
+          persistentVolumeClaim:
+            claimName: "renovate-config"
+        # Required because the container runs with readOnlyRootFilesystem: true.
+        # Renovate writes its working data (repo clones, caches, SQLite when used)
+        # under /tmp — read-only rootfs is officially supported by renovate-ce.
+        - name: tmp
+          emptyDir: {}
   selector:
     matchLabels:
       app: renovate

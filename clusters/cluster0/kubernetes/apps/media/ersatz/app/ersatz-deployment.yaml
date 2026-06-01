@@ -18,12 +18,26 @@ spec:
       labels:
         app: ersatz
     spec:
+      # ErsatzTV (jasongdove/ersatztv) is built to run as root (config lives under
+      # /root/.local/share/ersatztv and there is no PUID/PGID support), so
+      # runAsNonRoot/readOnlyRootFilesystem are not set. All other hardening that
+      # the image supports is applied: no privilege escalation, all capabilities
+      # dropped, RuntimeDefault seccomp, and no service-account token mounted.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
         - image: ersatztv/legacy:294a2ff10e5e03911b6efa299dd84993d8e5db5b
           imagePullPolicy: Always
           name: ersatz
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
             - name: TZ
               value: "Europe/Helsinki"
