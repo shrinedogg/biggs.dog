@@ -20,7 +20,7 @@ spec:
           type: RuntimeDefault
       automountServiceAccountToken: false
       containers:
-        - image: ghcr.io/mend/renovate-ce:14.5.0
+        - image: ghcr.io/mend/renovate-ce:14.6.0
           imagePullPolicy: Always
           name: renovate
           securityContext:
