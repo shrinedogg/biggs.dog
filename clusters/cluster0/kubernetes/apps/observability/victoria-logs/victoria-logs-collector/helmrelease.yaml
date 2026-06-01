@@ -110,17 +110,21 @@ spec:
     # -- Security context to be added to pod
     podSecurityContext:
       enabled: true
-      # fsGroup: 2000
+      seccompProfile:
+        type: RuntimeDefault
+      # NOTE: runAsNonRoot / runAsUser are intentionally NOT set. This DaemonSet
+      # must run as root to read root-owned host pod logs (/var/log, /var/lib) and
+      # to write vlagent checkpoint state to its writable hostPath (tmpDataPath).
+      # fsGroup does not apply to hostPath volumes, so it would not help here.
 
     # -- Security context to be added to pod's containers
     securityContext:
       enabled: true
-      # capabilities:
-      #   drop:
-      #     - ALL
-      # readOnlyRootFilesystem: true
-      # runAsNonRoot: true
-      # runAsUser: 1000
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop:
+          - ALL
 
     # -- Extra Volumes for the pod
     extraVolumes: []

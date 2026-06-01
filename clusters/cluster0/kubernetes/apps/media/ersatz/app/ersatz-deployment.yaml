@@ -18,24 +18,38 @@ spec:
       labels:
         app: ersatz
     spec:
+      # ErsatzTV (jasongdove/ersatztv) is built to run as root (config lives under
+      # /root/.local/share/ersatztv and there is no PUID/PGID support), so
+      # runAsNonRoot/readOnlyRootFilesystem are not set. All other hardening that
+      # the image supports is applied: no privilege escalation, all capabilities
+      # dropped, RuntimeDefault seccomp, and no service-account token mounted.
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
         - image: jasongdove/ersatztv:v26.3.0
           imagePullPolicy: Always
           name: ersatz
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
           env:
-          - name: TZ
-            value: "Europe/Helsinki"
+            - name: TZ
+              value: "Europe/Helsinki"
           ports:
             - name: ersatz-port
               containerPort: 8409
               protocol: TCP
           volumeMounts:
-          - name: ersatz-config
-            mountPath: /root/.local/share/ersatztv
-          - name: ersatz-media
-            mountPath: /nfs-share
+            - name: ersatz-config
+              mountPath: /root/.local/share/ersatztv
+            - name: ersatz-media
+              mountPath: /nfs-share
           resources:
             limits:
               gpu.intel.com/i915: "1"
@@ -46,12 +60,12 @@ spec:
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
-      - name: ersatz-config
-        persistentVolumeClaim:
-          claimName: ersatz-config-pvc
-      - name: ersatz-media
-        persistentVolumeClaim:
-          claimName: media-nfs-pvc
+        - name: ersatz-config
+          persistentVolumeClaim:
+            claimName: ersatz-config-pvc
+        - name: ersatz-media
+          persistentVolumeClaim:
+            claimName: media-nfs-pvc
   selector:
     matchLabels:
       app: ersatz

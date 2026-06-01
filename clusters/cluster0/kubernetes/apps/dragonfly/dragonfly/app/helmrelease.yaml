@@ -14,7 +14,22 @@ spec:
     crds:
       install: true
       keep: false
+    # The operator chart already ships runAsNonRoot + drop ALL + no privilege
+    # escalation; we add the seccomp profile and a read-only root filesystem to
+    # reach the restricted Pod Security Standard.
+    podSecurityContext:
+      runAsNonRoot: true
+      seccompProfile:
+        type: RuntimeDefault
     manager:
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop:
+            - ALL
+        seccompProfile:
+          type: RuntimeDefault
       topologySpreadConstraints:
         - maxSkew: 1 # Skew of 1 allows for rolling updates
           topologyKey: kubernetes.io/hostname

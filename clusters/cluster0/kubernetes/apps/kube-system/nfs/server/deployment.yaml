@@ -21,6 +21,14 @@ spec:
         app: nfs
     spec:
       terminationGracePeriodSeconds: 30
+      # This image runs an in-kernel NFS server (rpc.nfsd): it mounts the nfsd
+      # pseudo-filesystem, manages /proc/fs/nfsd and binds privileged ports. That
+      # genuinely requires privileged mode — it cannot run unprivileged or with a
+      # reduced capability set (see aminvakil/docker-alpine-nfs-server). The pod is
+      # therefore intentionally exempt from non-privileged hardening; the media
+      # namespace is labelled with the 'privileged' Pod Security Standard. We still
+      # drop the service-account token, which the server never needs.
+      automountServiceAccountToken: false
       containers:
         - image: quay.io/aminvakil/alpine-nfs-server:latest
           imagePullPolicy: Always
@@ -44,7 +52,12 @@ spec:
           lifecycle:
             preStop:
               exec:
-                command: ["/bin/sh", "-c", "echo \"Stopping NFS server gracefully...\"; exportfs -uav; sleep 5"]
+                command:
+                  [
+                    "/bin/sh",
+                    "-c",
+                    'echo "Stopping NFS server gracefully..."; exportfs -uav; sleep 5',
+                  ]
           resources:
             requests:
               memory: 12Mi

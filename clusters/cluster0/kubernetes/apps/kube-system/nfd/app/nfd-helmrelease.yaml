@@ -13,3 +13,28 @@ spec:
         kind: HelmRepository
         name: node-feature-discovery
         namespace: flux-system
+  values:
+    # master and worker ship a hardened container securityContext by default
+    # (runAsNonRoot, drop ALL, readOnlyRootFilesystem, no privilege escalation);
+    # we only add the RuntimeDefault seccomp profile to satisfy the restricted
+    # Pod Security Standard. The gc component has no container securityContext by
+    # default, so we set the full hardened context here.
+    master:
+      podSecurityContext:
+        seccompProfile:
+          type: RuntimeDefault
+    worker:
+      podSecurityContext:
+        seccompProfile:
+          type: RuntimeDefault
+    gc:
+      podSecurityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
