@@ -9,6 +9,41 @@ spec:
     name: affine
     namespace: flux-system
   interval: 3m
+  # The AFFiNE chart does not expose container securityContext values for its
+  # graphql/front Deployments or the migration Job (the graphql templates render
+  # no securityContext at all; front renders only a pod-level one). We inject the
+  # hardening with a Flux post-render Kustomize patch. The AFFiNE image is a
+  # Node.js app that runs as root, so we apply the user-independent controls only
+  # (drop ALL capabilities, no privilege escalation, RuntimeDefault seccomp);
+  # runAsNonRoot/readOnlyRootFilesystem are not forced because the image does not
+  # support them.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+            patch: |
+              - op: add
+                path: /spec/template/spec/containers/0/securityContext
+                value:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                      - ALL
+                  seccompProfile:
+                    type: RuntimeDefault
+          - target:
+              kind: Job
+            patch: |
+              - op: add
+                path: /spec/template/spec/containers/0/securityContext
+                value:
+                  allowPrivilegeEscalation: false
+                  capabilities:
+                    drop:
+                      - ALL
+                  seccompProfile:
+                    type: RuntimeDefault
   values:
     global:
       app:
@@ -30,7 +65,7 @@ spec:
         # sectionName targets a specific listener on the Gateway (optional).
         sectionName: ""
         annotations: {}
-        hostnames: 
+        hostnames:
           - "affine.biggs.dog"
       secret:
         secretName: "affine-private-key"
