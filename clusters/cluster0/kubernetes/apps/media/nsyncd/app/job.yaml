@@ -51,7 +51,6 @@ spec:
                 # NOTE: validate the next scheduled run — if zfs operations fail,
                 # revert to `privileged: true`.
                 privileged: true
-                allowPrivilegeEscalation: false
                 capabilities:
                   drop:
                     - ALL
