@@ -44,10 +44,10 @@ spec:
             privileged: true
           resources:
             limits:
-              nvidia.com/gpu: 1
+              nvidia.com/gpu: "1"
               memory: 42Gi
             requests:
-              nvidia.com/gpu: 1
+              nvidia.com/gpu: "1"
               memory: 42Gi
           volumeMounts:
             - mountPath: /storage
