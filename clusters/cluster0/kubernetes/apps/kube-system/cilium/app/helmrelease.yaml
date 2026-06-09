@@ -48,7 +48,7 @@ spec:
       exclusive: true
     dashboards:
       enabled: true
-    devices: "eth+ enp+ enx+ bond+"
+    devices: "eth+ enp+ enx+ eno+ ens+ bond+"
     endpointRoutes:
       enabled: true
     envoy:
