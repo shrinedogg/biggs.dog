@@ -18,3 +18,12 @@ spec:
   values:
     nfd:
       enabled: true
+    # Talos provides the driver via the nonfree-kmod-nvidia system extension.
+    driver:
+      enabled: false
+    # Talos provides nvidia-container-toolkit via system extension + machine config;
+    # the operator cannot mutate the immutable Talos host, so keep it disabled.
+    toolkit:
+      enabled: false
+    operator:
+      defaultRuntime: containerd
