@@ -3,7 +3,6 @@ kind: Service
 metadata:
   name: windows
 spec:
-  internalTrafficPolicy: Cluster
   ports:
     - name: http
       port: 8006
@@ -23,4 +22,4 @@ spec:
       targetPort: 5900
   selector:
     app: windows
-  type: ClusterIP
+  type: LoadBalancer
