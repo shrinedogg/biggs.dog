@@ -9,7 +9,7 @@ spec:
   interval: 3m
   chart:
     spec:
-      chart: nvidia
+      chart: gpu-operator
       version: 26.3.2
       sourceRef:
         kind: HelmRepository
