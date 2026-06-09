@@ -1,5 +1,6 @@
 .wip/
 .talos/
 .sops*
+.zed/
 age.agekey
 bootstrap-flux.sh

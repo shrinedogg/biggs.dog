@@ -25,3 +25,4 @@ resources:
   - affine-oci.yaml
   - manticore-repo.yaml
   - windrose-repo.yaml
+  - nvidia-repo.yaml
