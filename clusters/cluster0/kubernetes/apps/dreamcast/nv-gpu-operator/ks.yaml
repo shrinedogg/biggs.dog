@@ -2,14 +2,14 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app openebs
+  name: &app nv-gpu-operator
   namespace: flux-system
 spec:
-  targetNamespace: openebs-system
+  targetNamespace: dreamcast
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/openebs/openebs/app
+  path: ./clusters/cluster0/kubernetes/apps/dreamcast/nv-gpu-operator/app
   prune: true
   sourceRef:
     kind: GitRepository
@@ -18,26 +18,3 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 2m
----
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app openebs-volumes
-  namespace: flux-system
-spec:
-  targetNamespace: openebs-system
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/openebs/openebs/volumes
-  prune: true
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  wait: true
-  interval: 3m
-  retryInterval: 1m
-  timeout: 2m
-  dependsOn:
-    - name: openebs
-    - name: zfs

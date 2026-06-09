@@ -5,5 +5,5 @@ resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
   # Flux-Kustomizations
-  # - ./windows/ks.yaml
-  # - ./nv-gpu-operator/ks.yaml
+  - ./windows/ks.yaml
+  - ./nv-gpu-operator/ks.yaml

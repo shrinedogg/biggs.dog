@@ -16,3 +16,5 @@ spec:
         name: nvidia
         namespace: flux-system
   values:
+    nfd:
+      enabled: true
