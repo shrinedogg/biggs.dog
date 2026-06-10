@@ -26,3 +26,5 @@ resources:
   - manticore-repo.yaml
   - windrose-repo.yaml
   - nvidia-repo.yaml
+  - fenrir-git.yaml
+  - fenrir-oci.yaml

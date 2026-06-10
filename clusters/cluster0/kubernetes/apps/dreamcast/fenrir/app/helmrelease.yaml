@@ -1,0 +1,19 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: fenrir
+  namespace: dreamcast
+spec:
+  interval: 3m
+  chartRef:
+    kind: OCIRepository
+    name: direwolf-operator
+    namespace: flux-system
+  # Upstream chart defaults are already correct for this cluster:
+  # - operator env WOLF_IMAGE=ghcr.io/games-on-whales/wolf:stable
+  # - moonlight-proxy LoadBalancer Service with lbipam.cilium.io/sharing-key: direwolf
+  #   (Cilium LB-IPAM shares one LB IP between the proxy and per-session services)
+  # - cert-manager Issuers/Certificates via rawResources (cert-manager is installed)
+  values: {}

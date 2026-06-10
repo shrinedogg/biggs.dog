@@ -27,3 +27,19 @@ spec:
       enabled: false
     operator:
       defaultRuntime: containerd
+    # Time-slice the single physical GPU into 4 schedulable nvidia.com/gpu
+    # replicas: fenrir session pods need one for the wolf sidecar and one for
+    # the game container, so a single GPU is not enough without sharing.
+    devicePlugin:
+      config:
+        create: true
+        name: time-slicing-config
+        default: time-slicing
+        data:
+          time-slicing: |-
+            version: v1
+            sharing:
+              timeSlicing:
+                resources:
+                  - name: nvidia.com/gpu
+                    replicas: 4

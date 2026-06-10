@@ -1,0 +1,82 @@
+---
+# yaml-language-server: $schema=https://github.com/games-on-whales/fenrir/raw/refs/heads/main/schemas/direwolf.games-on-whales.github.io/app_v1alpha1.json
+# Adapted from upstream examples/nvidia_devices/firefox.yaml
+# (appAssetWebP base64 poster stripped).
+apiVersion: direwolf.games-on-whales.github.io/v1alpha1
+kind: App
+metadata:
+  name: firefox
+  namespace: dreamcast
+spec:
+  id: 1
+  isHDRSupported: false
+  title: Firefox
+  # This will automatically provision storage with the default parameters
+  volumeClaimTemplate:
+    spec: {}
+  wolfConfig:
+    runtimeVariables:
+      renderNode: /dev/dri/renderD128
+  template:
+    spec:
+      containers:
+        - name: app
+          image: ghcr.io/games-on-whales/firefox:edge
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+              cpu: 2000m
+              memory: 4G
+            requests:
+              nvidia.com/gpu: "1"
+              cpu: 2000m
+              memory: 4G
+          command:
+            - /bin/bash
+            - -c
+            - |
+              cleanup() {
+                echo "Cleaning up..." >&2
+                exit 0
+              }
+              trap cleanup SIGINT SIGTERM
+
+              # Wait for wayland display to be available
+              while [ ! -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]; do
+                echo "Waiting for wayland display..." >&2
+                sleep 1
+              done
+
+              while [ ! -S $XDG_RUNTIME_DIR/pulse-socket ]; do
+                echo "Waiting for pulse socket..." >&2
+                sleep 1
+              done
+
+              export PULSE_SINK="$(pactl list sinks short | awk '$2 ~ /^virtual_sink/ {print $2; exit}')"
+              export PULSE_SOURCE="${PULSE_SINK}.monitor"
+              exec /entrypoint.sh
+---
+# Adapted from upstream examples/testball.yaml (appAssetWebP base64 poster
+# stripped). Synthetic GStreamer test source; useful for verifying streaming
+# without a real app container.
+apiVersion: direwolf.games-on-whales.github.io/v1alpha1
+kind: App
+metadata:
+  name: testball
+  namespace: dreamcast
+spec:
+  id: 3
+  isHDRSupported: false
+  title: Test Ball
+  # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
+  wolfConfig:
+    runtimeVariables:
+      renderNode: /dev/dri/renderD128
+    startAudioServer: false
+    startVirtualCompositor: false
+    audio:
+      source: 'audiotestsrc wave=ticks is-live=true'
+    video:
+      source: |
+        videotestsrc pattern=ball flip=true is-live=true !
+        video/x-raw, framerate={fps}/1

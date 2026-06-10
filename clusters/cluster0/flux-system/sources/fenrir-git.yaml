@@ -1,0 +1,13 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: fenrir
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://github.com/games-on-whales/fenrir
+  ref:
+    branch: main
+    # Pinned for reproducibility; bump deliberately to pick up CRD changes.
+    commit: cdda8f789e9983c8416f0db2fe57d9b27881a83a
