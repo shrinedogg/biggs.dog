@@ -182,11 +182,12 @@ spec:
             sleep 1
           done
 
-          export PULSE_SINK="$(pactl list sinks short | awk '$2 ~ /^virtual_sink/ {print $2; exit}')"
-          export PULSE_SOURCE="${PULSE_SINK}.monitor"
-          # while true; do
-          #   sleep 1
-          # done
+          # Do NOT export PULSE_SINK/PULSE_SOURCE here: this image has no
+          # pactl, so the old lookup exported PULSE_SINK="" and
+          # PULSE_SOURCE=".monitor". libpulse treats a set-but-bogus device
+          # name as an explicit request and fails the stream instead of
+          # falling back, leaving Steam silent. The wolf pulseaudio server
+          # already makes the session's virtual sink the default sink.
 
           chown -R $PUID:$PGID /home/retro
           chmod -R 777 /home/retro
