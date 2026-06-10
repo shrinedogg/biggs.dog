@@ -11,11 +11,16 @@ metadata:
 spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 1
-  isHDRSupported: false
+  isHDRSupported: true
   title: Firefox
-  # This will automatically provision storage with the default parameters
+  # Operator defaults: RWO, 5Gi. Explicit ceph-block instead of the default
+  # host-path SC: on Talos the kubelet container sees /var/mnt (the openebs
+  # host-path base) read-only, so it cannot create the state/<app> subPath
+  # directory on local PVs (CreateContainerConfigError). CSI volumes are
+  # mounted under /var/lib/kubelet, which kubelet can write.
   volumeClaimTemplate:
-    spec: {}
+    spec:
+      storageClassName: host-path
   wolfConfig:
     runtimeVariables:
       renderNode: /dev/dri/renderD128
@@ -69,7 +74,7 @@ metadata:
 spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 3
-  isHDRSupported: false
+  isHDRSupported: true
   title: Test Ball
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:

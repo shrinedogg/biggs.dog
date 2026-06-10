@@ -21,6 +21,18 @@ spec:
           value: all
         - name: NVIDIA_VISIBLE_DEVICES
           value: all
+        # wolf:stable must start as root: its supervisord.conf has user=root
+        # and drops privileges per-program itself. The operator injects
+        # PUID=1000/UNAME=ubuntu, making the GOW entrypoint gosu to a non-root
+        # user before supervisord runs -> "Can't drop privilege as nonroot
+        # user" crash loop. Policy env is appended after the operator's
+        # defaults, so these duplicates win (kubelet keeps the last value).
+        - name: PUID
+          value: "0"
+        - name: PGID
+          value: "0"
+        - name: UNAME
+          value: root
       resources:
         requests:
           nvidia.com/gpu: "1"
