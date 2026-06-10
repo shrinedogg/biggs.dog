@@ -47,4 +47,10 @@ spec:
         containers:
           proxy:
             image:
-              tag: main
+              # Patched fork: /launch waits up to 120s (upstream 25s) for the
+              # session pod to come up. A cold start (image pull + wolf boot +
+              # agent readiness) exceeds 25s, so upstream returned 500 right
+              # before the pod was ready and the client cancelled the session.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.1).
+              repository: docker.io/shrinedogg/moonlight-proxy
+              tag: v0.1.1

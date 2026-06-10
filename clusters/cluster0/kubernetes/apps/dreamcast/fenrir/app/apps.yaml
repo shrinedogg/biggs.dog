@@ -105,6 +105,16 @@ spec:
   id: 2
   isHDRSupported: true
   title: Steam
+  # Persists /home/retro (Steam login, library, installed games) across
+  # sessions; without it the operator uses an ephemeral emptyDir. Local
+  # host-path keeps game data on the GPU node. Note: openebs host-path does
+  # not enforce the capacity request, it is bounded by the node's disk.
+  volumeClaimTemplate:
+    spec:
+      storageClassName: host-path
+      resources:
+        requests:
+          storage: 250Gi
   template:
     spec:
       hostIPC: true
