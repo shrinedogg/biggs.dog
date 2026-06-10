@@ -14,6 +14,24 @@ spec:
     requests:
       nvidia.com/gpu: "1"
       memory: 42G
+  # wolf:stable must start as root: its supervisord.conf has user=root and
+  # drops privileges per-program itself, but the operator hardcodes
+  # PUID=1000/UNAME=ubuntu into the wolf container, so the GOW entrypoint
+  # gosu's to a non-root user before supervisord runs -> "Can't drop
+  # privilege as nonroot user" crash loop.
+  #
+  # Do NOT fix this by re-declaring PUID/PGID/UNAME in the policy env: the
+  # operator builds the Deployment with server-side apply and env is a
+  # listType=map keyed by name, so duplicate names are rejected outright
+  # ("duplicate entries for key [name=PUID]") and the session Deployment is
+  # never created -- Moonlight then hangs until it times out. Instead, shadow
+  # the GOW /entrypoint.sh with a wrapper that forces root and skips gosu
+  # (see wolf-entrypoint.yaml).
+  volumes:
+    - name: wolf-root-entrypoint
+      configMap:
+        name: wolf-root-entrypoint
+        defaultMode: 0755
   sidecarPolicies:
     wolf:
       env:
@@ -21,18 +39,10 @@ spec:
           value: all
         - name: NVIDIA_VISIBLE_DEVICES
           value: all
-        # wolf:stable must start as root: its supervisord.conf has user=root
-        # and drops privileges per-program itself. The operator injects
-        # PUID=1000/UNAME=ubuntu, making the GOW entrypoint gosu to a non-root
-        # user before supervisord runs -> "Can't drop privilege as nonroot
-        # user" crash loop. Policy env is appended after the operator's
-        # defaults, so these duplicates win (kubelet keeps the last value).
-        - name: PUID
-          value: "0"
-        - name: PGID
-          value: "0"
-        - name: UNAME
-          value: root
+      volumeMounts:
+        - name: wolf-root-entrypoint
+          mountPath: /entrypoint.sh
+          subPath: entrypoint.sh
       resources:
         requests:
           nvidia.com/gpu: "1"
