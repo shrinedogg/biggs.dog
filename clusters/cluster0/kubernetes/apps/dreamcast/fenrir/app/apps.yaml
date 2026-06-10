@@ -85,7 +85,7 @@ spec:
     runtimeVariables:
       # See the firefox app above: the dGPU's DRM node is renderD129.
       renderNode: /dev/dri/renderD129
-    startAudioServer:  
+    startAudioServer: false
     startVirtualCompositor: false
     audio:
       source: 'audiotestsrc wave=ticks is-live=true'
