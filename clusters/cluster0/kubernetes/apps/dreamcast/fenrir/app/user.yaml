@@ -39,6 +39,13 @@ spec:
           value: all
         - name: NVIDIA_VISIBLE_DEVICES
           value: all
+        # The gpu-operator (CDI mode) injects the driver under /usr/local/lib
+        # and creates the GBM backend symlink at /usr/local/lib/gbm/, but the
+        # image's Mesa libgbm only searches /usr/lib/x86_64-linux-gnu/gbm.
+        # Without the nvidia backend, waylanddisplaysrc cannot allocate
+        # DMA-BUFs ("Failed to create GsCUDABuf" panic -> no video stream).
+        - name: GBM_BACKENDS_PATH
+          value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
