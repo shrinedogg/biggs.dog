@@ -16,4 +16,20 @@ spec:
   # - moonlight-proxy LoadBalancer Service with lbipam.cilium.io/sharing-key: direwolf
   #   (Cilium LB-IPAM shares one LB IP between the proxy and per-session services)
   # - cert-manager Issuers/Certificates via rawResources (cert-manager is installed)
-  values: {}
+  values:
+    # The SNAPSHOT chart was built from PR #7 and bakes the CI ref "7/merge"
+    # into its image tags, which kubelet rejects (InvalidImageName). Override
+    # all three with the published "main" tag (pullPolicy is Always upstream).
+    controllers:
+      direwolf_operator:
+        containers:
+          operator:
+            image:
+              tag: main
+            env:
+              AGENT_IMAGE: ghcr.io/games-on-whales/fenrir/wolf-agent:main
+      moonlight_proxy:
+        containers:
+          proxy:
+            image:
+              tag: main
