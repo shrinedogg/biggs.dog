@@ -128,6 +128,13 @@ spec:
           requests:
             nvidia.com/gpu: "1"
         securityContext:
+          # Privileged is required for controller input: wolf hotplugs
+          # uinput devices mid-session and the container's device cgroup
+          # denies open() on /dev/input/event* ("Operation not permitted").
+          # Kubernetes has no equivalent of Docker's device_cgroup_rules
+          # (c 13:* rmw), so privileged is the only way to admit devices
+          # that do not exist at container start.
+          privileged: true
           capabilities:
             add: ["SYS_ADMIN", "SYS_NICE", "SYS_PTRACE", "NET_RAW", "MKNOD", "NET_ADMIN"]
           seccompProfile:
@@ -194,6 +201,11 @@ spec:
         # and Big Picture renders nothing (black screen with cursor).
         - name: dshm
           mountPath: /dev/shm
+        # udev database written by the wolf-agent (fake-udev) so SDL/Steam
+        # detect the virtual controllers wolf hotplugs. The volume is
+        # defined in the User spec (user.yaml) and shared across the pod.
+        - name: udev-data
+          mountPath: /run/udev
       volumes:
       - name: uinput
         hostPath:

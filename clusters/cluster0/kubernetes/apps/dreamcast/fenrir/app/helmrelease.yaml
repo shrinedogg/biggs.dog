@@ -42,7 +42,12 @@ spec:
             args:
               - --lb-sharing-key=direwolf
             env:
-              AGENT_IMAGE: ghcr.io/games-on-whales/fenrir/wolf-agent:main
+              # Patched fork: the agent acts as fake-udev for hotplugged
+              # input devices (writes /run/udev/data entries to the shared
+              # udev-data volume and broadcasts synthetic udev netlink
+              # events in the pod netns) so SDL/Steam detect controllers.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
+              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.0
       moonlight_proxy:
         containers:
           proxy:

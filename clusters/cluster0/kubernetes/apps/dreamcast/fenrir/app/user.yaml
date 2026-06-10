@@ -32,6 +32,13 @@ spec:
       configMap:
         name: wolf-root-entrypoint
         defaultMode: 0755
+    # Pod-local udev database shared between the wolf-agent (writer) and the
+    # app container (reader, mounted at /run/udev). The agent plays the role
+    # of wolf's fake-udev: kernel uevents for the uinput devices wolf creates
+    # are only delivered in the host's network namespace, so without this
+    # SDL/Steam never detect hotplugged controllers.
+    - name: udev-data
+      emptyDir: {}
   sidecarPolicies:
     wolf:
       env:
@@ -57,3 +64,12 @@ spec:
         limits:
           nvidia.com/gpu: "1"
           squat.ai/uinput: "1"
+    wolfAgent:
+      volumeMounts:
+        - name: udev-data
+          mountPath: /run/udev
+      securityContext:
+        # Broadcasting synthetic libudev netlink events (fake-udev) requires
+        # CAP_NET_ADMIN in the pod's network namespace.
+        capabilities:
+          add: ["NET_ADMIN"]
