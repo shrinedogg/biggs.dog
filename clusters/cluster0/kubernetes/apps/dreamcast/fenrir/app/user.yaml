@@ -54,10 +54,6 @@ spec:
         requests:
           nvidia.com/gpu: "1"
           squat.ai/uinput: "1"
-          cpu: 1000m
-          memory: 2G
         limits:
           nvidia.com/gpu: "1"
           squat.ai/uinput: "1"
-          cpu: 1000m
-          memory: 2G

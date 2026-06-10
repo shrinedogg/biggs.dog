@@ -36,12 +36,8 @@ spec:
           resources:
             limits:
               nvidia.com/gpu: "1"
-              cpu: 2000m
-              memory: 4G
             requests:
               nvidia.com/gpu: "1"
-              cpu: 2000m
-              memory: 4G
           command:
             - /bin/bash
             - -c
@@ -120,7 +116,7 @@ spec:
       hostIPC: true
       containers:
       - name: app
-        image: ghcr.io/games-on-whales/steam:edge
+        image: ghcr.io/games-on-whales/steam:fedora-43
         # Without a GPU allocation the container gets no /dev/dri node and no
         # driver libs (CDI injection is per-allocated-container), so Sway and
         # Steam render nothing onto the Wayland display -> black video.
