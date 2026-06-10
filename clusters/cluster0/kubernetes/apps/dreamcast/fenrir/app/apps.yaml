@@ -138,7 +138,12 @@ spec:
           runAsUser: 0
           runAsGroup: 0
         env:
-        - name: RUN_SWAY
+        # Sway in fedora-43 ships wlroots 0.19, which aborts on wolf's
+        # compositor: wolf's eglBindWaylandDisplayWL (NVIDIA egl-wayland)
+        # registers a second wl_drm global and wlroots asserts on the
+        # duplicate device event. Gamescope's Wayland client path does not
+        # bind wl_drm, so it is unaffected.
+        - name: RUN_GAMESCOPE
           value: "true"
         - name: PROTON_LOG
           value: "1"
