@@ -121,6 +121,16 @@ spec:
       containers:
       - name: app
         image: ghcr.io/games-on-whales/steam:edge
+        # Without a GPU allocation the container gets no /dev/dri node and no
+        # driver libs (CDI injection is per-allocated-container), so Sway and
+        # Steam render nothing onto the Wayland display -> black video.
+        # nv-01 exposes 4 time-sliced nvidia.com/gpu replicas, so the wolf
+        # sidecar and the app each requesting one is fine.
+        resources:
+          limits:
+            nvidia.com/gpu: "1"
+          requests:
+            nvidia.com/gpu: "1"
         securityContext:
           capabilities:
             add: ["SYS_ADMIN", "SYS_NICE", "SYS_PTRACE", "NET_RAW", "MKNOD", "NET_ADMIN"]
