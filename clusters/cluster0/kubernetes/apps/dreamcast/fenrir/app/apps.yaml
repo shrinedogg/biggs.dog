@@ -23,7 +23,11 @@ spec:
       storageClassName: host-path
   wolfConfig:
     runtimeVariables:
-      renderNode: /dev/dri/renderD128
+      # The NVIDIA container toolkit injects the GPU's DRM node with its
+      # host numbering: on nv-01 the dGPU is renderD129 (renderD128 doesn't
+      # exist inside the container). With the wrong node wolf can't detect
+      # the GPU vendor and silently falls back to software x264 encoding.
+      renderNode: /dev/dri/renderD129
   template:
     spec:
       containers:
@@ -79,7 +83,8 @@ spec:
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:
     runtimeVariables:
-      renderNode: /dev/dri/renderD128
+      # See the firefox app above: the dGPU's DRM node is renderD129.
+      renderNode: /dev/dri/renderD129
     startAudioServer: false
     startVirtualCompositor: false
     audio:

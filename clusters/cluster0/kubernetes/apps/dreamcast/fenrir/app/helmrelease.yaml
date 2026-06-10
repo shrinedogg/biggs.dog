@@ -32,6 +32,15 @@ spec:
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
               repository: docker.io/shrinedogg/direwolf-operator
               tag: v0.1.0
+            # The operator's --lb-sharing-key defaults to POD_NAMESPACE
+            # ("dreamcast"), but the chart's moonlight-proxy Service is
+            # annotated with sharing-key "direwolf". Mismatched keys make
+            # Cilium LB-IPAM hand the per-session RTP Service a *different*
+            # external IP than the proxy, so Moonlight's RTSP handshake to
+            # the paired IP:48010 times out (macOS errno 60). Align the key
+            # so every session Service shares the proxy's LB IP.
+            args:
+              - --lb-sharing-key=direwolf
             env:
               AGENT_IMAGE: ghcr.io/games-on-whales/fenrir/wolf-agent:main
       moonlight_proxy:
