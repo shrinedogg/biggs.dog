@@ -146,6 +146,13 @@ spec:
           value: "true"
         - name: PROTON_LOG
           value: "1"
+        # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
+        # NVIDIA GBM backend in /usr/local/lib/gbm but Mesa's libgbm only
+        # searches /usr/lib/x86_64-linux-gnu/gbm. Without it Sway falls back
+        # to dumb buffers (rejected by NVIDIA render nodes), no output gets
+        # created, and Steam never launches -> black stream.
+        - name: GBM_BACKENDS_PATH
+          value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
         command:
         - /bin/bash
         - -c
