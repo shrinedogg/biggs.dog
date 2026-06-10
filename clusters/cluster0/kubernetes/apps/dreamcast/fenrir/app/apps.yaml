@@ -189,6 +189,18 @@ spec:
           # falling back, leaving Steam silent. The wolf pulseaudio server
           # already makes the session's virtual sink the default sink.
 
+          # Run a real udevd inside the container (privileged; the kernel
+          # broadcasts uevents into the pod's netns). This is what lets
+          # games detect the virtual pad Steam Input creates mid-game:
+          # Steam itself receives the Moonlight controller (via the
+          # wolf-agent's fake-udev events), but it then emulates a new
+          # uinput pad for the game, and without udevd nobody writes the
+          # udev db entry or libudev event for it -> SDL/Proton in-game
+          # see no controller at all.
+          /usr/lib/systemd/systemd-udevd --daemon
+          udevadm trigger --subsystem-match=input --action=add 2>/dev/null || true
+          udevadm settle --timeout=5 2>/dev/null || true
+
           chown -R $PUID:$PGID /home/retro
           chmod -R 777 /home/retro
           exec /entrypoint.sh
