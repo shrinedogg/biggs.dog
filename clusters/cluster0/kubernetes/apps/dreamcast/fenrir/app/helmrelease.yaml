@@ -25,7 +25,13 @@ spec:
         containers:
           operator:
             image:
-              tag: main
+              # Patched fork: retries stream reconciliation (upstream stalls
+              # the session until the 1-minute reaper kills it whenever
+              # wolf-agent isn't up on the first try) and prunes stale
+              # trackedSessions entries that spam the logs.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
+              repository: docker.io/shrinedogg/direwolf-operator
+              tag: v0.1.0
             env:
               AGENT_IMAGE: ghcr.io/games-on-whales/fenrir/wolf-agent:main
       moonlight_proxy:

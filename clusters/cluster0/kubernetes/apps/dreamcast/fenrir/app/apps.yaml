@@ -13,11 +13,11 @@ spec:
   id: 1
   isHDRSupported: true
   title: Firefox
-  # Operator defaults: RWO, 5Gi. Explicit ceph-block instead of the default
-  # host-path SC: on Talos the kubelet container sees /var/mnt (the openebs
-  # host-path base) read-only, so it cannot create the state/<app> subPath
-  # directory on local PVs (CreateContainerConfigError). CSI volumes are
-  # mounted under /var/lib/kubelet, which kubelet can write.
+  # Operator defaults: RWO, 5Gi. Local openebs host-path keeps the Firefox
+  # profile on the node. The earlier "failed to create subPath directory"
+  # error on this SC was solved by making the openebs BasePath writable for
+  # kubelet (see the "host path and perms fixes" commit); ceph-block also
+  # works if this ever regresses.
   volumeClaimTemplate:
     spec:
       storageClassName: host-path
