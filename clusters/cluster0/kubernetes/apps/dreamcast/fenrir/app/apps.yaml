@@ -189,6 +189,11 @@ spec:
           mountPath: /dev/uinput
         - name: input-events
           mountPath: /dev/input
+        # Steam's CEF UI (steamwebhelper) allocates its GPU command buffers
+        # in /dev/shm; the container-runtime default of 64Mi fills instantly
+        # and Big Picture renders nothing (black screen with cursor).
+        - name: dshm
+          mountPath: /dev/shm
       volumes:
       - name: uinput
         hostPath:
@@ -198,6 +203,10 @@ spec:
         hostPath:
           path: /dev/input
           type: Directory
+      - name: dshm
+        emptyDir:
+          medium: Memory
+          sizeLimit: 4Gi
   wolfConfig:
     runtimeVariables:
       # See the firefox app above: the dGPU's DRM node is renderD129.
