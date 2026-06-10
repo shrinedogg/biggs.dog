@@ -26,6 +26,10 @@ spec:
         - name: generic-device-plugin
           image: ghcr.io/squat/generic-device-plugin:latest
           args:
+            # The :latest image changed the default domain to devic.es;
+            # fenrir's User CR requests squat.ai/uinput.
+            - --domain
+            - squat.ai
             - --device
             - |
               name: uinput
