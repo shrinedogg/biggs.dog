@@ -175,16 +175,11 @@ spec:
           value: "1"
         - name: DXVK_ENABLE_NVAPI
           value: "1"
-        # Ask the container toolkit to expose the graphics + NGX userspace
-        # (libnvidia-ngx.so, libnvidia-api.so, the GL/Vulkan libs) and not
-        # just compute/utility. NOTE: necessary but NOT sufficient on nv-01 --
-        # the driver's wine NGX bridge (_nvngx.dll / nvngx.dll) is stripped by
-        # the Talos nonfree-kmod-nvidia extension and is absent host-wide, so
-        # it must still be supplied into the Proton prefix before DLSS will
-        # initialise. With time-sliced CDI injection this var may be a no-op
-        # unless the node's CDI spec was generated with the graphics cap.
-        - name: NVIDIA_DRIVER_CAPABILITIES
-          value: all
+        # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
+        # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
+        # (session.go), and a duplicate env key makes the server-side-apply
+        # patch invalid -> the Deployment is never created and the session
+        # reaper kills the session after 60s.
         command:
         - /bin/bash
         - -c
