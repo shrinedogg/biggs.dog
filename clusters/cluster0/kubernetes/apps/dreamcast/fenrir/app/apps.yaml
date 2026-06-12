@@ -220,6 +220,59 @@ spec:
           udevadm trigger --subsystem-match=input --action=add 2>/dev/null || true
           udevadm settle --timeout=5 2>/dev/null || true
 
+          # Focus guard (sway only): Steam's steamwebhelper maps an invisible,
+          # unnamed, class-less notification popup (role "popup",
+          # _NET_WM_WINDOW_TYPE_NOTIFICATION) that grabs X input focus away
+          # from the running game. Gamescope pins focus to the game so it is
+          # immune; sway honors the client-side XSetInputFocus and keyboard +
+          # Steam Input controller routing both break (input lands in the
+          # popup, Steam thinks BPM is foreground). The guard polls X focus
+          # and, while a viewable steam_app_* window exists, returns focus to
+          # it whenever an unnamed/class-less window holds it. Legitimate
+          # focus changes (BPM has WM_CLASS steamwebhelper) are untouched.
+          cat > /tmp/focus-guard.py <<'PYEOF'
+          import time
+          from Xlib import display, X
+
+          def viewable_game(d):
+              for w in d.screen().root.query_tree().children:
+                  try:
+                      cls = w.get_wm_class()
+                      if cls and cls[0].startswith("steam_app_") \
+                              and w.get_attributes().map_state == X.IsViewable:
+                          return w
+                  except Exception:
+                      pass
+              return None
+
+          while True:
+              try:
+                  d = display.Display()
+                  while True:
+                      game = viewable_game(d)
+                      if game is not None:
+                          f = d.get_input_focus().focus
+                          if getattr(f, "id", None) not in (None, game.id):
+                              try:
+                                  cls = f.get_wm_class()
+                                  name = f.get_wm_name()
+                              except Exception:
+                                  cls = name = None
+                              if not cls and not name:
+                                  d.set_input_focus(game, X.RevertToParent,
+                                                    X.CurrentTime)
+                                  d.sync()
+                      time.sleep(1)
+              except Exception:
+                  time.sleep(5)
+          PYEOF
+          if [ "$RUN_SWAY" = "true" ]; then
+            (
+              while [ ! -S /tmp/.X11-unix/X0 ]; do sleep 2; done
+              exec runuser -u ${UNAME:-retro} -- env DISPLAY=:0 python3 /tmp/focus-guard.py
+            ) &
+          fi
+
           chown -R $PUID:$PGID /home/retro
           chmod -R 777 /home/retro
           exec /entrypoint.sh
