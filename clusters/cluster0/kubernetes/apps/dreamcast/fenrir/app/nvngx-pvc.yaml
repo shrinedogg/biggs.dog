@@ -1,0 +1,25 @@
+---
+# Persistent, node-local cache for the NVIDIA "wine" NGX bridge DLLs
+# (nvngx.dll / _nvngx.dll) used to enable DLSS under Proton. The Talos
+# nonfree-kmod-nvidia extension strips these from the host driver, so the
+# steam App's nvngx-bridge initContainer extracts them from the matching
+# NVIDIA driver .run once and stores them here; the app container mounts
+# this read-only at /usr/local/lib/nvidia/wine so Proton can copy them into
+# each game's prefix system32.
+#
+# host-path keeps the cache on the GPU node (nv-01) alongside the App's
+# /home/retro volume. Binding is WaitForFirstConsumer, so this PVC stays
+# Pending until the first streaming session mounts it; that is expected and
+# self-heals as soon as Moonlight spawns the steam pod.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: nvngx-cache
+  namespace: dreamcast
+spec:
+  storageClassName: host-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 4Gi

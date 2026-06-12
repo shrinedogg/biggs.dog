@@ -114,6 +114,60 @@ spec:
   template:
     spec:
       hostIPC: true
+      # DLSS: restore the NVIDIA "wine" NGX bridge DLLs that the Talos
+      # nonfree-kmod-nvidia extension strips. Proton looks for nvngx.dll /
+      # _nvngx.dll under realpath(libGLX_nvidia.so)/../nvidia/wine (the CDI
+      # spec roots driver libs at /usr/local/lib) and copies them into each
+      # prefix's system32 when PROTON_ENABLE_NVAPI=1. Without them the in-game
+      # DLSS toggle stays greyed out. This initContainer fetches the DLLs from
+      # the matching NVIDIA driver .run (cached on the nvngx-cache PVC so the
+      # download happens at most once) and stages them for the app container.
+      initContainers:
+      - name: nvngx-bridge
+        image: ghcr.io/games-on-whales/steam:fedora-43
+        securityContext:
+          # Write to the fresh cache PVC / scratch emptyDir (root-owned).
+          runAsUser: 0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          set -euo pipefail
+          # Must match the host NVIDIA driver shipped by the Talos extension.
+          # Bump this when the node's nvidia driver/extension is upgraded.
+          VER=595.71.05
+          DEST=/cache
+          mkdir -p "$DEST"
+          if [ -f "$DEST/_nvngx.dll" ] && [ -f "$DEST/nvngx.dll" ] \
+             && [ "$(cat "$DEST/.driver-version" 2>/dev/null || true)" = "$VER" ]; then
+            echo "nvngx cache hit for driver $VER"
+            exit 0
+          fi
+          echo "nvngx cache miss; downloading NVIDIA $VER to extract wine NGX DLLs"
+          cd /work
+          url="https://us.download.nvidia.com/XFree86/Linux-x86_64/$VER/NVIDIA-Linux-x86_64-$VER.run"
+          if command -v curl >/dev/null 2>&1; then
+            curl -fsSL -o nv.run "$url"
+          else
+            wget -qO nv.run "$url"
+          fi
+          sh nv.run -x
+          main="$(find . -name nvngx.dll -type f | head -n1)"
+          bridge="$(find . -name _nvngx.dll -type f | head -n1)"
+          if [ -z "$main" ] || [ -z "$bridge" ]; then
+            echo "ERROR: nvngx.dll/_nvngx.dll not found in extracted driver" >&2
+            exit 1
+          fi
+          install -m 0644 "$main" "$DEST/nvngx.dll"
+          install -m 0644 "$bridge" "$DEST/_nvngx.dll"
+          echo "$VER" > "$DEST/.driver-version"
+          echo "staged nvngx bridge DLLs:"
+          ls -l "$DEST"
+        volumeMounts:
+        - name: nvngx-cache
+          mountPath: /cache
+        - name: nvngx-work
+          mountPath: /work
       containers:
       - name: app
         image: ghcr.io/games-on-whales/steam:fedora-43
@@ -291,6 +345,13 @@ spec:
         # defined in the User spec (user.yaml) and shared across the pod.
         - name: udev-data
           mountPath: /run/udev
+        # DLSS: the nvngx-bridge initContainer stages the NVIDIA wine NGX
+        # bridge DLLs here. Proton derives this exact path from
+        # realpath(libGLX_nvidia.so)/../nvidia/wine (CDI roots driver libs in
+        # /usr/local/lib) and copies them into each prefix's system32.
+        - name: nvngx-cache
+          mountPath: /usr/local/lib/nvidia/wine
+          readOnly: true
       volumes:
       - name: uinput
         hostPath:
@@ -303,6 +364,15 @@ spec:
       - name: dshm
         emptyDir:
           medium: Memory
+          sizeLimit: 4Gi
+      # Persistent cache (host-path on nv-01) holding the extracted wine NGX
+      # bridge DLLs so the NVIDIA driver .run is downloaded at most once.
+      - name: nvngx-cache
+        persistentVolumeClaim:
+          claimName: nvngx-cache
+      # Scratch space for the initContainer to download + extract the .run.
+      - name: nvngx-work
+        emptyDir:
           sizeLimit: 4Gi
   wolfConfig:
     runtimeVariables:
