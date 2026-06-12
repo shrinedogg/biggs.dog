@@ -12,7 +12,6 @@ spec:
     name: direwolf-operator
     namespace: flux-system
   # Upstream chart defaults are already correct for this cluster:
-  # - operator env WOLF_IMAGE=ghcr.io/games-on-whales/wolf:stable
   # - moonlight-proxy LoadBalancer Service with lbipam.cilium.io/sharing-key: direwolf
   #   (Cilium LB-IPAM shares one LB IP between the proxy and per-session services)
   # - cert-manager Issuers/Certificates via rawResources (cert-manager is installed)
@@ -48,6 +47,13 @@ spec:
               # events in the pod netns) so SDL/Steam detect controllers.
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
               AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.0
+              # Patched wolf: gst-wayland-display no longer advertises the
+              # legacy wl_drm global when dmabuf v4 feedback is active, which
+              # crashed nested wlroots compositors (sway) with
+              # assert(wl->drm_render_name == NULL). Overlay built from
+              # https://github.com/shrinedogg/gst-wayland-display
+              # (branch fix/optional-wl-drm) on ghcr.io/games-on-whales/wolf:stable.
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.1.0
       moonlight_proxy:
         containers:
           proxy:

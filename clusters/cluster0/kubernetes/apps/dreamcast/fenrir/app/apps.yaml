@@ -145,16 +145,16 @@ spec:
           runAsUser: 0
           runAsGroup: 0
         env:
-        # Sway in fedora-43 ships wlroots 0.19, which aborts on wolf's
-        # compositor: wolf's eglBindWaylandDisplayWL (NVIDIA egl-wayland)
-        # registers a second wl_drm global and wlroots asserts on the
-        # duplicate device event (backend/wayland/backend.c:311). Gamescope's
-        # Wayland client path does not bind wl_drm, so it is unaffected.
-        # (RUN_SWAY was tried and reproduced the assertion -> black screen
-        # with only a cursor, so we stay on gamescope.)
-        - name: RUN_GAMESCOPE
+        # Sway (wlroots 0.19) used to abort on wolf's compositor: it
+        # advertised both the legacy wl_drm global and dmabuf v4 feedback,
+        # and wlroots asserted on the duplicate device announcement
+        # (backend/wayland/backend.c:311). Fixed in the patched wolf image
+        # (docker.io/shrinedogg/wolf, see helmrelease.yaml WOLF_IMAGE):
+        # the compositor now skips wl_drm when dmabuf v4 feedback is active
+        # (opt back in with GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1).
+        - name: RUN_SWAY
           value: "true"
-        # - name: RUN_SWAY
+        # - name: RUN_GAMESCOPE
         #   value: "true"
         - name: PROTON_LOG
           value: "1"
@@ -165,6 +165,26 @@ spec:
         # created, and Steam never launches -> black stream.
         - name: GBM_BACKENDS_PATH
           value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+        # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
+        # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
+        # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
+        # DLSS option stays greyed out regardless of the RTX GPU. These are
+        # Proton-side toggles consumed by the entrypoint, so they take effect
+        # even though the GPU is injected via CDI.
+        - name: PROTON_ENABLE_NVAPI
+          value: "1"
+        - name: DXVK_ENABLE_NVAPI
+          value: "1"
+        # Ask the container toolkit to expose the graphics + NGX userspace
+        # (libnvidia-ngx.so, libnvidia-api.so, the GL/Vulkan libs) and not
+        # just compute/utility. NOTE: necessary but NOT sufficient on nv-01 --
+        # the driver's wine NGX bridge (_nvngx.dll / nvngx.dll) is stripped by
+        # the Talos nonfree-kmod-nvidia extension and is absent host-wide, so
+        # it must still be supplied into the Proton prefix before DLSS will
+        # initialise. With time-sliced CDI injection this var may be a no-op
+        # unless the node's CDI spec was generated with the graphics cap.
+        - name: NVIDIA_DRIVER_CAPABILITIES
+          value: all
         command:
         - /bin/bash
         - -c

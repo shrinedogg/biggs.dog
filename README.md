@@ -167,7 +167,7 @@ The `dreamcast` namespace is the newest addition to the cluster: an on-demand, G
 
 - **Firefox** — reference app, validates the GPU/video path.
 - **Test Ball** — synthetic `videotestsrc` pattern with no app container; isolates the Wolf/NVENC encode path from app rendering.
-- **Steam** — Big Picture via gamescope, with a 250Gi `host-path` PVC persisting `/home/retro` (login, library, installed games) across sessions.
+- **Steam** — Big Picture via Sway, with a 250Gi `host-path` PVC persisting `/home/retro` (login, library, installed games) across sessions.
 
 ### Patched Fork & Engineering Notes
 
@@ -181,6 +181,7 @@ Getting this working end-to-end required a fork of the operator (`[shrinedogg/fe
 | `docker.io/shrinedogg/direwolf-operator` | `v0.1.0` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent isn't up on the first try) and prunes stale `trackedSessions` entries that spam logs. |
 | `docker.io/shrinedogg/moonlight-proxy`   | `v0.1.1` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session.                        |
 | `docker.io/shrinedogg/wolf-agent`        | `v0.1.0` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers.  |
+| `docker.io/shrinedogg/wolf`              | `v0.1.0` | Overlay on `wolf:stable` with a patched `gst-wayland-display` ([shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display), branch `fix/optional-wl-drm`): skips the legacy `wl_drm` global when dmabuf v4 feedback is active, fixing the wlroots/Sway nested-compositor abort. |
 
 
 **Key fixes captured in the manifests:**
@@ -188,7 +189,7 @@ Getting this working end-to-end required a fork of the operator (`[shrinedogg/fe
 - **LB IP sharing** — the operator's `--lb-sharing-key` is aligned to `direwolf` so Cilium LB-IPAM hands every per-session RTP Service the same external IP as the proxy. Mismatched keys split the IP and the RTSP handshake times out (macOS errno 60).
 - **GPU on the app container** — the game container needs its own `nvidia.com/gpu` request; CDI driver/device injection is per-allocated-container, so without it the app has no render node and produces a black stream.
 - `**GBM_BACKENDS_PATH`** — set on both the Wolf sidecar and the Steam container; the CDI hook drops the NVIDIA GBM backend in `/usr/local/lib/gbm` while Mesa only searches `/usr/lib/x86_64-linux-gnu/gbm`.
-- **gamescope over Sway** — the `steam:fedora-43` image's Sway (wlroots 0.19) aborts on Wolf's compositor (NVIDIA EGL registers a duplicate `wl_drm` global); gamescope's client path is unaffected.
+- **Sway via patched Wolf compositor** — Wolf's `gst-wayland-display` advertised both the legacy `wl_drm` global and `zwp_linux_dmabuf_v1` v4 feedback; nested wlroots (Sway 0.19+) binds both and aborts on the duplicate device announcement (`assert(wl->drm_render_name == NULL)`). The patched `shrinedogg/wolf` image skips `wl_drm` when dmabuf v4 feedback is active (legacy clients can opt back in with `GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1`), letting Steam run under Sway instead of gamescope.
 - `**/dev/shm` sizing** — a 4Gi memory-backed `emptyDir` at `/dev/shm`; the 64Mi runtime default exhausts instantly under Steam's CEF UI, yielding a black screen with only a cursor.
 - **User namespaces** — Steam's pressure-vessel runtime requires `user.max_user_namespaces`, which Talos defaults to `0`. Set via an Omni machine-config patch on the GPU node (node-level config, not in this repo).
 - **Privileged Steam container** — Wolf hotplugs `uinput` devices mid-session; Kubernetes has no equivalent of Docker's `device_cgroup_rules`, so the container must be privileged to open the late-appearing `/dev/input/event`* nodes.
