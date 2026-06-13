@@ -105,12 +105,16 @@ spec:
       acceleration: disabled
       algorithm: maglev
       mode: snat
-      # Required when bpf.lbModeAnnotation is enabled. Dispatch is only used
-      # for the forward (client->pod) path when a packet lands on a non-backend
-      # node; for Moonlight that direction is small control/input packets, so
-      # the geneve overhead never approaches MTU. The heavy video return path
-      # is sent natively (no encap) direct from the backend node under DSR.
-      dsrDispatch: geneve
+      # Required when bpf.lbModeAnnotation is enabled. "opt" carries the
+      # service IP/port in an IPv4 option and is the dispatch mode for
+      # native routing (geneve dispatch requires geneve tunnel mode, which
+      # this cluster is not in -> agent crashloop). It needs all nodes on the
+      # same L2 segment, which they are (192.168.2.0/24). Dispatch only applies
+      # to the forward (client->pod) path when a packet lands on a non-backend
+      # node -- for Moonlight that is small control/input packets, so the IP
+      # option overhead never approaches MTU. The heavy video return path is
+      # sent natively (no encap) direct from the backend node under DSR.
+      dsrDispatch: opt
     localRedirectPolicy: true
     # nodePort:
     #   enabled: true
