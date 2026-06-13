@@ -33,6 +33,13 @@ spec:
     bpf:
       datapathMode: netkit  # netkit can have issues with external LB traffic
       lbExternalClusterIP: true
+      # Allow per-Service forwarding mode via the
+      # service.cilium.io/forwarding-mode annotation. Default stays SNAT
+      # (loadBalancer.mode below); only annotated Services (the dreamcast
+      # Moonlight Services) opt into DSR so the high-bitrate host->client
+      # video egresses directly from nv-01 instead of hairpinning back
+      # through the ECMP ingress node + SNAT.
+      lbModeAnnotation: true
       masquerade: true
       preallocateMaps: true
     bgpControlPlane:
@@ -98,6 +105,12 @@ spec:
       acceleration: disabled
       algorithm: maglev
       mode: snat
+      # Required when bpf.lbModeAnnotation is enabled. Dispatch is only used
+      # for the forward (client->pod) path when a packet lands on a non-backend
+      # node; for Moonlight that direction is small control/input packets, so
+      # the geneve overhead never approaches MTU. The heavy video return path
+      # is sent natively (no encap) direct from the backend node under DSR.
+      dsrDispatch: geneve
     localRedirectPolicy: true
     # nodePort:
     #   enabled: true

@@ -1,0 +1,60 @@
+---
+# The dreamcast Moonlight LoadBalancer Services (the moonlight-proxy "direwolf"
+# Service and every per-session "<user>-<app>-<id>-rtp" Service) all share one
+# LB IP via lbipam.cilium.io/sharing-key: direwolf, which forces
+# externalTrafficPolicy: Cluster (Cilium won't share an IP across Local-policy
+# Services with different pod selectors -- cilium/cilium#38766). Cluster policy
+# means the LB IP is advertised from every node, so Moonlight's high-bitrate
+# UDP video can land on a non-GPU node and get SNAT-hairpinned to nv-01,
+# showing up as packet loss.
+#
+# This policy opts those Services into DSR (service.cilium.io/forwarding-mode)
+# so the host->client video return path egresses directly from the backend
+# node (nv-01) with no extra hop or SNAT, while keeping the shared IP and
+# Cluster policy intact (an annotation does not affect LB-IPAM sharing).
+# Requires bpf.lbModeAnnotation=true + loadBalancer.dsrDispatch on Cilium.
+#
+# The annotation must be present at Service creation, so it is injected at
+# admission. Operator-created RTP Services are created fresh per session; the
+# long-lived proxy Service must be recreated once after this policy is applied
+# so it too is admitted with the annotation.
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: direwolf-dsr
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE", "UPDATE"]
+        resources: ["services"]
+  matchConditions:
+    - name: in-dreamcast
+      expression: "object.metadata.namespace == 'dreamcast'"
+    - name: is-loadbalancer
+      expression: "object.spec.type == 'LoadBalancer'"
+    - name: is-direwolf-shared
+      expression: >
+        has(object.metadata.annotations) &&
+        'lbipam.cilium.io/sharing-key' in object.metadata.annotations &&
+        object.metadata.annotations['lbipam.cilium.io/sharing-key'] == 'direwolf'
+  reinvocationPolicy: IfNeeded
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >
+          Object{
+            metadata: Object.metadata{
+              annotations: {"service.cilium.io/forwarding-mode": "dsr"}
+            }
+          }
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: direwolf-dsr
+spec:
+  policyName: direwolf-dsr
+  matchResources: {}
