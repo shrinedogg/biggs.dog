@@ -46,6 +46,21 @@ clusters/
             └── rook-ceph/
 ```
 
+## 🖥️ Cluster Nodes
+
+Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all running **Talos Linux v1.13.4** (kernel `6.18.34-talos`, `amd64`) with Kubernetes **v1.36.2**.
+
+| Hostname     | Role          | CPU                                          | RAM    | GPU                                                                          |
+| ------------ | ------------- | -------------------------------------------- | ------ | ---------------------------------------------------------------------------- |
+| `control-01` | control-plane | AMD EPYC 4564P (16C / 32T)                   | 128 GB | AMD Radeon iGPU (Raphael, `1002:164e`, unused)                               |
+| `nv-01`      | worker        | AMD Ryzen 7 7800X3D (8C / 16T)              | 64 GB  | **NVIDIA GeForce RTX 5090** dGPU (32 GB, `10de:2b85`, time-sliced ×4) + AMD Radeon iGPU |
+| `worker-01`  | worker        | Intel Core Ultra 5 225H (Arrow Lake-H, 14T) | 32 GB  | Intel Arc Graphics iGPU (`8086:7d51`)                                        |
+| `worker-02`  | worker        | Intel Core i7-1360P (Raptor Lake-P, 16T)    | 32 GB  | Intel Iris Xe Graphics iGPU (`8086:a7a0`)                                    |
+| `worker-03`  | worker        | Intel Core i7-1360P (Raptor Lake-P, 16T)    | 32 GB  | Intel Iris Xe Graphics iGPU (`8086:a7a0`)                                    |
+| `worker-04`  | worker        | Intel Core Ultra 5 125H (Meteor Lake, 18T)  | 32 GB  | Intel Arc Graphics iGPU (`8086:7d55`)                                        |
+
+> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas for the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack). The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
+
 ## 🔧 Core Components
 
 ### Networking
