@@ -11,6 +11,32 @@ spec:
     kind: OCIRepository
     name: direwolf-operator
     namespace: flux-system
+  # The moonlight-proxy LoadBalancer Service and every per-session RTP Service
+  # share one LB IP via lbipam.cilium.io/sharing-key: direwolf, and Cilium BGP
+  # advertises that IP at /32 granularity. For externalTrafficPolicy: Local to
+  # land all Moonlight traffic directly on the GPU node (no extra inter-node
+  # hop or SNAT, which was causing RTP packet loss), everything sharing the IP
+  # must live on nv-01 and be Local-policy. This pins the proxy to the GPU node
+  # and sets its Service to Local; the ephemeral per-session RTP Services are
+  # handled by the direwolf-rtp-etp-local MutatingAdmissionPolicy.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+              name: moonlight-proxy
+            patch: |
+              - op: add
+                path: /spec/template/spec/nodeSelector
+                value:
+                  nvidia.com/gpu.present: "true"
+          - target:
+              kind: Service
+              name: direwolf
+            patch: |
+              - op: add
+                path: /spec/externalTrafficPolicy
+                value: Local
   # Upstream chart defaults are already correct for this cluster:
   # - moonlight-proxy LoadBalancer Service with lbipam.cilium.io/sharing-key: direwolf
   #   (Cilium LB-IPAM shares one LB IP between the proxy and per-session services)
