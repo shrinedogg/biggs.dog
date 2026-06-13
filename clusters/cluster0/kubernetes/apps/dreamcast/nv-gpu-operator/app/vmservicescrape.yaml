@@ -1,0 +1,22 @@
+---
+# Scrape the gpu-operator's DCGM exporter into VictoriaMetrics. Without this
+# nothing collects DCGM_FI_DEV_XID_ERRORS / GPU temp / power / clocks, which is
+# why the nv-01 hard-freeze (suspected GPU Xid 109 CTX_SWITCH_TIMEOUT under
+# load) could not be root-caused from metrics. The vmagent (observability/stack)
+# runs with selectAllByDefault=true, so this VMServiceScrape is auto-discovered.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: nvidia-dcgm-exporter
+  namespace: dreamcast
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-dcgm-exporter
+  endpoints:
+    - port: gpu-metrics
+      path: /metrics
+      interval: 30s
+      # Preserve the exporter's own Hostname/gpu/UUID/modelName labels so the
+      # GPU and node are identifiable (e.g. Xid alerts per GPU on nv-01).
+      honorLabels: true
