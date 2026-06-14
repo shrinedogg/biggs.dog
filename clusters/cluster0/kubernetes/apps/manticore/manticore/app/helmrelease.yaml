@@ -5,6 +5,20 @@ metadata:
   namespace: manticore
 spec:
   interval: 3m
+  # Rolling the worker StatefulSet is slow: every pod runs a graceful-shutdown
+  # preStop hook (./shutdown.sh), so a single 25.0.0 upgrade can momentarily look
+  # "stalled" and Helm aborts the wait early. With Flux's default of zero retries
+  # that one failure wedges the release permanently (RetriesExceeded) even after
+  # the pods come up healthy. Give the rollout headroom and let transient
+  # failures self-heal instead of needing a manual reconcile.
+  timeout: 15m
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
   chart:
     spec:
       chart: manticoresearch
