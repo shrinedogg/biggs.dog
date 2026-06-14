@@ -1,0 +1,73 @@
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: nvidia-gpu-tuning
+  namespace: dreamcast
+  labels:
+    app: nvidia-gpu-tuning
+spec:
+  selector:
+    matchLabels:
+      app: nvidia-gpu-tuning
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: nvidia-gpu-tuning
+    spec:
+      # Pin to the single RTX 5090 streaming node.
+      nodeSelector:
+        kubernetes.io/hostname: nv-01
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: nvidia-smi-tuning
+          # Slim glibc base; nvidia-smi + libnvidia-ml are CDI-injected from the
+          # host at /usr/local/{bin,lib} when nvidia.com/gpu is requested.
+          image: docker.io/library/ubuntu:24.04
+          # nvidia-smi -pm/-pl/-lgc require root + the GPU control device.
+          securityContext:
+            privileged: true
+            runAsUser: 0
+          env:
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: all
+            - name: NVIDIA_DRIVER_CAPABILITIES
+              value: utility
+            - name: LD_LIBRARY_PATH
+              value: /usr/local/lib
+            # --- Tunable: mitigation for recurring Xid 109 (CTX SWITCH TIMEOUT) ---
+            # RTX 5090 stock max boost is 3105 MHz; cap it to curb boost-clock
+            # transients. Power limit is intentionally left at stock (600W).
+            # Lower the clock further if Xid 109 persists; raise toward 3105 for perf.
+            - name: GPU_CLOCK_MAX_MHZ
+              value: "2800"
+            - name: REAPPLY_INTERVAL_SECONDS
+              value: "300"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -u
+              SMI=/usr/local/bin/nvidia-smi
+              echo "[gpu-tuning] applying: persistence=on power=stock(600W) gfx_clock_max=${GPU_CLOCK_MAX_MHZ}MHz"
+              apply() {
+                "${SMI}" -pm 1 || true
+                "${SMI}" -lgc "0,${GPU_CLOCK_MAX_MHZ}" || true
+              }
+              apply
+              "${SMI}" --query-gpu=persistence_mode,power.limit,clocks.max.gr --format=csv || true
+              # Re-assert periodically in case the driver resets clocks/power.
+              while true; do
+                sleep "${REAPPLY_INTERVAL_SECONDS}"
+                apply
+              done
+          resources:
+            # Consumes one of the 4 time-sliced nvidia.com/gpu replicas (needed to
+            # trigger CDI injection of nvidia-smi). Leaves 3 for streaming sessions.
+            limits:
+              nvidia.com/gpu: 1
+            requests:
+              cpu: 25m
+              memory: 64Mi
