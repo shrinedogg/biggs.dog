@@ -62,12 +62,24 @@ spec:
   # that one label to a valid value on every resource that carries it. The
   # existence selector skips the lone resource without a labels map, so the
   # replace op is always safe.
+  # ${KAGENT_VERSION} is supplied by the kagent Flux Kustomization's
+  # postBuild.substitute (kept in sync with the OCIRepository tag). Everything
+  # below tracks that single value automatically.
   postRenderers:
     - kustomize:
+        # Same root cause as the label fix below: the chart defaults its image
+        # tags to .Chart.Version, which Flux turns into "<ver>+<digest>". "+" is
+        # an illegal Docker tag, so the controller/ui pods land in
+        # InvalidImageName. Pin both back to the clean chart version.
+        images:
+          - name: cr.kagent.dev/kagent-dev/kagent/controller
+            newTag: "${KAGENT_VERSION}"
+          - name: cr.kagent.dev/kagent-dev/kagent/ui
+            newTag: "${KAGENT_VERSION}"
         patches:
           - target:
               labelSelector: app.kubernetes.io/version
             patch: |
               - op: replace
                 path: /metadata/labels/app.kubernetes.io~1version
-                value: "0.9.7"
+                value: "${KAGENT_VERSION}"

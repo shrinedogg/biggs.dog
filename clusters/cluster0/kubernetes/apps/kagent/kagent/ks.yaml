@@ -23,3 +23,13 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 5m
+  # Single knob for the kagent chart version. Flux can't feed an OCIRepository's
+  # resolved tag into a HelmRelease post-renderer, so this variable carries it:
+  # the HelmRelease interpolates ${KAGENT_VERSION} to pin the controller/ui
+  # image tags and the version label (otherwise they inherit Flux's
+  # "<ver>+<digest>" build metadata, which is an illegal Docker tag and label
+  # value). Keep this in sync with the tag in
+  # ./clusters/cluster0/flux-system/sources/kagent-oci.yaml.
+  postBuild:
+    substitute:
+      KAGENT_VERSION: "0.9.7"
