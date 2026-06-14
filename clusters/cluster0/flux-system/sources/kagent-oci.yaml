@@ -11,4 +11,4 @@ spec:
     # When bumping this tag, also update KAGENT_VERSION in
     # ./clusters/cluster0/kubernetes/apps/kagent/kagent/ks.yaml (the HelmRelease
     # post-renderer uses it to sanitize the chart's image tags + version label).
-    tag: "0.9.7"
+    tag: "0.9.7-de7ad4a95185"
