@@ -27,6 +27,13 @@ spec:
       enabled: false
     operator:
       defaultRuntime: containerd
+    # Export GPU Xid errors (DCGM_FI_DEV_XID_ERRORS) alongside the default
+    # counters so faults like Xid 109 (which preceded the nv-01 hard freezes)
+    # are visible/alertable in VictoriaMetrics. Counter set defined in the
+    # dcgm-metrics-config ConfigMap (this directory); key is dcgm-metrics.csv.
+    dcgmExporter:
+      config:
+        name: dcgm-metrics-config
     # Time-slice the single physical GPU into 4 schedulable nvidia.com/gpu
     # replicas: fenrir session pods need one for the wolf sidecar and one for
     # the game container, so a single GPU is not enough without sharing.
