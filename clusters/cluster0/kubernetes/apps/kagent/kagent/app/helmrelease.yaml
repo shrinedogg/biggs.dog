@@ -54,32 +54,5 @@ spec:
         - name: database-url
           mountPath: /etc/kagent-db
           readOnly: true
-  # Flux's helm-controller appends the OCI chart digest to .Chart.Version as
-  # semver build metadata (e.g. "0.9.7+de7ad4a95185"). The kagent chart emits
-  # .Chart.Version verbatim into the app.kubernetes.io/version label, and the
-  # "+" is an illegal Kubernetes label value, so every apply fails with
-  # 'ServiceAccount "kagent-controller" is invalid: metadata.labels'. Rewrite
-  # that one label to a valid value on every resource that carries it. The
-  # existence selector skips the lone resource without a labels map, so the
-  # replace op is always safe.
-  # ${KAGENT_VERSION} is supplied by the kagent Flux Kustomization's
-  # postBuild.substitute (kept in sync with the OCIRepository tag). Everything
-  # below tracks that single value automatically.
-  postRenderers:
-    - kustomize:
-        # Same root cause as the label fix below: the chart defaults its image
-        # tags to .Chart.Version, which Flux turns into "<ver>+<digest>". "+" is
-        # an illegal Docker tag, so the controller/ui pods land in
-        # InvalidImageName. Pin both back to the clean chart version.
-        images:
-          - name: cr.kagent.dev/kagent-dev/kagent/controller
-            newTag: "${KAGENT_VERSION}"
-          - name: cr.kagent.dev/kagent-dev/kagent/ui
-            newTag: "${KAGENT_VERSION}"
-        patches:
-          - target:
-              labelSelector: app.kubernetes.io/version
-            patch: |
-              - op: replace
-                path: /metadata/labels/app.kubernetes.io~1version
-                value: "${KAGENT_VERSION}"
+
+ 
