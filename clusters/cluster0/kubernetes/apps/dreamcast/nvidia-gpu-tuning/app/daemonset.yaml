@@ -25,7 +25,7 @@ spec:
         - name: nvidia-smi-tuning
           # Slim glibc base; nvidia-smi + libnvidia-ml are CDI-injected from the
           # host at /usr/local/{bin,lib} when nvidia.com/gpu is requested.
-          image: docker.io/library/ubuntu:24.04
+          image: docker.io/library/ubuntu:26.04
           # nvidia-smi -pm/-pl/-lgc require root + the GPU control device.
           securityContext:
             privileged: true
