@@ -33,21 +33,21 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: a 4-bit (INT4) Qwen3.6-27B build that fits the 5090's
-            # 32 GB with ample headroom for KV cache (~15 GB weights). This
-            # repo is compressed-tensors INT4, so --quantization must be
-            # "compressed-tensors". --served-model-name must match the
+            # MODEL: NVIDIA ModelOpt NVFP4 build of the Qwen3.6-35B-A3B MoE.
+            # NVFP4 is hardware-accelerated on the Blackwell 5090 (sm_120).
+            # The checkpoint is mixed-precision (~23 GB weights), so it fits a
+            # 32 GB card but leaves a modest KV-cache budget. --quantization
+            # must be "modelopt_fp4"; --served-model-name must match the
             # provider model in the kagent HelmRelease.
             # ----------------------------------------------------------------
-            - --model=cyankiwi/Qwen3.6-27B-AWQ-INT4
-            - --quantization=compressed-tensors
-            - --served-model-name=cyankiwi/Qwen3.6-27B-AWQ-INT4
-            # Context length sized to leave VRAM for KV cache on a 32 GB card.
-            # This is a VL + GDN model; its weights, vision encoder and CUDA
-            # graph capture nearly fill the card, so we run eager (no CUDA
-            # graphs) to free several GB and keep a conservative context.
+            - --model=nvidia/Qwen3.6-35B-A3B-NVFP4
+            - --quantization=modelopt_fp4
+            - --served-model-name=nvidia/Qwen3.6-35B-A3B-NVFP4
+            # ~23 GB of weights leaves little headroom on 32 GB, so run eager
+            # (no CUDA graph capture) and keep a conservative context. If more
+            # context is needed, add "--kv-cache-dtype=fp8" to halve KV memory.
             - --max-model-len=16384
-            - --gpu-memory-utilization=0.90
+            - --gpu-memory-utilization=0.92
             - --enforce-eager
             # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
             # drop the vision weights, but forbidding image/video inputs skips
