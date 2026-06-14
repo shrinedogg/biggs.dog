@@ -1,0 +1,12 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kagent
+  labels:
+    # Privileged: the vLLM inference server runs on the nv-01 GPU node and
+    # relies on NVIDIA CDI device injection (nvidia.com/gpu). kagent's own
+    # controller/UI pods still run with hardened (non-root) securityContexts.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

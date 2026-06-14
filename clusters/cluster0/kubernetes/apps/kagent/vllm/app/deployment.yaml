@@ -1,0 +1,101 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm
+  namespace: kagent
+  labels:
+    app: vllm
+spec:
+  replicas: 1
+  # Weights live on a RWO host-path volume on nv-01; never run two at once.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm
+  template:
+    metadata:
+      labels:
+        app: vllm
+    spec:
+      # Pin to the single RTX 5090 node.
+      nodeSelector:
+        kubernetes.io/hostname: nv-01
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: vllm
+          # CUDA 12.9 build supports the 5090 (Blackwell, sm_120).
+          image: docker.io/vllm/vllm-openai:v0.23.0
+          args:
+            # ----------------------------------------------------------------
+            # MODEL: pick a quantized Qwen3 repo that fits the 5090's 32 GB.
+            # The bf16 weights of a 30B model are ~60 GB and will NOT fit, so
+            # an FP8 or 4-bit (AWQ/GPTQ) build is required. Examples:
+            #   Qwen/Qwen3-30B-A3B-FP8        (~30 GB, very tight)
+            #   Qwen/Qwen3-30B-A3B-AWQ        (~17 GB, recommended)
+            # Set --quantization to match the repo (awq_marlin / fp8 / gptq).
+            # ----------------------------------------------------------------
+            - --model=Qwen/Qwen3-30B-A3B-AWQ
+            - --quantization=awq_marlin
+            - --served-model-name=Qwen/Qwen3-30B-A3B-AWQ
+            # Context length sized to leave VRAM for KV cache on a 32 GB card.
+            - --max-model-len=32768
+            - --gpu-memory-utilization=0.92
+            # Required for kagent tool calling. Qwen3 uses the hermes parser.
+            - --enable-auto-tool-choice
+            - --tool-call-parser=hermes
+            - --host=0.0.0.0
+            - --port=8000
+          env:
+            - name: HF_HOME
+              value: /models
+            # Secures the OpenAI-compatible endpoint; kagent sends the same key.
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kagent-vllm
+                  key: VLLM_API_KEY
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "2"
+              memory: 16Gi
+              nvidia.com/gpu: 1
+            limits:
+              # Consumes the last of the 4 time-sliced nvidia.com/gpu replicas.
+              nvidia.com/gpu: 1
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            # First boot downloads weights; allow up to ~30 min.
+            periodSeconds: 15
+            failureThreshold: 120
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            # vLLM needs a large shared-memory segment for NCCL/IPC.
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

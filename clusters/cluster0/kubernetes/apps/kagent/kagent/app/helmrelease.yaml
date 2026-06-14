@@ -1,0 +1,44 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kagent
+  namespace: kagent
+spec:
+  interval: 3m
+  chartRef:
+    kind: OCIRepository
+    name: kagent
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    # ------------------------------------------------------------------
+    # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
+    # The chart renders a ModelConfig named "default-model-config" that
+    # the built-in agents use. Pointing it at vLLM keeps everything local.
+    # ------------------------------------------------------------------
+    providers:
+      default: openAI
+      openAI:
+        provider: OpenAI
+        # Must match vLLM's --served-model-name.
+        model: "Qwen/Qwen3-30B-A3B-AWQ"
+        apiKeySecretRef: kagent-vllm
+        apiKeySecretKey: OPENAI_API_KEY
+        config:
+          baseUrl: "http://vllm.kagent.svc.cluster.local:8000/v1"
+    # Bundled Postgres is dev-grade but fine here; give it real storage so
+    # its PVC binds (the cluster has no default StorageClass).
+    database:
+      postgres:
+        bundled:
+          enabled: true
+          storageClassName: ceph-block
+          storage: 2Gi

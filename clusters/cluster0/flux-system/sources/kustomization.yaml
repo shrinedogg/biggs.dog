@@ -28,3 +28,5 @@ resources:
   - nvidia-repo.yaml
   - fenrir-git.yaml
   - fenrir-oci.yaml
+  - kagent-crds-oci.yaml
+  - kagent-oci.yaml

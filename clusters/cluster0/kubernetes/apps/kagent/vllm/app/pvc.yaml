@@ -1,0 +1,17 @@
+---
+# Node-local cache for HuggingFace model weights. Kept on host-path so the
+# multi-GB Qwen3 download survives pod restarts and stays on the GPU node
+# (nv-01). Binding is WaitForFirstConsumer, so this PVC stays Pending until
+# the vLLM pod is scheduled; that is expected.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vllm-models
+  namespace: kagent
+spec:
+  storageClassName: host-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 100Gi
