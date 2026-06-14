@@ -1,0 +1,30 @@
+# 1Password: item kagent-user-password (username, password) — must match CNPG bootstrap credentials.
+# Materializes secret "kagent-database-url" (key: url) mounted into the kagent
+# controller at /etc/kagent-db/url (POSTGRES_DATABASE_URL_FILE).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: kagent-database-url
+  namespace: kagent
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: kagent-database-url
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        url: >-
+          postgres://{{ .username | urlquery }}:{{ .password | urlquery }}@cnpg-kagent-rw.cnpg-system.svc.cluster.local:5432/kagent
+  data:
+    - secretKey: username
+      remoteRef:
+        key: kagent-user-password
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: kagent-user-password
+        property: password

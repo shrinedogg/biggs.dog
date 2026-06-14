@@ -29,16 +29,28 @@ spec:
       openAI:
         provider: OpenAI
         # Must match vLLM's --served-model-name.
-        model: "Qwen/Qwen3-30B-A3B-AWQ"
+        model: "Qwen/Qwen3.6-27B-GGUF:Q8_0"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
           baseUrl: "http://vllm.kagent.svc.cluster.local:8000/v1"
-    # Bundled Postgres is dev-grade but fine here; give it real storage so
-    # its PVC binds (the cluster has no default StorageClass).
+    # Use the cluster's CNPG operator (cnpg-kagent) instead of the bundled
+    # dev Postgres. The full connection URL (incl. password) is provided at
+    # runtime from a mounted secret file, so no credentials live in git.
+    # vectorEnabled requires pgvector, which cnpg-kagent loads via its
+    # postgresql.extensions image (long-term memory support).
     database:
       postgres:
         bundled:
-          enabled: true
-          storageClassName: ceph-block
-          storage: 2Gi
+          enabled: false
+        vectorEnabled: true
+        urlFile: /etc/kagent-db/url
+    controller:
+      volumes:
+        - name: database-url
+          secret:
+            secretName: kagent-database-url
+      volumeMounts:
+        - name: database-url
+          mountPath: /etc/kagent-db
+          readOnly: true
