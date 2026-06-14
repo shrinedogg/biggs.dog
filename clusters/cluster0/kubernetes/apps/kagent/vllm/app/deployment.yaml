@@ -19,6 +19,10 @@ spec:
       labels:
         app: vllm
     spec:
+      # The Service is named "vllm", so Kubernetes injects legacy service-link
+      # env vars (e.g. VLLM_PORT=tcp://<ip>:8000) that collide with vLLM's own
+      # VLLM_PORT config and crash the engine. Disable the injection.
+      enableServiceLinks: false
       # Pin to the single RTX 5090 node.
       nodeSelector:
         kubernetes.io/hostname: nv-01
@@ -29,19 +33,26 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: pick a quantized Qwen3 repo that fits the 5090's 32 GB.
-            # The bf16 weights of a 30B model are ~60 GB and will NOT fit, so
-            # an FP8 or 4-bit (AWQ/GPTQ) build is required. Examples:
-            #   Qwen/Qwen3-30B-A3B-FP8        (~30 GB, very tight)
-            #   Qwen/Qwen3-30B-A3B-AWQ        (~17 GB, recommended)
-            # Set --quantization to match the repo (awq_marlin / fp8 / gptq).
+            # MODEL: a 4-bit (INT4) Qwen3.6-27B build that fits the 5090's
+            # 32 GB with ample headroom for KV cache (~15 GB weights). This
+            # repo is compressed-tensors INT4, so --quantization must be
+            # "compressed-tensors". --served-model-name must match the
+            # provider model in the kagent HelmRelease.
             # ----------------------------------------------------------------
-            - --model=Qwen/Qwen3-30B-A3B-AWQ
-            - --quantization=awq_marlin
-            - --served-model-name=Qwen/Qwen3-30B-A3B-AWQ
+            - --model=cyankiwi/Qwen3.6-27B-AWQ-INT4
+            - --quantization=compressed-tensors
+            - --served-model-name=cyankiwi/Qwen3.6-27B-AWQ-INT4
             # Context length sized to leave VRAM for KV cache on a 32 GB card.
-            - --max-model-len=32768
-            - --gpu-memory-utilization=0.92
+            # This is a VL + GDN model; its weights, vision encoder and CUDA
+            # graph capture nearly fill the card, so we run eager (no CUDA
+            # graphs) to free several GB and keep a conservative context.
+            - --max-model-len=16384
+            - --gpu-memory-utilization=0.90
+            - --enforce-eager
+            # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
+            # drop the vision weights, but forbidding image/video inputs skips
+            # the multimodal profiling + encoder cache (frees several GB).
+            - '--limit-mm-per-prompt={"image":0,"video":0}'
             # Required for kagent tool calling. Qwen3 uses the hermes parser.
             - --enable-auto-tool-choice
             - --tool-call-parser=hermes

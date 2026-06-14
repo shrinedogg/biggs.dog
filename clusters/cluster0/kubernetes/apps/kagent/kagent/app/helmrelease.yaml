@@ -29,7 +29,7 @@ spec:
       openAI:
         provider: OpenAI
         # Must match vLLM's --served-model-name.
-        model: "Qwen/Qwen3.6-27B-GGUF:Q8_0"
+        model: "cyankiwi/Qwen3.6-27B-AWQ-INT4"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
