@@ -1,0 +1,30 @@
+---
+# The dragonfly-operator auto-generates a NetworkPolicy (networkPolicyEnabled
+# defaults to true) that only permits in-namespace pods to reach port 6379.
+# AFFiNE runs in the `affine` namespace, so its connections time out.
+# NetworkPolicies are additive, so this extra policy authorizes the affine
+# namespace without touching the operator-managed policy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-affine-to-dragonfly-db
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly-db
+    app.kubernetes.io/part-of: dragonfly-operator
+spec:
+  podSelector:
+    matchLabels:
+      app: dragonfly-db
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/part-of: dragonfly
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: affine
+      ports:
+        - port: 6379
+          protocol: TCP

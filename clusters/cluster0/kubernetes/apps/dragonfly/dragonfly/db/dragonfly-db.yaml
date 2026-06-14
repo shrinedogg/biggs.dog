@@ -10,6 +10,11 @@ metadata:
   name: dragonfly-db
 spec:
   replicas: 2
+  # AFFiNE/BullMQ Lua scripts access keys not declared in KEYS[]. Redis allows
+  # this, but Dragonfly rejects it by default ("script tried accessing
+  # undeclared key"). This flag restores Redis-compatible behavior.
+  args:
+    - "--default_lua_flags=allow-undeclared-keys"
   resources:
     requests:
       cpu: 500m
