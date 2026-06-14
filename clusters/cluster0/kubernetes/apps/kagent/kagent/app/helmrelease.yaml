@@ -29,7 +29,7 @@ spec:
       openAI:
         provider: OpenAI
         # Must match vLLM's --served-model-name.
-        model: "nvidia/Qwen3.6-35B-A3B-NVFP4"
+        model: "cyankiwi/Qwen3.6-27B-AWQ-INT4"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
@@ -54,3 +54,20 @@ spec:
         - name: database-url
           mountPath: /etc/kagent-db
           readOnly: true
+  # Flux's helm-controller appends the OCI chart digest to .Chart.Version as
+  # semver build metadata (e.g. "0.9.7+de7ad4a95185"). The kagent chart emits
+  # .Chart.Version verbatim into the app.kubernetes.io/version label, and the
+  # "+" is an illegal Kubernetes label value, so every apply fails with
+  # 'ServiceAccount "kagent-controller" is invalid: metadata.labels'. Rewrite
+  # that one label to a valid value on every resource that carries it. The
+  # existence selector skips the lone resource without a labels map, so the
+  # replace op is always safe.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              labelSelector: app.kubernetes.io/version
+            patch: |
+              - op: replace
+                path: /metadata/labels/app.kubernetes.io~1version
+                value: "0.9.7"

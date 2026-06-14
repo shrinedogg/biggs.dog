@@ -33,21 +33,21 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: NVIDIA ModelOpt NVFP4 build of the Qwen3.6-35B-A3B MoE.
-            # NVFP4 is hardware-accelerated on the Blackwell 5090 (sm_120).
-            # The checkpoint is mixed-precision (~23 GB weights), so it fits a
-            # 32 GB card but leaves a modest KV-cache budget. --quantization
-            # must be "modelopt_fp4"; --served-model-name must match the
-            # provider model in the kagent HelmRelease.
+            # MODEL: 4-bit (compressed-tensors INT4) Qwen3.6-27B. On the
+            # consumer 5090 (sm_120) stable vLLM has no native FP4, so NVFP4
+            # gives no speed benefit and is larger; this INT4 build (~15 GB)
+            # leaves far more KV-cache headroom and performs the same via the
+            # Marlin kernel. --quantization must be "compressed-tensors";
+            # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=nvidia/Qwen3.6-35B-A3B-NVFP4
-            - --quantization=modelopt_fp4
-            - --served-model-name=nvidia/Qwen3.6-35B-A3B-NVFP4
-            # ~23 GB of weights leaves little headroom on 32 GB, so run eager
-            # (no CUDA graph capture) and keep a conservative context. If more
-            # context is needed, add "--kv-cache-dtype=fp8" to halve KV memory.
-            - --max-model-len=16384
-            - --gpu-memory-utilization=0.92
+            - --model=cyankiwi/Qwen3.6-27B-AWQ-INT4
+            - --quantization=compressed-tensors
+            - --served-model-name=cyankiwi/Qwen3.6-27B-AWQ-INT4
+            # ~15 GB weights leaves ample KV headroom. Still a VL model, so run
+            # eager + vision disabled; drop --enforce-eager later for CUDA-graph
+            # speed if memory allows.
+            - --max-model-len=32768
+            - --gpu-memory-utilization=0.90
             - --enforce-eager
             # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
             # drop the vision weights, but forbidding image/video inputs skips
