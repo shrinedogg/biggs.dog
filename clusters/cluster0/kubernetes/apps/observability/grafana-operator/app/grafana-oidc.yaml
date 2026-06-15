@@ -1,0 +1,27 @@
+---
+# Pocket ID OAuth client credentials for Grafana's native generic_oauth.
+# 1Password: create item "grafana-oidc" in the biggs-dog vault with fields
+# "client-id" and "client-secret" from the Pocket ID OIDC client whose callback
+# URL is https://grafana.biggs.dog/login/generic_oauth.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: grafana-oidc
+  namespace: observability
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: grafana-oidc
+    creationPolicy: Owner
+  data:
+    - secretKey: client-id
+      remoteRef:
+        key: grafana-oidc
+        property: client-id
+    - secretKey: client-secret
+      remoteRef:
+        key: grafana-oidc
+        property: client-secret
