@@ -1,0 +1,25 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app pocket-id
+  namespace: flux-system
+spec:
+  dependsOn:
+    # ClusterSecretStore (onepassword-connect) must exist for the ExternalSecret.
+    - name: secretstore
+    # CNPG Postgres (cnpg-pocket-id) + the pocket-id-user-password secret must be ready.
+    - name: cnpg-databases
+  targetNamespace: auth
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/auth/pocket-id/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m

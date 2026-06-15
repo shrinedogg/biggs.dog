@@ -31,3 +31,4 @@ resources:
   - kagent-crds-oci.yaml
   - kagent-oci.yaml
   - agent-sandbox-git.yaml
+  - oauth2-proxy-repo.yaml

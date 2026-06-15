@@ -1,0 +1,30 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-pocket-id
+  namespace: cnpg-system
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      database: pocketid
+      owner: pocketid
+      dataChecksums: true
+      secret:
+        name: pocket-id-user-password
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 150m
+    limits:
+      memory: 300Mi
+      cpu: 150m
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: barman-object-store

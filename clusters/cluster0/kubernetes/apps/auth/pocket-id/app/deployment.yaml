@@ -1,0 +1,84 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pocket-id
+  namespace: auth
+  labels:
+    app: pocket-id
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: pocket-id
+  template:
+    metadata:
+      labels:
+        app: pocket-id
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+        - name: pocket-id
+          image: ghcr.io/pocket-id/pocket-id:v2.8.0
+          env:
+            # Public URL behind the agentgateway (TLS terminated at the gateway).
+            - name: APP_URL
+              value: "https://id.biggs.dog"
+            - name: TRUST_PROXY
+              value: "true"
+            # Store uploaded files in Postgres so the pod stays stateless; the
+            # CNPG cluster (cnpg-pocket-id) is backed up via barman.
+            - name: FILE_BACKEND
+              value: "database"
+            # Homelab: no phone-home heartbeat / GitHub version check.
+            - name: ANALYTICS_DISABLED
+              value: "true"
+            - name: VERSION_CHECK_DISABLED
+              value: "true"
+            - name: PORT
+              value: "1411"
+          # DB_CONNECTION_STRING + ENCRYPTION_KEY from the pocket-id ExternalSecret.
+          envFrom:
+            - secretRef:
+                name: pocket-id
+          ports:
+            - name: http
+              containerPort: 1411
+              protocol: TCP
+          # The image runs its entrypoint as root (handles PUID/PGID), so only the
+          # user-independent hardening controls are applied (same approach as affine).
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          startupProbe:
+            exec:
+              command: ["/app/pocket-id", "healthcheck"]
+            periodSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            exec:
+              command: ["/app/pocket-id", "healthcheck"]
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["/app/pocket-id", "healthcheck"]
+            periodSeconds: 30
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      volumes:
+        - name: data
+          emptyDir: {}
