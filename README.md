@@ -28,6 +28,7 @@ clusters/
     └── kubernetes/
         └── apps/             # Application deployments
             ├── affine/
+            ├── auth/              # SSO stack (Pocket ID + OAuth2 Proxy)
             ├── biggs/
             ├── cert-manager/
             ├── cnpg/
@@ -109,6 +110,22 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | [SOPS](https://github.com/getsops/sops)                            | Encrypted secrets (age key)                     |
 
 
+### Identity & SSO
+
+The `auth` namespace provides single sign-on for the cluster. [Pocket ID](https://github.com/pocket-id/pocket-id) is a passkey-first OIDC provider, and [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy) acts as its OIDC client to gate browser apps.
+
+
+| Component                                                       | Description                                                                                                  |
+| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| [Pocket ID](https://github.com/pocket-id/pocket-id)            | Passkey-based OIDC provider at `id.biggs.dog` (Postgres via CNPG, uploads stored in the database)            |
+| [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy)   | OIDC client at `auth.biggs.dog`; provides forward-auth for apps with a shared `.biggs.dog` session cookie    |
+
+Protected apps attach an agentgateway `AgentgatewayPolicy` with `traffic.extAuth` that calls OAuth2 Proxy's `/oauth2/auth` endpoint (Envoy ext-authz compatible) and redirects unauthenticated users to the Pocket ID sign-in. A cross-namespace `ReferenceGrant` lets each app's policy reach the OAuth2 Proxy service in the `auth` namespace.
+
+- **Forward-auth (via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI
+- **Native OIDC (direct Pocket ID client):** Grafana
+
+
 ### Observability
 
 
@@ -138,6 +155,11 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 
 
 ## 📺 Applications
+
+### Authentication
+
+- **Pocket ID** - Passkey-first OIDC identity provider (`id.biggs.dog`)
+- **OAuth2 Proxy** - Forward-auth / SSO gateway for browser apps (`auth.biggs.dog`)
 
 ### Media Stack
 
@@ -206,7 +228,7 @@ Getting this working end-to-end required a fork of the operator (`[shrinedogg/fe
 - `**GBM_BACKENDS_PATH`** — set on both the Wolf sidecar and the Steam container; the CDI hook drops the NVIDIA GBM backend in `/usr/local/lib/gbm` while Mesa only searches `/usr/lib/x86_64-linux-gnu/gbm`.
 - **Sway via patched Wolf compositor** — Wolf's `gst-wayland-display` advertised both the legacy `wl_drm` global and `zwp_linux_dmabuf_v1` v4 feedback; nested wlroots (Sway 0.19+) binds both and aborts on the duplicate device announcement (`assert(wl->drm_render_name == NULL)`). The patched `shrinedogg/wolf` image skips `wl_drm` when dmabuf v4 feedback is active (legacy clients can opt back in with `GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1`), letting Steam run under Sway instead of gamescope.
 - `**/dev/shm` sizing** — a 4Gi memory-backed `emptyDir` at `/dev/shm`; the 64Mi runtime default exhausts instantly under Steam's CEF UI, yielding a black screen with only a cursor.
-- **User namespaces** — Steam's pressure-vessel runtime requires `user.max_user_namespaces`, which Talos defaults to `0`. Set via an Omni machine-config patch on the GPU node (node-level config, not in this repo).
+- **User namespaces** — Steam's pressure-vessel runtime requires `user.max_user_namespaces`, which Talos defaults to `0`. Enabled cluster-wide via Omni machine-config patches on every node (node-level config, not in this repo); also used by the `auth` and `affine` workloads, which run with `hostUsers: false` so their containers' root maps to an unprivileged host UID.
 - **Privileged Steam container** — Wolf hotplugs `uinput` devices mid-session; Kubernetes has no equivalent of Docker's `device_cgroup_rules`, so the container must be privileged to open the late-appearing `/dev/input/event`* nodes.
 - **Root Wolf entrypoint** — a ConfigMap (`wolf-entrypoint.yaml`) shadows the GOW `/entrypoint.sh` to force the Wolf sidecar to run as root, avoiding the upstream `gosu`/`supervisord` privilege-drop crash loop. (Re-declaring `PUID`/`PGID`/`UNAME` is rejected by server-side apply as duplicate map keys.)
 - **DRM render-node override** — `wolfConfig.runtimeVariables.renderNode` is pinned to `/dev/dri/renderD129`. The NVIDIA container toolkit injects the dGPU with its host numbering (`renderD128` doesn't exist inside the container), and with the wrong node Wolf fails GPU vendor detection and silently falls back to **software x264 encoding**.
