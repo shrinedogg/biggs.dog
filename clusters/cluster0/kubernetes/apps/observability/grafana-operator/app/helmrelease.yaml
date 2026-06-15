@@ -49,6 +49,17 @@ spec:
       GF_DATE_FORMATS_USE_BROWSER_LOCALE: true
       GF_EXPLORE_ENABLED: true
       GF_SECURITY_ANGULAR_SUPPORT_ENABLED: true
+    # Pocket ID OAuth client credentials (kept out of grafana.ini). These env
+    # vars override the matching [auth.generic_oauth] keys below.
+    envValueFrom:
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID:
+        secretKeyRef:
+          name: grafana-oidc
+          key: client-id
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET:
+        secretKeyRef:
+          name: grafana-oidc
+          key: client-secret
     grafana.ini:
       server:
         domain: grafana.biggs.dog
@@ -62,6 +73,26 @@ spec:
         auto_assign_org: true
         auto_assign_org_id: 1
         auto_assign_org_role: Admin
+      # Native OIDC login via Pocket ID. client_id/client_secret are injected
+      # from the grafana-oidc secret via envValueFrom (GF_AUTH_GENERIC_OAUTH_*).
+      # role_attribute_path is intentionally unset, so users fall back to the
+      # users.auto_assign_org_role above (Admin).
+      auth.generic_oauth:
+        enabled: true
+        name: Pocket ID
+        icon: signin
+        allow_sign_up: true
+        auto_login: false
+        use_pkce: true
+        use_refresh_token: true
+        scopes: openid email profile groups
+        auth_url: https://id.biggs.dog/authorize
+        token_url: https://id.biggs.dog/api/oidc/token
+        api_url: https://id.biggs.dog/api/oidc/userinfo
+        login_attribute_path: preferred_username
+        name_attribute_path: name
+        email_attribute_path: email
+        groups_attribute_path: groups
       analytics:
         check_for_updates: false
         check_for_plugin_updates: false

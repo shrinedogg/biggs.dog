@@ -1,0 +1,25 @@
+---
+# Allows AgentgatewayPolicy resources in other namespaces to reference the
+# oauth2-proxy Service as their external-authorization (forward-auth) backend.
+# Each protected app's policy lives in its own namespace, so a cross-namespace
+# backendRef into `auth` requires this grant.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: extauth-to-oauth2-proxy
+  namespace: auth
+spec:
+  from:
+    - group: agentgateway.dev
+      kind: AgentgatewayPolicy
+      namespace: rook-ceph
+    - group: agentgateway.dev
+      kind: AgentgatewayPolicy
+      namespace: media
+    - group: agentgateway.dev
+      kind: AgentgatewayPolicy
+      namespace: ai-system
+  to:
+    - group: ""
+      kind: Service
+      name: oauth2-proxy

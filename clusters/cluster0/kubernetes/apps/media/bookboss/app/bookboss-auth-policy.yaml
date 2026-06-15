@@ -1,0 +1,33 @@
+---
+# Forward-auth (SSO) in front of bookboss via oauth2-proxy. See the rook-ceph
+# policy for a description of the /oauth2/auth ext-authz flow.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: bookboss-forward-auth
+  namespace: media
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: bookboss
+  traffic:
+    extAuth:
+      backendRef:
+        group: ""
+        kind: Service
+        name: oauth2-proxy
+        namespace: auth
+        port: 80
+      http:
+        path: '"/oauth2/auth"'
+        allowedRequestHeaders:
+          - cookie
+          - authorization
+        allowedResponseHeaders:
+          - authorization
+          - x-auth-request-user
+          - x-auth-request-email
+          - x-auth-request-groups
+          - x-auth-request-preferred-username
+        redirect: '"https://auth.biggs.dog/oauth2/start?rd=https://bookboss.biggs.dog" + request.path'
