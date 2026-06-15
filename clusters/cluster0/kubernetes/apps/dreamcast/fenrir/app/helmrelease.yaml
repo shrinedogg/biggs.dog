@@ -47,13 +47,16 @@ spec:
               # events in the pod netns) so SDL/Steam detect controllers.
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
               AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.0
-              # Patched wolf: gst-wayland-display no longer advertises the
-              # legacy wl_drm global when dmabuf v4 feedback is active, which
-              # crashed nested wlroots compositors (sway) with
-              # assert(wl->drm_render_name == NULL). Overlay built from
-              # https://github.com/shrinedogg/gst-wayland-display
-              # (branch fix/optional-wl-drm) on ghcr.io/games-on-whales/wolf:stable.
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.1.0
+              # Patched wolf: from-source build adding HDR / HEVC Main10 support.
+              # Compositor built from https://github.com/shrinedogg/gst-wayland-display
+              # (branch feat/hdr-hevc-main10 @2e01aa9: 10-bit RGB10A2 producer caps +
+              # color-management-v1 capture + BT.2020/PQ render, on top of the
+              # fix/optional-wl-drm wl_drm fix). Wolf C++ from
+              # https://github.com/shrinedogg/wolf (branch feat/hdr-hevc-main10):
+              # HEVC Main10 P010 encode + Moonlight HDR-mode control signaling.
+              # HDR is opt-in per session via WOLF_ENABLE_HDR=TRUE (see user.yaml
+              # sidecarPolicies.wolf.env).
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.0
       moonlight_proxy:
         containers:
           proxy:

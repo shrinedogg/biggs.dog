@@ -42,6 +42,12 @@ spec:
   sidecarPolicies:
     wolf:
       env:
+        # Opt in to HDR / HEVC Main10 for this user's sessions. Wolf gates HDR
+        # advertisement (serverinfo Main10 + per-session HDR signaling) behind
+        # this env; the image leaves it unset by default, so HDR is enabled here
+        # rather than baked into the image.
+        - name: WOLF_ENABLE_HDR
+          value: "TRUE"
         - name: NVIDIA_DRIVER_CAPABILITIES
           value: all
         - name: NVIDIA_VISIBLE_DEVICES
