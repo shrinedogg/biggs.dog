@@ -41,6 +41,9 @@ spec:
         # Behind the agentgateway (TLS terminated upstream); share cookies across
         # every *.biggs.dog service so it can guard them.
         reverse_proxy = "true"
+        # Only the in-cluster agentgateway (pod CIDR) may set X-Forwarded-* —
+        # prevents direct callers from spoofing forwarded headers.
+        trusted_proxy_ips = ["10.244.0.0/16"]
         cookie_domains = [".biggs.dog"]
         whitelist_domains = [".biggs.dog"]
         cookie_secure = "true"
