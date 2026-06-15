@@ -8,6 +8,8 @@ spec:
   dependsOn:
     # CRDs (kagent + kmcp) must exist before the controller starts.
     - name: kagent-crds
+    # agent-sandbox CRDs/controller must exist before SandboxAgent reconciliation.
+    - name: agent-sandbox
     # The local model endpoint + shared API key secret must be ready.
     - name: vllm
   targetNamespace: kagent

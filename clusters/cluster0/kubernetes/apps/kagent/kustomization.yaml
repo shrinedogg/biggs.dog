@@ -6,5 +6,6 @@ resources:
   - ./namespace.yaml
   # Flux-Kustomizations
   - ./vllm/ks.yaml
+  - ./agent-sandbox/ks.yaml
   - ./kagent-crds/ks.yaml
   - ./kagent/ks.yaml

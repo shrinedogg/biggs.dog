@@ -1,0 +1,36 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+# Upstream chart: agent-sandbox GitRepository (./helm). Required for kagent SandboxAgent
+# CRs (agents.x-k8s.io Sandbox + extension APIs). After first install, restart
+# kagent-controller so it registers the Sandbox API.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agent-sandbox
+  namespace: agent-sandbox-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: ./helm
+      reconcileStrategy: Revision
+      sourceRef:
+        kind: GitRepository
+        name: agent-sandbox
+        namespace: flux-system
+  install:
+    createNamespace: true
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    image:
+      tag: v0.4.6
+    controller:
+      # SandboxTemplate / SandboxClaim controllers (needed for kagent SandboxAgent).
+      extensions: true
