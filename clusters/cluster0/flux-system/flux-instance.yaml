@@ -36,6 +36,17 @@ spec:
             value:
               - key: "CriticalAddonsOnly"
                 operator: "Exists"
+      # OCI Helm charts that use .Chart.Version in labels/image tags break when
+      # helm-controller appends the artifact digest (e.g. 0.9.7+de7ad4a95185).
+      # layerSelector.operation=copy does not stop this. Disable digest tracking
+      # so .Chart.Version stays the tag from Chart.yaml.
+      - target:
+          kind: Deployment
+          name: helm-controller
+        patch: |
+          - op: add
+            path: /spec/template/spec/containers/0/args/-
+            value: --feature-gates=DisableChartDigestTracking=true
   sync:
     kind: GitRepository
     url: "https://github.com/shrinedogg/biggs.dog.git"
