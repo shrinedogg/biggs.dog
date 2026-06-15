@@ -18,8 +18,13 @@ spec:
       labels:
         app: pocket-id
     spec:
-      securityContext:
-        fsGroup: 1000
+      # Kubernetes 1.36 user namespaces: map the pod's UIDs/GIDs to an
+      # unprivileged range on the host. The pocket-id image's entrypoint starts
+      # as root to `chown /app/data` and then `su-exec` down to 1000 — inside the
+      # user namespace that "root" is mapped to a harmless host UID, so the
+      # entrypoint manages permissions without any real host privilege (and
+      # without us having to add CHOWN/SETUID/SETGID back to the container).
+      hostUsers: false
       containers:
         - name: pocket-id
           image: ghcr.io/pocket-id/pocket-id:v2.8.0
@@ -48,13 +53,12 @@ spec:
             - name: http
               containerPort: 1411
               protocol: TCP
-          # The image runs its entrypoint as root (handles PUID/PGID), so only the
-          # user-independent hardening controls are applied (same approach as affine).
+          # The entrypoint runs as (namespaced) root to set up /app/data, so we
+          # don't drop ALL capabilities here — within the user namespace they
+          # grant no real host privilege. no_new_privs + RuntimeDefault seccomp
+          # still apply.
           securityContext:
             allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - ALL
             seccompProfile:
               type: RuntimeDefault
           resources:

@@ -16,7 +16,9 @@ spec:
   # Node.js app that runs as root, so we apply the user-independent controls only
   # (drop ALL capabilities, no privilege escalation, RuntimeDefault seccomp);
   # runAsNonRoot/readOnlyRootFilesystem are not forced because the image does not
-  # support them.
+  # support them. We additionally run every pod in a user namespace
+  # (hostUsers: false, Kubernetes 1.36) so the in-container root maps to an
+  # unprivileged host UID range — defense-in-depth on top of the cap drop.
   postRenderers:
     - kustomize:
         patches:
@@ -32,6 +34,9 @@ spec:
                       - ALL
                   seccompProfile:
                     type: RuntimeDefault
+              - op: add
+                path: /spec/template/spec/hostUsers
+                value: false
           - target:
               kind: Job
             patch: |
@@ -44,6 +49,9 @@ spec:
                       - ALL
                   seccompProfile:
                     type: RuntimeDefault
+              - op: add
+                path: /spec/template/spec/hostUsers
+                value: false
   values:
     global:
       app:
