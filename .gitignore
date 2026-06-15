@@ -4,3 +4,4 @@
 .zed/
 age.agekey
 bootstrap-flux.sh
+.cursor/kagent-mcp.env
