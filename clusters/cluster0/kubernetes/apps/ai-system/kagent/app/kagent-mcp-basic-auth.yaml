@@ -1,0 +1,26 @@
+# 1Password: item "kagent-mcp-basic-auth" in the biggs-dog vault:
+#   htaccess  — one htpasswd line (APR1), e.g. htpasswd -nbm admin '<password>'
+#               agentgateway reads the synced secret key ".htaccess".
+#   password  — same plaintext password (concealed). For MCP clients only; not synced to the cluster.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: kagent-mcp-basic-auth
+  namespace: ai-system
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: kagent-mcp-basic-auth
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        .htaccess: "{{ .htaccess }}"
+  data:
+    - secretKey: htaccess
+      remoteRef:
+        key: kagent-mcp-basic-auth
+        property: htaccess

@@ -1,6 +1,5 @@
 ---
-# Reuses kagent-ui-basic-auth (1Password item kagent-ui-basic-auth). Same htpasswd
-# credentials as the UI at kagent.biggs.dog.
+# 1Password item kagent-mcp-basic-auth — see kagent-mcp-basic-auth ExternalSecret.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
@@ -16,4 +15,4 @@ spec:
       mode: Strict
       realm: kagent
       secretRef:
-        name: kagent-ui-basic-auth
+        name: kagent-mcp-basic-auth
