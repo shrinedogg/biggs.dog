@@ -1,0 +1,16 @@
+# Declaratively enable pgvector in the kagent database. The Cluster mounts the
+# extension binaries (postgresql.extensions), but CREATE EXTENSION requires
+# superuser; kagent's migration runs as the app user and fails without this.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-kagent-db
+  namespace: cnpg-system
+spec:
+  name: kagent
+  owner: kagent
+  cluster:
+    name: cnpg-kagent
+  extensions:
+    - name: vector
+      ensure: present
