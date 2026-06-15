@@ -1,0 +1,27 @@
+# 1Password: item "kagent-ui-basic-auth" in the biggs-dog vault with field
+# "htaccess" containing one htpasswd line (APR1), e.g.:
+#   htpasswd -nbm admin '<your-password>'
+# Paste the full output (user:$apr1$...) into the field. agentgateway reads the
+# synced secret key ".htaccess".
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: kagent-ui-basic-auth
+  namespace: kagent
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: kagent-ui-basic-auth
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        .htaccess: "{{ .htaccess }}"
+  data:
+    - secretKey: htaccess
+      remoteRef:
+        key: kagent-ui-basic-auth
+        property: htaccess
