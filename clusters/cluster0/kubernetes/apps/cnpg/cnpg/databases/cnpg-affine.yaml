@@ -12,7 +12,13 @@ spec:
       dataChecksums: true
       secret:
         name: affine-user-password
-  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  # Minimal trixie operand + extension images from the official CNPG 1.29 catalog
+  # (../app/postgresql-minimal-trixie-catalog.yaml). Enables pgvector by name only.
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
   resources:
     requests:
       memory: 300Mi
@@ -25,9 +31,7 @@ spec:
     size: 5Gi
   postgresql:
     extensions:
-    - name: pgvector
-      image:
-        reference: ghcr.io/cloudnative-pg/pgvector:0.8.2-18-trixie
+      - name: pgvector
   plugins:
   - name: barman-cloud.cloudnative-pg.io
     isWALArchiver: true

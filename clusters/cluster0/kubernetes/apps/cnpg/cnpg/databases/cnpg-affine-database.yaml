@@ -1,0 +1,15 @@
+# Declaratively enable pgvector in the affine database (same pattern as kagent).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-affine-db
+  namespace: cnpg-system
+spec:
+  name: affine
+  owner: affine
+  cluster:
+    name: cnpg-affine
+  extensions:
+    - name: vector
+      version: "0.8.2"
+      ensure: present
