@@ -3,7 +3,7 @@ apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:
   name: kagent-ui-basic-auth
-  namespace: kagent
+  namespace: ai-system
 spec:
   targetRefs:
     - group: gateway.networking.k8s.io

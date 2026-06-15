@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: vllm
-  namespace: kagent
+  namespace: ai-system
   labels:
     app: vllm
 spec:

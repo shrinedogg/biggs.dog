@@ -5,7 +5,7 @@ apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: kagent-database-url
-  namespace: kagent
+  namespace: ai-system
 spec:
   refreshInterval: 1h
   secretStoreRef:

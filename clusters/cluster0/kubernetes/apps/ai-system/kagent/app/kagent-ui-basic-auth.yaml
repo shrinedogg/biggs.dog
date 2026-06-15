@@ -7,7 +7,7 @@ apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
   name: kagent-ui-basic-auth
-  namespace: kagent
+  namespace: ai-system
 spec:
   refreshInterval: 1h
   secretStoreRef:

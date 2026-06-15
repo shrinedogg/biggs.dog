@@ -5,10 +5,11 @@ metadata:
   name: &app agent-sandbox
   namespace: flux-system
 spec:
+  targetNamespace: ai-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/kagent/agent-sandbox/app
+  path: ./clusters/cluster0/kubernetes/apps/ai-system/agent-sandbox/app
   prune: true
   sourceRef:
     kind: GitRepository

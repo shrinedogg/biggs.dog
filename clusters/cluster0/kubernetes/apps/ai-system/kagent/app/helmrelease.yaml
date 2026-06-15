@@ -4,7 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: kagent
-  namespace: kagent
+  namespace: ai-system
 spec:
   interval: 3m
   chartRef:
@@ -33,7 +33,7 @@ spec:
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
-          baseUrl: "http://vllm.kagent.svc.cluster.local:8000/v1"
+          baseUrl: "http://vllm.ai-system.svc.cluster.local:8000/v1"
     # Use the cluster's CNPG operator (cnpg-kagent) instead of the bundled
     # dev Postgres. The full connection URL (incl. password) is provided at
     # runtime from a mounted secret file, so no credentials live in git.

@@ -7,7 +7,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: agent-sandbox
-  namespace: agent-sandbox-system
+  namespace: ai-system
 spec:
   interval: 3m
   chart:
@@ -19,7 +19,7 @@ spec:
         name: agent-sandbox
         namespace: flux-system
   install:
-    createNamespace: true
+    createNamespace: false
     crds: CreateReplace
     remediation:
       retries: 3
@@ -29,6 +29,9 @@ spec:
     remediation:
       retries: 3
   values:
+    namespace:
+      create: false
+      name: ai-system
     image:
       tag: v0.4.6
     controller:

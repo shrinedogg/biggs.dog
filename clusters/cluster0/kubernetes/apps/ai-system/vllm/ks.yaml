@@ -10,11 +10,11 @@ spec:
     - name: nv-gpu-operator
     # ClusterSecretStore (onepassword-connect) must exist for the ExternalSecret.
     - name: secretstore
-  targetNamespace: kagent
+  targetNamespace: ai-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/kagent/vllm/app
+  path: ./clusters/cluster0/kubernetes/apps/ai-system/vllm/app
   prune: true
   sourceRef:
     kind: GitRepository

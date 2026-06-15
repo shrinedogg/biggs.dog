@@ -7,7 +7,7 @@ apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: vllm-models
-  namespace: kagent
+  namespace: ai-system
 spec:
   storageClassName: host-path
   accessModes:
