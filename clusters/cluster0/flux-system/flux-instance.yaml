@@ -36,10 +36,10 @@ spec:
             value:
               - key: "CriticalAddonsOnly"
                 operator: "Exists"
-      # OCI Helm charts that use .Chart.Version in labels/image tags break when
-      # helm-controller appends the artifact digest (e.g. 0.9.7+de7ad4a95185).
-      # layerSelector.operation=copy does not stop this. Disable digest tracking
-      # so .Chart.Version stays the tag from Chart.yaml.
+      # Helm charts that use .Chart.Version in labels break when helm-controller
+      # appends the artifact digest (e.g. 0.9.7+de7ad4a95185 or 0.1.0+d0c124d4a1fd).
+      # Affects OCI and Git chart sources. layerSelector.operation=copy does not
+      # stop this. Disable digest tracking so .Chart.Version stays Chart.yaml.
       - target:
           kind: Deployment
           name: helm-controller

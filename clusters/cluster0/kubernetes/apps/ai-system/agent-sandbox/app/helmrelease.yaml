@@ -13,7 +13,11 @@ spec:
   chart:
     spec:
       chart: ./helm
-      reconcileStrategy: Revision
+      # ChartVersion keeps .Chart.Version at Chart.yaml (0.1.0) without appending
+      # the Git commit digest. Revision would produce 0.1.0+d0c124d4a1fd, which
+      # breaks helm.sh/chart labels. We pin releases via GitRepository ref.tag
+      # and values.image.tag instead of tracking every upstream commit.
+      reconcileStrategy: ChartVersion
       sourceRef:
         kind: GitRepository
         name: agent-sandbox
