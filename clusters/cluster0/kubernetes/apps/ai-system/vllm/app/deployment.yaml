@@ -57,25 +57,24 @@ spec:
             # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
-            # 64K context: raised from 32K because some built-in agents
-            # (e.g. observability-agent) have system prompts + tool schemas
-            # that exceed 32768 tokens and return a context-length error.
-            # fp8 KV cache keeps the memory cost of doubling the context
-            # manageable on this 32 GB card.
-            - --max-model-len=62720
+            # 80K context (effective ~80K after vLLM's architecture-driven
+            # auto-reduction of ~4.3%). Raised from 64K to give heavy agents
+            # (e.g. flux-agent, observability-agent) ample room for their
+            # large system prompts + tool schemas + output. fp8 KV cache
+            # keeps the memory cost manageable on this 32 GB card.
+            - --max-model-len=83584
+            # nv-01 is a headless Talos node with a DEDICATED GPU -- no
+            # desktop/OS holding VRAM -- so we can push utilization high.
             # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
-            # memory profiling), then sizes the KV pool from what's left, so a
-            # higher util just feeds the KV pool (vLLM sizes KV to fit whatever
-            # remains, never over-allocating). nv-01 is a headless Talos node
-            # with a DEDICATED GPU -- no desktop/OS holding VRAM -- so we can
-            # push utilization high and give nearly all VRAM to the model.
-            # 0.85 starved the KV pool (no cache blocks); 0.92 still left only
-            # 0.33 GiB KV vs the 1.29 GiB needed for one 32K request. 0.97
-            # yields ~1.9 GiB KV, clearing that with room for some concurrency.
-            # If it OOMs, fall back to --enforce-eager (frees the capture
-            # reserve for KV); if KV is still short, 0.98 is safe on this
-            # dedicated node.
-            - --gpu-memory-utilization=0.98
+            # memory profiling), then sizes the KV pool from what's left, so
+            # raising util feeds the KV pool without risking a capture OOM.
+            # History: 0.85 → no cache blocks; 0.92 → 0.33 GiB KV (short);
+            # 0.97 → 1.90 GiB KV (working). 0.99 → ~2.53 GiB KV, which
+            # covers the larger minimum needed for the 83K context window.
+            # Stopped at 0.99 (not 1.00): leaves ~320 MB for transient
+            # allocations that fall outside the KV pool budget.
+            # If it OOMs, fall back to --enforce-eager.
+            - --gpu-memory-utilization=0.99
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
