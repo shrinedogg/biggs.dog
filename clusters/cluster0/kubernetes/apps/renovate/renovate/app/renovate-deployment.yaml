@@ -6,6 +6,11 @@ metadata:
   name: renovate
   namespace: renovate
 spec:
+  # Single replica backed by an RWO (ceph-block) config PVC. The default
+  # RollingUpdate surges a second pod that deadlocks on a Multi-Attach error for
+  # the RWO volume; Recreate terminates the old pod first.
+  strategy:
+    type: Recreate
   template:
     metadata:
       labels:

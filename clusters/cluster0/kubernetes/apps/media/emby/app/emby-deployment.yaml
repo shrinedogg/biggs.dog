@@ -7,11 +7,11 @@ metadata:
     app: emby
 spec:
   replicas: 1
+  # Single replica backed by an RWO (ceph-block) config PVC. RollingUpdate can
+  # surge a second pod that deadlocks on a Multi-Attach error for the RWO
+  # volume; Recreate terminates the old pod first.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
+    type: Recreate
   selector:
     matchLabels:
       app: emby

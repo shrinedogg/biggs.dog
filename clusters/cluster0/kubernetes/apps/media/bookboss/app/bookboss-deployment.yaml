@@ -7,11 +7,11 @@ metadata:
   namespace: media
 spec:
   replicas: 1
+  # Single replica backed by RWO (ceph-block) PVCs. RollingUpdate would try to
+  # start the new pod before terminating the old one, which deadlocks on a
+  # Multi-Attach error for the RWO volumes. Recreate kills the old pod first.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    type: Recreate
   selector:
     matchLabels:
       app: bookboss
