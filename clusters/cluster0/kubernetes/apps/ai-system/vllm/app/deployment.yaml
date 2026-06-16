@@ -75,7 +75,7 @@ spec:
             # If it OOMs, fall back to --enforce-eager (frees the capture
             # reserve for KV); if KV is still short, 0.98 is safe on this
             # dedicated node.
-            - --gpu-memory-utilization=0.97
+            - --gpu-memory-utilization=0.98
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
