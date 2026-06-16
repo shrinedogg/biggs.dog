@@ -1,0 +1,32 @@
+---
+# Scrape vLLM's Prometheus /metrics endpoint into Victoria Metrics.
+# The VM Operator's vmagent uses selectAllByDefault=true, so this is
+# picked up automatically with no changes to the vmagent config.
+#
+# vLLM exposes these metrics (among others):
+#   vllm:generation_tokens_total          -- total tokens generated (use rate() for tok/s)
+#   vllm:prompt_tokens_total              -- total prompt tokens processed
+#   vllm:time_to_first_token_seconds      -- TTFT histogram
+#   vllm:time_per_output_token_seconds    -- per-token latency histogram (inverse = tok/s)
+#   vllm:e2e_request_latency_seconds      -- end-to-end request latency histogram
+#   vllm:gpu_cache_usage_perc             -- KV cache utilisation (watch this -- ~1.9 GiB)
+#   vllm:num_requests_running             -- in-flight requests
+#   vllm:num_requests_waiting             -- queued requests
+#
+# Note: /metrics does NOT require the VLLM_API_KEY; it bypasses the
+# OpenAI-compat auth middleware.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: vllm
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: vllm
+spec:
+  selector:
+    matchLabels:
+      app: vllm
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 30s

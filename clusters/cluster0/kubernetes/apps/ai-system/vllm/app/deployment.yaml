@@ -57,10 +57,12 @@ spec:
             # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
-            # 32K context (vs the card's 256K): shrinks the KV pool and the
-            # profiling activation peak, freeing VRAM for graph capture. Still
-            # ample for kagent prompts + large tool results.
-            - --max-model-len=32768
+            # 64K context: raised from 32K because some built-in agents
+            # (e.g. observability-agent) have system prompts + tool schemas
+            # that exceed 32768 tokens and return a context-length error.
+            # fp8 KV cache keeps the memory cost of doubling the context
+            # manageable on this 32 GB card.
+            - --max-model-len=65536
             # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
             # memory profiling), then sizes the KV pool from what's left, so a
             # higher util just feeds the KV pool (vLLM sizes KV to fit whatever
