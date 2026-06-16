@@ -33,46 +33,55 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: NVFP4 (4-bit) Qwen3.6-27B. The RTX 5090 (Blackwell,
-            # sm_120) has native FP4 Tensor Cores; this is an experiment to
-            # confirm vLLM v0.23.0 actually engages an FP4 kernel on sm_120
-            # (rather than silently falling back) and that it's beneficial.
-            # Quantization is intentionally NOT pinned here: vLLM auto-detects
-            # it from the checkpoint's quantization_config. Verify the FP4
-            # kernel selection + throughput in the startup logs; if it falls
-            # back / is slower, revert to the cyankiwi/Qwen3.6-27B-AWQ-INT4
-            # (compressed-tensors INT4, ~15 GB) build.
-            # --served-model-name must match the kagent HelmRelease provider.
+            # MODEL: NeuralNet-Hub NVFP4 build of Qwen3.6-27B, served per its
+            # model card's recommended vLLM config:
+            #   https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4
+            # NVFP4 requires Blackwell (sm_100+); nv-01's 48 GB Blackwell card
+            # qualifies. The card's full config barely fits in 48 GB, so we run
+            # it as-recommended except: context is lowered (kagent needs
+            # nowhere near 256K) for comfortable VRAM headroom, plus port and
+            # vision-off deviations flagged below. --served-model-name must
+            # match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=unsloth/Qwen3.6-27B-NVFP4
-            - --served-model-name=unsloth/Qwen3.6-27B-NVFP4
-            # Vision disabled (text-only kagent traffic). --enforce-eager IS
-            # kept on: enabling CUDA graphs made capture OOM repeatedly on this
-            # 32 GB card (tried to alloc +1.53 GiB with only ~759 MiB free).
-            # The 27B NVFP4 weights (~16 GB) + KV cache leave too little VRAM
-            # headroom for graph capture, and nv-01 has no other large GPU
-            # tenant to blame. Eager trades some speed (first-request Triton
-            # JIT spikes on the hybrid GDN kernels) for a pod that boots
-            # reliably -- a crashlooping vLLM takes every kagent agent down
-            # with it. Revisit CUDA graphs only with more VRAM or a smaller
-            # --max-model-len. If agent multi-step calls still time out, raise
-            # the kagent request timeout rather than fighting GPU memory here.
-            - --max-model-len=32768
-            - --gpu-memory-utilization=0.90
-            - --enforce-eager
-            # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
-            # drop the vision weights, but forbidding image/video inputs skips
-            # the multimodal profiling + encoder cache (frees several GB).
-            - '--limit-mm-per-prompt={"image":0,"video":0}'
-            # Required for kagent tool calling. This NVFP4 checkpoint emits
-            # Qwen3-Coder-style XML tool calls (<function=..><parameter=..>),
-            # NOT hermes JSON, so it needs the qwen3_coder parser. (The old
-            # cyankiwi INT4 build used hermes; the two ship different chat
-            # templates.) If kagent tool calls still fail, check the vLLM logs
-            # for parser errors and confirm the format against the model's
-            # tokenizer_config chat template.
+            - --model=NeuralNet-Hub/Qwen3.6-27B-NVFP4
+            - --served-model-name=NeuralNet-Hub/Qwen3.6-27B-NVFP4
+            # Card-recommended quantization/dtype/KV-cache.
+            - --quantization=nvfp4
+            - --dtype=bfloat16
+            - --kv-cache-dtype=fp8
+            # DEVIATION: card recommends 262144 (256K). kagent prompts (system
+            # prompt + tool schemas + tool results) never approach that, so we
+            # cap at 64K. This is the single biggest VRAM lever -- it turns the
+            # card's "barely fits" 256K KV cache into a comfortable margin while
+            # still allowing large tool outputs (k8s manifests, logs).
+            - --max-model-len=65536
+            # Card value. With the smaller context above there's now real
+            # headroom on 48 GB; if CUDA-graph capture still OOMs, drop to 0.90.
+            - --gpu-memory-utilization=0.95
+            # Card-recommended throughput + bounded graph-capture knobs.
+            - --max-num-batched-tokens=4096
+            - --max-num-seqs=200
+            - --max-cudagraph-capture-size=209
+            - --enable-prefix-caching
+            # Qwen3.6 ships custom modeling code (model_type qwen3_5); the card
+            # requires trust-remote-code. NOTE: this executes repo-provided
+            # Python from the checkpoint -- acceptable only for trusted models.
+            - --trust-remote-code
+            # Thinking disabled (card's config.yaml does the same): kagent only
+            # needs tool calls, and reasoning traces would just add latency.
+            - '--default-chat-template-kwargs={"enable_thinking": false}'
+            - --reasoning-parser=qwen3
+            # Required for kagent tool calling; this checkpoint emits
+            # Qwen3-Coder XML tool calls, matching the card's parser choice.
             - --enable-auto-tool-choice
             - --tool-call-parser=qwen3_coder
+            # DEVIATION (workload + memory): the card leaves vision enabled,
+            # but kagent traffic is text-only. Forbidding image/video skips the
+            # multimodal profiling + encoder cache, reclaiming the slim margin
+            # on a "barely fits" 48 GB budget at no functional cost here.
+            - '--limit-mm-per-prompt={"image":0,"video":0}'
+            # DEVIATION: card uses port 18000; keep 8000 to match the Service
+            # and the kagent provider baseUrl.
             - --host=0.0.0.0
             - --port=8000
           env:

@@ -40,7 +40,7 @@ spec:
       openAI:
         provider: OpenAI
         # Must match vLLM's --served-model-name.
-        model: "unsloth/Qwen3.6-27B-NVFP4"
+        model: "NeuralNet-Hub/Qwen3.6-27B-NVFP4"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
