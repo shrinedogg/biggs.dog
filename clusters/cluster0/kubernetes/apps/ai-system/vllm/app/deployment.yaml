@@ -33,19 +33,21 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: 4-bit (compressed-tensors INT4) Qwen3.6-27B. On the
-            # consumer 5090 (sm_120) stable vLLM has no native FP4, so NVFP4
-            # gives no speed benefit and is larger; this INT4 build (~15 GB)
-            # leaves far more KV-cache headroom and performs the same via the
-            # Marlin kernel. --quantization must be "compressed-tensors";
+            # MODEL: NVFP4 (4-bit) Qwen3.6-27B. The RTX 5090 (Blackwell,
+            # sm_120) has native FP4 Tensor Cores; this is an experiment to
+            # confirm vLLM v0.23.0 actually engages an FP4 kernel on sm_120
+            # (rather than silently falling back) and that it's beneficial.
+            # Quantization is intentionally NOT pinned here: vLLM auto-detects
+            # it from the checkpoint's quantization_config. Verify the FP4
+            # kernel selection + throughput in the startup logs; if it falls
+            # back / is slower, revert to the cyankiwi/Qwen3.6-27B-AWQ-INT4
+            # (compressed-tensors INT4, ~15 GB) build.
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=cyankiwi/Qwen3.6-27B-AWQ-INT4
-            - --quantization=compressed-tensors
-            - --served-model-name=cyankiwi/Qwen3.6-27B-AWQ-INT4
-            # ~15 GB weights leaves ample KV headroom. Still a VL model, so run
-            # eager + vision disabled; drop --enforce-eager later for CUDA-graph
-            # speed if memory allows.
+            - --model=unsloth/Qwen3.6-27B-NVFP4
+            - --served-model-name=unsloth/Qwen3.6-27B-NVFP4
+            # Still a VL model, so run eager + vision disabled; drop
+            # --enforce-eager later for CUDA-graph speed if memory allows.
             - --max-model-len=32768
             - --gpu-memory-utilization=0.90
             - --enforce-eager
