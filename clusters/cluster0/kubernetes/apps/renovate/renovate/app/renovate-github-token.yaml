@@ -1,0 +1,24 @@
+# A read-only github.com PAT used only for datasource/release-notes lookups.
+# Renovate runs here as a GitHub App, whose installation token cannot query
+# arbitrary github.com repos (and gets rate-limited), so GitRepository sources
+# (e.g. gateway-api, agent-sandbox) and github-releases/-tags datasources are
+# skipped with "github-token-required". The standard GITHUB_COM_TOKEN env var
+# fixes that. 1Password: create item "renovate-github-token" in the biggs-dog
+# vault with field "token" set to a classic PAT with public_repo (or fine-grained
+# read-only "Contents" for public repos) scope.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: renovate-github-token
+  namespace: renovate
+spec:
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    creationPolicy: Owner
+  data:
+  - secretKey: token
+    remoteRef:
+      key: renovate-github-token
+      property: token

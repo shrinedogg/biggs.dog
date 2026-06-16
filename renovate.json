@@ -35,6 +35,16 @@
             ],
             "datasourceTemplate": "docker",
             "versioningTemplate": "docker"
+        },
+        {
+            "customType": "regex",
+            "description": "CNPG ClusterImageCatalog extension images (reference: field, which the kubernetes manager ignores)",
+            "managerFilePatterns": ["/(^|/)clusters/.+catalog\\.ya?ml$/"],
+            "matchStrings": [
+                "reference:\\s*(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+            ],
+            "datasourceTemplate": "docker",
+            "versioningTemplate": "docker"
         }
     ],
     "packageRules": [
@@ -106,6 +116,27 @@
                 ":warning: This repo carries a workaround for cloudnative-pg/charts#781 (broken chart TLS certs on cert-manager >= 1.18): `certificate.createServerCertificate`/`createClientCertificate` are set to `false` in the HelmRelease and the server/client certs are self-managed in `apps/cnpg/barman/certificates/` (reconciled by the `cnpg-barman-certs` Kustomization).",
                 "Before merging, check whether this release fixes #781 or wires `certificate.issuerName` (PR #811). If so, you can point `issuerName` at `barman-cloud-ca-issuer` (or re-enable the chart certs) and remove the `certificates/` directory and the `cnpg-barman-certs` Kustomization."
             ]
+        },
+        {
+            "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
+            "matchDatasources": ["docker"],
+            "matchPackageNames": [
+                "ghcr.io/continuwuity/continuwuity",
+                "ghcr.io/games-on-whales/firefox",
+                "ghcr.io/games-on-whales/steam",
+                "ghcr.io/squat/generic-device-plugin",
+                "quay.io/aminvakil/alpine-nfs-server",
+                "szkud/biggslanding",
+                "shrinedogg/nsyncd",
+                "ersatztv/legacy"
+            ],
+            "pinDigests": true
+        },
+        {
+            "description": "Group CNPG operand + extension catalog images so the catalog updates as one set",
+            "matchDatasources": ["docker"],
+            "matchPackageNames": ["/^ghcr\\.io/cloudnative-pg//"],
+            "groupName": "cnpg-images"
         },
         {
             "description": "Group media app container images",

@@ -29,7 +29,11 @@ spec:
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
       containers:
-        - image: ersatztv/legacy:294a2ff10e5e03911b6efa299dd84993d8e5db5b
+        # Tracks the rolling `develop` (nightly) channel. Renovate pins and bumps the
+        # digest (see pinDigests rule in renovate.json) so updates land in-place
+        # without rolling back to an older stable vXX.Y.Z build, which could downgrade
+        # the database schema.
+        - image: ersatztv/legacy:develop
           imagePullPolicy: Always
           name: ersatz
           securityContext:

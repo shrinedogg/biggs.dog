@@ -65,6 +65,15 @@ spec:
                 secretKeyRef:
                   name: renovate-github-secret
                   key: app-id
+            # Read-only github.com PAT for datasource/release-notes lookups. The
+            # GitHub App installation token can't query arbitrary github.com repos
+            # and gets rate-limited, so GitRepository sources and github-* datasources
+            # are otherwise skipped with "github-token-required".
+            - name: GITHUB_COM_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: renovate-github-token
+                  key: token
             - name: MEND_RNV_ACCEPT_TOS
               value: "y"
             - name: MEND_RNV_LICENSE_KEY
