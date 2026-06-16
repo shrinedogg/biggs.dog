@@ -55,9 +55,15 @@ spec:
             # drop the vision weights, but forbidding image/video inputs skips
             # the multimodal profiling + encoder cache (frees several GB).
             - '--limit-mm-per-prompt={"image":0,"video":0}'
-            # Required for kagent tool calling. Qwen3 uses the hermes parser.
+            # Required for kagent tool calling. This NVFP4 checkpoint emits
+            # Qwen3-Coder-style XML tool calls (<function=..><parameter=..>),
+            # NOT hermes JSON, so it needs the qwen3_coder parser. (The old
+            # cyankiwi INT4 build used hermes; the two ship different chat
+            # templates.) If kagent tool calls still fail, check the vLLM logs
+            # for parser errors and confirm the format against the model's
+            # tokenizer_config chat template.
             - --enable-auto-tool-choice
-            - --tool-call-parser=hermes
+            - --tool-call-parser=qwen3_coder
             - --host=0.0.0.0
             - --port=8000
           env:
