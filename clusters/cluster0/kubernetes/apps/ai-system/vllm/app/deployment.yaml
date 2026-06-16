@@ -62,14 +62,18 @@ spec:
             # ample for kagent prompts + large tool results.
             - --max-model-len=32768
             # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
-            # memory profiling), then sizes the KV pool from what's left. At
-            # 0.85 nothing remained for KV ("No available memory for the cache
-            # blocks"), so we RAISE this -- capture is already budgeted, so a
-            # higher util just feeds the KV pool without risking a capture OOM
-            # (vLLM sizes KV to fit whatever remains, never over-allocating).
-            # If KV is still too small, raise toward 0.95; if it OOMs, fall
-            # back to --enforce-eager (frees the capture reserve for KV).
-            - --gpu-memory-utilization=0.92
+            # memory profiling), then sizes the KV pool from what's left, so a
+            # higher util just feeds the KV pool (vLLM sizes KV to fit whatever
+            # remains, never over-allocating). nv-01 is a headless Talos node
+            # with a DEDICATED GPU -- no desktop/OS holding VRAM -- so we can
+            # push utilization high and give nearly all VRAM to the model.
+            # 0.85 starved the KV pool (no cache blocks); 0.92 still left only
+            # 0.33 GiB KV vs the 1.29 GiB needed for one 32K request. 0.97
+            # yields ~1.9 GiB KV, clearing that with room for some concurrency.
+            # If it OOMs, fall back to --enforce-eager (frees the capture
+            # reserve for KV); if KV is still short, 0.98 is safe on this
+            # dedicated node.
+            - --gpu-memory-utilization=0.97
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
