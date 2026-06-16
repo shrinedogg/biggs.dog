@@ -28,6 +28,7 @@ clusters/
     └── kubernetes/
         └── apps/             # Application deployments
             ├── affine/
+            ├── ai-system/         # Local LLM (vLLM) + kagent agents + Flux MCP
             ├── auth/              # SSO stack (Pocket ID + OAuth2 Proxy)
             ├── biggs/
             ├── cert-manager/
@@ -60,7 +61,7 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | `worker-03`  | worker        | Intel Core i7-1360P (Raptor Lake-P, 16T)    | 32 GB  | Intel Iris Xe Graphics iGPU (`8086:a7a0`)                                    |
 | `worker-04`  | worker        | Intel Core Ultra 5 125H (Meteor Lake, 18T)  | 32 GB  | Intel Arc Graphics iGPU (`8086:7d55`)                                        |
 
-> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas for the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack). The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
+> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas shared between the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack) and the in-cluster LLM (vLLM/kagent, see [AI & Agents](#-ai--agents)). The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
 
 ## 🔧 Core Components
 
@@ -239,6 +240,29 @@ Getting this working end-to-end required a fork of the operator (`[shrinedogg/fe
 - **PulseAudio device names** — the Steam app deliberately does **not** export `PULSE_SINK`/`PULSE_SOURCE`. The image has no `pactl`, so the upstream lookup exported empty/bogus names; libpulse treats a set-but-invalid device as an explicit request and fails the stream (silent Steam) instead of falling back to Wolf's default virtual sink.
 - **No `NVIDIA_DRIVER_CAPABILITIES` on the app container** — the operator already appends `NVIDIA_DRIVER_CAPABILITIES=all` to the app container (`session.go`); re-declaring it makes the server-side-apply patch invalid (duplicate map key) so the Deployment is never created and the reaper kills the session after 60s. (Same failure class as the root-entrypoint `PUID` note above.)
 - **DLSS / NVAPI under Proton** — DLSS needs two things on Talos. (1) The `nonfree-kmod-nvidia` extension strips the NVIDIA "wine" NGX bridge DLLs (`nvngx.dll` / `_nvngx.dll`), so an `nvngx-bridge` initContainer extracts them from the matching driver `.run` and caches them on the `nvngx-cache` host-path PVC (downloaded at most once); Proton copies them into each prefix's `system32` when `PROTON_ENABLE_NVAPI=1`. (2) DLSS is gated behind NVAPI, so `PROTON_ENABLE_NVAPI=1` + `DXVK_ENABLE_NVAPI=1` are set on the Steam container, otherwise the in-game DLSS toggle stays greyed out despite the RTX GPU.
+
+## 🤖 AI & Agents
+
+The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack: an OpenAI-compatible LLM served in-cluster by [vLLM](https://github.com/vllm-project/vllm), and [kagent](https://kagent.dev/) agents that use it to inspect and troubleshoot the cluster over MCP. No inference leaves the cluster. Per-task agent routing for this repo is documented in [`.rules`](.rules).
+
+### Components
+
+| Component | Description |
+| --------- | ----------- |
+| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices. Serves `NeuralNet-Hub/Qwen3.6-27B-NVFP4` — a 4-bit **NVFP4** quant of Qwen3.6-27B that runs on the 5090's native Blackwell FP4 tensor cores via the FlashInfer/CUTLASS FP4 kernel. |
+| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server at `kagent-mcp.biggs.dog/mcp` (basic-auth) plus a UI behind OAuth2 Proxy forward-auth. Long-term memory uses CNPG Postgres with pgvector. |
+| flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/` (the other agents are chart built-ins toggled in the kagent `HelmRelease`). |
+
+**Available agents** (`kubectl get agents -n ai-system`): `k8s-agent`, `observability-agent`, `promql-agent`, `helm-agent`, `flux-agent`, and three Cilium agents (`cilium-manager-agent`, `cilium-debug-agent`, `cilium-policy-agent`). The chart's `argo-rollouts`, `istio`, and `kgateway` agents are disabled. See [`.rules`](.rules) for which agent to use for what.
+
+### Engineering Notes
+
+- **NVFP4 on a consumer 5090** — the RTX 5090 (Blackwell, `sm_120`) has native FP4 tensor cores, and vLLM `v0.23.0` engages a real FP4 GEMM kernel (`FlashInferCutlassNvFp4LinearKernel`) on it — confirmed in the boot logs, with no fp16/marlin fallback.
+- **Quantization is auto-detected** — the model card's `--quantization nvfp4` is *rejected* (the checkpoint's config declares `compressed-tensors`); omitting `--quantization` lets vLLM auto-detect and still select the FP4 kernel.
+- **Served name must match kagent** — vLLM's `--served-model-name` must equal the kagent provider `model:` in the `HelmRelease`, or every agent 404s on the model.
+- **Tool-call parser** — this checkpoint emits Qwen3-Coder-style XML tool calls (`<function=…><parameter=…>`), so vLLM runs `--tool-call-parser qwen3_coder` (not `hermes`); thinking is disabled (`enable_thinking: false`) since the agents only need tool calls.
+- **CUDA graphs on 32 GB** — the 27B model nearly fills the card, so fitting CUDA-graph capture required `fp8` KV cache, a small `--max-num-seqs 8` / `--max-cudagraph-capture-size 8` (kagent is single-user), 32K context, and `--gpu-memory-utilization 0.97` — safe to push that high because `nv-01` is a headless Talos node with a dedicated GPU (no OS/display VRAM). vLLM reserves graph-capture memory up front, then fills the KV pool from the rest.
+- **MCP route timeout** — agent runs are multi-step LLM tool-calling loops that easily exceed Envoy's ~15s default; the `kagent-mcp` `HTTPRoute` sets `timeouts.request: 300s`. Even so, keep agent prompts tightly scoped so they finish within the client-side MCP timeout.
 
 ## 🌐 Networking Configuration
 
