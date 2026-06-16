@@ -61,11 +61,15 @@ spec:
             # profiling activation peak, freeing VRAM for graph capture. Still
             # ample for kagent prompts + large tool results.
             - --max-model-len=32768
-            # Lowered from the card's 0.95 so vLLM sizes a smaller KV pool and
-            # leaves headroom for CUDA-graph capture on 32 GB. If capture still
-            # OOMs: drop to 0.80, then as a last resort add --enforce-eager to
-            # disable graphs entirely (the previously stable fallback).
-            - --gpu-memory-utilization=0.85
+            # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
+            # memory profiling), then sizes the KV pool from what's left. At
+            # 0.85 nothing remained for KV ("No available memory for the cache
+            # blocks"), so we RAISE this -- capture is already budgeted, so a
+            # higher util just feeds the KV pool without risking a capture OOM
+            # (vLLM sizes KV to fit whatever remains, never over-allocating).
+            # If KV is still too small, raise toward 0.95; if it OOMs, fall
+            # back to --enforce-eager (frees the capture reserve for KV).
+            - --gpu-memory-utilization=0.92
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
