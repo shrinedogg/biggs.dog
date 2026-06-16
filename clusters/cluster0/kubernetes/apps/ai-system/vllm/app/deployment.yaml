@@ -45,8 +45,13 @@ spec:
             # ----------------------------------------------------------------
             - --model=NeuralNet-Hub/Qwen3.6-27B-NVFP4
             - --served-model-name=NeuralNet-Hub/Qwen3.6-27B-NVFP4
-            # Card-recommended quantization/dtype/KV-cache.
-            - --quantization=nvfp4
+            # Card-recommended dtype/KV-cache. NOTE: the card's
+            # `--quantization nvfp4` is WRONG for this checkpoint -- its config
+            # declares quantization_config=compressed-tensors, and vLLM rejects
+            # the mismatch at startup. Omitting --quantization lets vLLM
+            # auto-detect compressed-tensors, which still selects the NVFP4
+            # kernel (FlashInferCutlassNvFp4LinearKernel), so we get FP4 either
+            # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
             # DEVIATION: card recommends 262144 (256K). kagent prompts (system
