@@ -36,12 +36,15 @@ spec:
             # MODEL: NeuralNet-Hub NVFP4 build of Qwen3.6-27B, served per its
             # model card's recommended vLLM config:
             #   https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4
-            # NVFP4 requires Blackwell (sm_100+); nv-01's 48 GB Blackwell card
-            # qualifies. The card's full config barely fits in 48 GB, so we run
-            # it as-recommended except: context is lowered (kagent needs
-            # nowhere near 256K) for comfortable VRAM headroom, plus port and
-            # vision-off deviations flagged below. --served-model-name must
-            # match the kagent HelmRelease provider.
+            # NVFP4 requires Blackwell (sm_100+); nv-01's RTX 5090 (sm_120,
+            # 32 GB) qualifies. We keep the card's useful settings (NVFP4 auto-
+            # detect, fp8 KV cache, parsers, thinking off) but TUNE FOR 32 GB
+            # while keeping CUDA graphs ENABLED: the levers below (small
+            # max-num-seqs, matching capture-size cap, fp8 KV, lower context +
+            # util) shrink both the KV pool and the graph-capture footprint so
+            # capture has room. Earlier capture OOMs used vLLM's large defaults
+            # (200 seqs / ~512 capture) with no fp8 KV cache. --served-model-
+            # name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
             - --model=NeuralNet-Hub/Qwen3.6-27B-NVFP4
             - --served-model-name=NeuralNet-Hub/Qwen3.6-27B-NVFP4
@@ -54,19 +57,23 @@ spec:
             # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
-            # DEVIATION: card recommends 262144 (256K). kagent prompts (system
-            # prompt + tool schemas + tool results) never approach that, so we
-            # cap at 64K. This is the single biggest VRAM lever -- it turns the
-            # card's "barely fits" 256K KV cache into a comfortable margin while
-            # still allowing large tool outputs (k8s manifests, logs).
-            - --max-model-len=65536
-            # Card value. With the smaller context above there's now real
-            # headroom on 48 GB; if CUDA-graph capture still OOMs, drop to 0.90.
-            - --gpu-memory-utilization=0.95
-            # Card-recommended throughput + bounded graph-capture knobs.
+            # 32K context (vs the card's 256K): shrinks the KV pool and the
+            # profiling activation peak, freeing VRAM for graph capture. Still
+            # ample for kagent prompts + large tool results.
+            - --max-model-len=32768
+            # Lowered from the card's 0.95 so vLLM sizes a smaller KV pool and
+            # leaves headroom for CUDA-graph capture on 32 GB. If capture still
+            # OOMs: drop to 0.80, then as a last resort add --enforce-eager to
+            # disable graphs entirely (the previously stable fallback).
+            - --gpu-memory-utilization=0.85
             - --max-num-batched-tokens=4096
-            - --max-num-seqs=200
-            - --max-cudagraph-capture-size=209
+            # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
+            # concurrency at 8. This bounds the batch sizes vLLM captures (and
+            # therefore capture memory) far below the card's 200/209. Keep
+            # max-cudagraph-capture-size == max-num-seqs so nothing larger is
+            # captured.
+            - --max-num-seqs=8
+            - --max-cudagraph-capture-size=8
             - --enable-prefix-caching
             # Qwen3.6 ships custom modeling code (model_type qwen3_5); the card
             # requires trust-remote-code. NOTE: this executes repo-provided
