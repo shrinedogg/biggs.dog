@@ -1,0 +1,103 @@
+---
+# Minimal dedicated identity for the VictoriaMetrics MCP server.
+# No cluster RBAC needed — the server only makes HTTP calls to the
+# VMSingle API; it does not touch the Kubernetes API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: victoria-metrics-mcp
+  namespace: ai-system
+---
+# VictoriaMetrics MCP Server.
+# Exposes PromQL/MetricsQL query, metrics discovery, alerting rules,
+# cardinality analysis, and embedded VictoriaMetrics documentation via
+# streamable HTTP at :8080/mcp, proxying to the in-cluster VMSingle.
+#
+# The victoria-metrics-k8s-stack HelmRelease uses fullnameOverride="stack",
+# so the VM Operator names the Service "vmsingle-stack". If that ever changes,
+# update VM_INSTANCE_ENTRYPOINT to match.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: victoria-metrics-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: victoria-metrics-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: victoria-metrics-mcp
+    spec:
+      serviceAccountName: victoria-metrics-mcp
+      terminationGracePeriodSeconds: 10
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - name: server
+          image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.20.2
+          imagePullPolicy: IfNotPresent
+          env:
+            # vmsingle-stack: the VM Operator creates a Service named
+            # vmsingle-<VMSingle-CR-name>; with fullnameOverride="stack" the
+            # chart creates the CR as "stack" → Service is "vmsingle-stack".
+            - name: VM_INSTANCE_ENTRYPOINT
+              value: "http://vmsingle-stack.observability.svc.cluster.local:8428"
+            - name: VM_INSTANCE_TYPE
+              value: "single"
+            # Streamable HTTP mode — the modern, non-legacy MCP transport.
+            # Exposes /mcp endpoint (matching the RemoteMCPServer url below).
+            - name: MCP_SERVER_MODE
+              value: "http"
+            - name: MCP_LISTEN_ADDR
+              value: "0.0.0.0:8080"
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 8080
+              name: http
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health/liveness
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /health/readiness
+              port: http
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              # Higher than a plain proxy: the server loads an embedded
+              # documentation vector DB into memory on startup.
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+          volumeMounts:
+            - name: temp
+              mountPath: /tmp
+      volumes:
+        - name: temp
+          emptyDir: {}

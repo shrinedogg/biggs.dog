@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: victoria-metrics-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: victoria-metrics-mcp
+spec:
+  selector:
+    app.kubernetes.io/name: victoria-metrics-mcp
+  ports:
+    - name: http
+      port: 8080
+      protocol: TCP
+      targetPort: http

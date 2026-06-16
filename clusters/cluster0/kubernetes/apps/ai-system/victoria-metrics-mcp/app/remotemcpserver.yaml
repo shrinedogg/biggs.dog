@@ -1,0 +1,17 @@
+---
+# Registers the in-cluster VictoriaMetrics MCP server as a kagent tool source.
+# Mirrors the pattern established by flux-operator-mcp.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: victoria-metrics-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    VictoriaMetrics MCP server — query metrics, inspect alerts/rules, analyze
+    TSDB cardinality, and search embedded VictoriaMetrics documentation.
+  protocol: STREAMABLE_HTTP
+  url: http://victoria-metrics-mcp.ai-system:8080/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s
