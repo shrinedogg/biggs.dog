@@ -1,0 +1,16 @@
+---
+# Registers the in-cluster Flux MCP server as a kagent tool source.
+# Mirrors the chart-managed kagent-grafana-mcp RemoteMCPServer, but points
+# cross-namespace at the flux-operator-mcp Service in flux-system.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: flux-operator-mcp
+  namespace: ai-system
+spec:
+  description: Flux Operator MCP server (read-only GitOps inspection)
+  protocol: STREAMABLE_HTTP
+  url: http://flux-operator-mcp.flux-system:9090/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s

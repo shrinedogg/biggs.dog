@@ -1,0 +1,81 @@
+---
+# Flux Operator MCP Server (ControlPlane).
+# Runs in flux-system under its own least-privilege ServiceAccount
+# (flux-operator-mcp, see rbac.yaml) — NOT the cluster-admin flux-operator SA
+# used by the upstream sample.
+#
+# Transport: streamable HTTP on :9090 at /mcp (the modern, non-legacy transport).
+# Started in --read-only mode: the agent can fully inspect/diagnose Flux but
+# cannot mutate the cluster. Enabling writes requires BOTH setting
+# --read-only=false here (and adding the write tool names to the flux-agent in
+# agent.yaml) AND widening the read-only ClusterRole in rbac.yaml — the SA has
+# no write verbs, so it is safe by construction.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: flux-operator-mcp
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/name: flux-operator-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: flux-operator-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: flux-operator-mcp
+    spec:
+      serviceAccountName: flux-operator-mcp
+      terminationGracePeriodSeconds: 10
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - name: server
+          image: ghcr.io/controlplaneio-fluxcd/flux-operator-mcp:v0.52.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - serve
+            - --transport=http
+            - --port=9090
+            - --read-only=true
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
+          ports:
+            - containerPort: 9090
+              name: http
+              protocol: TCP
+          livenessProbe:
+            tcpSocket:
+              port: http
+          readinessProbe:
+            tcpSocket:
+              port: http
+          resources:
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+            requests:
+              cpu: 10m
+              memory: 64Mi
+          volumeMounts:
+            - name: temp
+              mountPath: /tmp
+      volumes:
+        - name: temp
+          emptyDir: {}

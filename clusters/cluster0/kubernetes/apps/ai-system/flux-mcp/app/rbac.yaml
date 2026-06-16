@@ -1,0 +1,104 @@
+---
+# Dedicated least-privilege identity for the Flux MCP server.
+# The server runs in --read-only mode, so this grants only read verbs
+# (get/list/watch) on the resources the read-only Flux tools need:
+#   - get_flux_instance        -> Flux Operator + Flux CD CRs
+#   - get_kubernetes_resources -> curated workload/diagnostic resources
+#   - get_kubernetes_api_versions -> CRDs (+ built-in discovery)
+#   - get_kubernetes_logs      -> pods/log
+#   - get_kubernetes_metrics   -> metrics.k8s.io
+# Secret read is granted but the server runs with --mask-secrets (default on),
+# so values are redacted in tool output — the agent sees metadata and key names
+# only. Excludes RBAC resources and all write verbs. As a bonus this means
+# flipping the server to --read-only=false alone cannot mutate anything;
+# enabling write tools also requires widening this Role.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: flux-operator-mcp
+  namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-operator-mcp-readonly
+rules:
+  # Flux Operator (FluxInstance, FluxReport, ResourceSet, ResourceSetInputProvider)
+  # and all Flux CD toolkit APIs (sources, kustomizations, helmreleases, etc.).
+  - apiGroups:
+      - fluxcd.controlplane.io
+      - source.toolkit.fluxcd.io
+      - kustomize.toolkit.fluxcd.io
+      - helm.toolkit.fluxcd.io
+      - notification.toolkit.fluxcd.io
+      - image.toolkit.fluxcd.io
+    resources:
+      - "*"
+    verbs: ["get", "list", "watch"]
+  # CRD discovery for get_kubernetes_api_versions.
+  - apiGroups:
+      - apiextensions.k8s.io
+    resources:
+      - customresourcedefinitions
+    verbs: ["get", "list", "watch"]
+  # Core diagnostic resources and pod logs. Secrets are included but their
+  # values are redacted by --mask-secrets (see header note).
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+      - pods/log
+      - services
+      - endpoints
+      - configmaps
+      - secrets
+      - events
+      - namespaces
+      - nodes
+      - persistentvolumeclaims
+      - persistentvolumes
+      - serviceaccounts
+      - replicationcontrollers
+    verbs: ["get", "list", "watch"]
+  # Workloads.
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+      - replicasets
+      - statefulsets
+      - daemonsets
+    verbs: ["get", "list", "watch"]
+  - apiGroups:
+      - batch
+    resources:
+      - jobs
+      - cronjobs
+    verbs: ["get", "list", "watch"]
+  # Cluster networking (Gateway API + NetworkPolicies/Ingress) for diagnostics.
+  - apiGroups:
+      - networking.k8s.io
+      - gateway.networking.k8s.io
+    resources:
+      - "*"
+    verbs: ["get", "list", "watch"]
+  # Pod/node resource metrics for get_kubernetes_metrics.
+  - apiGroups:
+      - metrics.k8s.io
+    resources:
+      - pods
+      - nodes
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-operator-mcp-readonly
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-operator-mcp-readonly
+subjects:
+  - kind: ServiceAccount
+    name: flux-operator-mcp
+    namespace: flux-system

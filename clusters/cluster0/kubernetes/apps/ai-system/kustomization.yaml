@@ -9,3 +9,4 @@ resources:
   - ./agent-sandbox/ks.yaml
   - ./kagent-crds/ks.yaml
   - ./kagent/ks.yaml
+  - ./flux-mcp/ks.yaml
