@@ -1,0 +1,283 @@
+---
+# Grafana dashboard for the in-cluster vLLM inference server.
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard). No Grafana Operator CRD needed.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vllm-inference-dashboard
+  namespace: ai-system
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "AI"
+data:
+  vllm-inference.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "vLLM inference server — NeuralNet-Hub/Qwen3.6-27B-NVFP4 on nv-01 RTX 5090 (NVFP4 + CUDA graphs)",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "Token Throughput",
+          "description": "Tokens generated and prompt tokens processed per second.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "rate(vllm:generation_tokens_total[2m])",
+              "legendFormat": "Generation tok/s",
+              "refId": "A"
+            },
+            {
+              "expr": "rate(vllm:prompt_tokens_total[2m])",
+              "legendFormat": "Prompt tok/s",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto",
+                "axisLabel": "tok/s"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "desc" }
+          }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "Request Concurrency",
+          "description": "Number of requests currently running or waiting for a KV cache slot.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "vllm:num_requests_running",
+              "legendFormat": "Running",
+              "refId": "A"
+            },
+            {
+              "expr": "vllm:num_requests_waiting",
+              "legendFormat": "Waiting",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "Waiting" },
+                "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }]
+              }
+            ]
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "KV Cache Utilisation",
+          "description": "Fraction of the KV cache pool in use. Budget on this host is ~1.9 GiB (gpu_memory_utilization=0.97, max_num_seqs=8, fp8 KV).",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "vllm:gpu_cache_usage_perc",
+              "legendFormat": "Cache used",
+              "refId": "A"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percentunit",
+              "min": 0,
+              "max": 1,
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 20,
+                "showPoints": "auto"
+              },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.7 },
+                  { "color": "red",    "value": 0.9 }
+                ]
+              },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "single", "sort": "none" }
+          }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "Time to First Token (TTFT)",
+          "description": "Latency from request arrival to the first generated token. Improved by CUDA graph capture.",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
+              "legendFormat": "P50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(vllm:time_to_first_token_seconds_bucket[5m]))",
+              "legendFormat": "P99",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "mean"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Time per Output Token (TPOT)",
+          "description": "Inter-token latency. Inverse gives per-request generation speed in tok/s.",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
+              "legendFormat": "P50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(vllm:time_per_output_token_seconds_bucket[5m]))",
+              "legendFormat": "P99",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "mean"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "End-to-End Request Latency",
+          "description": "Total wall-clock latency from request arrival to final token. Includes queuing, prefill, and decode.",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(vllm:e2e_request_latency_seconds_bucket[5m]))",
+              "legendFormat": "P50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(vllm:e2e_request_latency_seconds_bucket[5m]))",
+              "legendFormat": "P99",
+              "refId": "B"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "drawStyle": "line",
+                "lineInterpolation": "smooth",
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "showPoints": "auto"
+              }
+            },
+            "overrides": []
+          },
+          "options": {
+            "legend": { "calcs": ["lastNotNull", "mean"], "displayMode": "list", "placement": "bottom", "showLegend": true },
+            "tooltip": { "mode": "multi", "sort": "none" }
+          }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["vllm", "ai", "inference"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-1h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "vLLM Inference",
+      "uid": "vllm-inference",
+      "version": 1
+    }
