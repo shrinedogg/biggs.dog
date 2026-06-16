@@ -57,12 +57,15 @@ spec:
             # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
-            # 80K context (effective ~80K after vLLM's architecture-driven
-            # auto-reduction of ~4.3%). Raised from 64K to give heavy agents
-            # (e.g. flux-agent, observability-agent) ample room for their
-            # large system prompts + tool schemas + output. fp8 KV cache
-            # keeps the memory cost manageable on this 32 GB card.
-            - --max-model-len=83584
+            # Context window. vLLM auto-reduces this to the model's
+            # architectural RoPE/position-embedding cap of 62720 tokens
+            # regardless of what value is set here (confirmed at boot).
+            # 65536 is used as the requested value; effective = 62720.
+            # NOTE: flux-agent's system prompt + tool schemas = 62721 tokens
+            # (1 over the cap). To fix flux-agent, trim ~5 tokens from its
+            # systemMessage in flux-mcp/app/agent.yaml rather than fighting
+            # the model's architectural limit here.
+            - --max-model-len=65536
             # nv-01 is a headless Talos node with a DEDICATED GPU -- no
             # desktop/OS holding VRAM -- so we can push utilization high.
             # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
