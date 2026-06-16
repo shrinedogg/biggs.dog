@@ -78,18 +78,23 @@ spec:
                   name: bookboss-metadata
                   key: GOOGLEBOOKS_API_TOKEN
                   optional: true
-            # - name: BOOKBOSS__OIDC__CLIENT_ID
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: bookboss-oidc
-            #       key: client_id
-            #       optional: true
-            # - name: BOOKBOSS__OIDC__CLIENT_SECRET
-            #   valueFrom:
-            #     secretKeyRef:
-            #       name: bookboss-oidc
-            #       key: client_secret
-            #       optional: true
+            # Native OIDC SSO via Pocket ID. Setting all three OIDC vars enables
+            # the "Sign in with SSO" button. oauth2-proxy still gates the edge;
+            # this lets you log into BookBoss itself through Pocket ID instead of
+            # a local password. The IdP email claim must match an existing
+            # BookBoss user (BookBoss does not auto-provision).
+            - name: BOOKBOSS__OIDC__DISCOVERY_URL
+              value: https://id.biggs.dog/.well-known/openid-configuration
+            - name: BOOKBOSS__OIDC__CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-oidc
+                  key: client_id
+            - name: BOOKBOSS__OIDC__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: bookboss-oidc
+                  key: client_secret
           volumeMounts:
             - name: bookboss-config
               mountPath: /data

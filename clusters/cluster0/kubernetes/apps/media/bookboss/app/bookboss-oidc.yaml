@@ -1,0 +1,26 @@
+# Pocket ID OAuth client credentials for BookBoss's native OIDC SSO.
+# 1Password: create item "bookboss-oidc" in the biggs-dog vault with fields
+# "client-id" and "client-secret" from the Pocket ID OIDC client whose callback
+# URL is https://bookboss.biggs.dog/auth/oidc/callback (scopes: openid email).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: bookboss-oidc
+  namespace: media
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: bookboss-oidc
+    creationPolicy: Owner
+  data:
+    - secretKey: client_id
+      remoteRef:
+        key: bookboss-oidc
+        property: client-id
+    - secretKey: client_secret
+      remoteRef:
+        key: bookboss-oidc
+        property: client-secret
