@@ -62,7 +62,7 @@ spec:
             # that exceed 32768 tokens and return a context-length error.
             # fp8 KV cache keeps the memory cost of doubling the context
             # manageable on this 32 GB card.
-            - --max-model-len=65536
+            - --max-model-len=62720
             # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
             # memory profiling), then sizes the KV pool from what's left, so a
             # higher util just feeds the KV pool (vLLM sizes KV to fit whatever
