@@ -64,6 +64,8 @@ spec:
               value: "0.0.0.0:8080"
           securityContext:
             runAsNonRoot: true
+            runAsUser: 1000 # Dockerfile.goreleaser: adduser -u 1000 -S mcp
+            runAsGroup: 1000
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
