@@ -51,9 +51,16 @@ spec:
         # Expose identity to protected upstreams via X-Auth-Request-* headers.
         set_xauthrequest = "true"
         pass_access_token = "true"
-    # Cookie-based sessions (no Redis dependency).
+    # Redis-backed sessions (via Dragonfly). Keeps the browser cookie a small
+    # session ticket instead of a chunked multi-KB cookie holding the access /
+    # id / refresh tokens — the large cookie didn't survive the agentgateway
+    # ext-authz subrequest to /oauth2/auth, causing a forward-auth redirect loop.
     sessionStorage:
-      type: cookie
+      type: redis
+      redis:
+        clientType: standalone
+        standalone:
+          connectionUrl: redis://dragonfly-db.dragonfly.svc.cluster.local:6379
     # The redis wait init container is only needed for redis session storage.
     initContainers:
       waitForRedis:

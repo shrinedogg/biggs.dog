@@ -28,3 +28,30 @@ spec:
       ports:
         - port: 6379
           protocol: TCP
+---
+# oauth2-proxy (auth namespace) uses Dragonfly for its session store, so it also
+# needs to reach port 6379. Same additive pattern as the affine policy above.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-auth-to-dragonfly-db
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly-db
+    app.kubernetes.io/part-of: dragonfly-operator
+spec:
+  podSelector:
+    matchLabels:
+      app: dragonfly-db
+      app.kubernetes.io/name: dragonfly
+      app.kubernetes.io/part-of: dragonfly
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: auth
+      ports:
+        - port: 6379
+          protocol: TCP

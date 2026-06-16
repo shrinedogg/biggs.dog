@@ -122,6 +122,8 @@ The `auth` namespace provides single sign-on for the cluster. [Pocket ID](https:
 
 Protected apps attach an agentgateway `AgentgatewayPolicy` with `traffic.extAuth` that calls OAuth2 Proxy's `/oauth2/auth` endpoint (Envoy ext-authz compatible) and redirects unauthenticated users to the Pocket ID sign-in. A cross-namespace `ReferenceGrant` lets each app's policy reach the OAuth2 Proxy service in the `auth` namespace.
 
+OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cookie stays a small session ticket. A cookie-based session carrying the access/id/refresh tokens grows past 4 KB and gets chunked, and that large cookie didn't survive the ext-authz subrequest to `/oauth2/auth` — causing a forward-auth redirect loop. A NetworkPolicy authorizes the `auth` namespace to reach `dragonfly-db:6379`.
+
 - **Forward-auth (via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI
 - **Native OIDC (direct Pocket ID client):** Grafana
 
