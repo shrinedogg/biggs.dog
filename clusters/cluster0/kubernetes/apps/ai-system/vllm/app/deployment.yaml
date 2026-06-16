@@ -52,10 +52,13 @@ spec:
             # JIT-compiled *during inference* under eager mode, causing big
             # first-request latency spikes (and agent timeouts). Letting vLLM
             # warm up + capture CUDA graphs at startup moves that cost off the
-            # hot path. If this OOMs or fails to capture graphs with the GDN/VL
-            # stack, re-add --enforce-eager (and/or lower gpu-memory-utilization).
+            # hot path. CUDA-graph capture needs spare VRAM, so memory util is
+            # held at 0.80 (capture OOM'd at 0.90 with only ~759 MiB free on the
+            # 32 GB card). KV cache at 0.80/32k is still ample for single-user
+            # agent traffic; nudge back toward 0.85 for more cache if capture
+            # has headroom. If capture still OOMs/fails, re-add --enforce-eager.
             - --max-model-len=32768
-            - --gpu-memory-utilization=0.90
+            - --gpu-memory-utilization=0.80
             # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
             # drop the vision weights, but forbidding image/video inputs skips
             # the multimodal profiling + encoder cache (frees several GB).
