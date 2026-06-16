@@ -96,6 +96,12 @@ spec:
                   name: bookboss-oidc
                   key: client_secret
           volumeMounts:
+            # The image ships without a /tmp directory and BookBoss's temp-file
+            # handling assumes it exists, so epub processing (enrichment, opening
+            # a book) fails with "No such file or directory ... /tmp/...". An
+            # emptyDir provides a writable /tmp.
+            - name: tmp
+              mountPath: /tmp
             - name: bookboss-config
               mountPath: /data
             - name: bookboss-library
@@ -108,6 +114,8 @@ spec:
             limits:
               memory: 1Gi
       volumes:
+        - name: tmp
+          emptyDir: {}
         - name: bookboss-config
           persistentVolumeClaim:
             claimName: bookboss-config-pvc
