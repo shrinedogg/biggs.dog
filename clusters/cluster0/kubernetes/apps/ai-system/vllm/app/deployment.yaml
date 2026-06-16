@@ -69,12 +69,13 @@ spec:
             # memory profiling), then sizes the KV pool from what's left, so
             # raising util feeds the KV pool without risking a capture OOM.
             # History: 0.85 → no cache blocks; 0.92 → 0.33 GiB KV (short);
-            # 0.97 → 1.90 GiB KV (working). 0.99 → ~2.53 GiB KV, which
-            # covers the larger minimum needed for the 83K context window.
-            # Stopped at 0.99 (not 1.00): leaves ~320 MB for transient
-            # allocations that fall outside the KV pool budget.
+            # 0.97 → 1.90 GiB KV (working). Hard ceiling: the CUDA driver
+            # context consumes ~500 MB before vLLM starts, leaving only
+            # 30.86/31.36 GiB free at boot (ceiling = 0.984). 0.99 exceeded
+            # that and errored; 0.98 × 31.36 = 30.73 GiB clears it with
+            # margin and yields ~2.21 GiB KV -- enough for the 83K window.
             # If it OOMs, fall back to --enforce-eager.
-            - --gpu-memory-utilization=0.99
+            - --gpu-memory-utilization=0.98
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
