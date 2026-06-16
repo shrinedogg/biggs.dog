@@ -20,6 +20,17 @@ spec:
       retries: 3
   values:
     # ------------------------------------------------------------------
+    # Built-in agents we don't use. Disabling here (rather than
+    # `kubectl delete`) is the durable removal: the Agent CRs are owned by
+    # this HelmRelease, so Flux re-creates anything deleted out-of-band.
+    # ------------------------------------------------------------------
+    argo-rollouts-agent:
+      enabled: false
+    istio-agent:
+      enabled: false
+    kgateway-agent:
+      enabled: false
+    # ------------------------------------------------------------------
     # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
     # The chart renders a ModelConfig named "default-model-config" that
     # the built-in agents use. Pointing it at vLLM keeps everything local.
