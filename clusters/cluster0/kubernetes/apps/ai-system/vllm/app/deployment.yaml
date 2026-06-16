@@ -46,19 +46,20 @@ spec:
             # ----------------------------------------------------------------
             - --model=unsloth/Qwen3.6-27B-NVFP4
             - --served-model-name=unsloth/Qwen3.6-27B-NVFP4
-            # Vision disabled (text-only kagent traffic). --enforce-eager is
-            # intentionally NOT set: this is a hybrid GDN linear-attention
-            # model whose conv1d/gating/delta-rule Triton kernels were being
-            # JIT-compiled *during inference* under eager mode, causing big
-            # first-request latency spikes (and agent timeouts). Letting vLLM
-            # warm up + capture CUDA graphs at startup moves that cost off the
-            # hot path. CUDA-graph capture needs spare VRAM, so memory util is
-            # held at 0.80 (capture OOM'd at 0.90 with only ~759 MiB free on the
-            # 32 GB card). KV cache at 0.80/32k is still ample for single-user
-            # agent traffic; nudge back toward 0.85 for more cache if capture
-            # has headroom. If capture still OOMs/fails, re-add --enforce-eager.
+            # Vision disabled (text-only kagent traffic). --enforce-eager IS
+            # kept on: enabling CUDA graphs made capture OOM repeatedly on this
+            # 32 GB card (tried to alloc +1.53 GiB with only ~759 MiB free).
+            # The 27B NVFP4 weights (~16 GB) + KV cache leave too little VRAM
+            # headroom for graph capture, and nv-01 has no other large GPU
+            # tenant to blame. Eager trades some speed (first-request Triton
+            # JIT spikes on the hybrid GDN kernels) for a pod that boots
+            # reliably -- a crashlooping vLLM takes every kagent agent down
+            # with it. Revisit CUDA graphs only with more VRAM or a smaller
+            # --max-model-len. If agent multi-step calls still time out, raise
+            # the kagent request timeout rather than fighting GPU memory here.
             - --max-model-len=32768
-            - --gpu-memory-utilization=0.80
+            - --gpu-memory-utilization=0.90
+            - --enforce-eager
             # kagent only sends text. Qwen3.6 is multimodal-only, so we can't
             # drop the vision weights, but forbidding image/video inputs skips
             # the multimodal profiling + encoder cache (frees several GB).
