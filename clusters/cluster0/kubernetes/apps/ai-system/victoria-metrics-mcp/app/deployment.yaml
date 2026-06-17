@@ -46,7 +46,7 @@ spec:
                       - linux
       containers:
         - name: server
-          image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.20.2
+          image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.120.1
           imagePullPolicy: IfNotPresent
           env:
             # vmsingle-stack: the VM Operator creates a Service named
