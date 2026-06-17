@@ -1,0 +1,63 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-arbiter
+  namespace: dreamcast
+---
+# In dreamcast: watch gaming-session pods and remove their scheduling gate
+# (patch on the core pod resource; schedulingGates can only be removed, never
+# added, after creation).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gpu-arbiter
+  namespace: dreamcast
+rules:
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gpu-arbiter
+  namespace: dreamcast
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gpu-arbiter
+subjects:
+  - kind: ServiceAccount
+    name: gpu-arbiter
+    namespace: dreamcast
+---
+# Cross-namespace: scale the vllm Deployment in ai-system to 0/1.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gpu-arbiter-vllm-scaler
+  namespace: ai-system
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    verbs: ["get", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gpu-arbiter-vllm-scaler
+  namespace: ai-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gpu-arbiter-vllm-scaler
+subjects:
+  # The ServiceAccount lives in dreamcast; a RoleBinding in ai-system can still
+  # reference it to grant cross-namespace access.
+  - kind: ServiceAccount
+    name: gpu-arbiter
+    namespace: dreamcast

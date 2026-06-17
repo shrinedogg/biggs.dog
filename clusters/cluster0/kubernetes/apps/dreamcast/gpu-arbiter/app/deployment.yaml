@@ -1,0 +1,114 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-arbiter
+  namespace: dreamcast
+  labels:
+    app: gpu-arbiter
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: gpu-arbiter
+  template:
+    metadata:
+      labels:
+        app: gpu-arbiter
+    spec:
+      serviceAccountName: gpu-arbiter
+      enableServiceLinks: false
+      containers:
+        - name: arbiter
+          # alpine/k8s bundles kubectl + curl + jq + bash. Bump the tag to track
+          # the cluster; basic get/scale/patch work fine across version skew.
+          image: alpine/k8s:1.31.1
+          env:
+            - name: VLLM_NS
+              value: ai-system
+            - name: VLLM_DEPLOY
+              value: vllm
+            - name: GAME_NS
+              value: dreamcast
+            - name: GAME_SELECTOR
+              value: app=direwolf-worker
+            - name: GATE
+              value: gpu.biggs.dog/await-vram
+            - name: VM_URL
+              value: http://vmsingle-stack.observability.svc:8428
+            # Ungate once the GPU has at least this much free VRAM (MiB). With
+            # vLLM up free is ~518 MiB; after scale-to-0 it jumps to ~32000 MiB.
+            - name: FREE_MIB
+              value: "8000"
+            # Safety: ungate anyway after this many seconds so a stuck/absent
+            # metric never blocks a game from starting (degrades to the race).
+            - name: GATE_TIMEOUT
+              value: "180"
+            - name: INTERVAL
+              value: "5"
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -uo pipefail
+              : "${VLLM_NS:=ai-system}" "${VLLM_DEPLOY:=vllm}" "${GAME_NS:=dreamcast}" \
+                "${GAME_SELECTOR:=app=direwolf-worker}" "${GATE:=gpu.biggs.dog/await-vram}" \
+                "${VM_URL:=http://vmsingle-stack.observability.svc:8428}" \
+                "${FREE_MIB:=8000}" "${GATE_TIMEOUT:=180}" "${INTERVAL:=5}"
+              echo "gpu-arbiter: scale ${VLLM_NS}/${VLLM_DEPLOY} on ${GAME_NS}[${GAME_SELECTOR}]; gate=${GATE} free>=${FREE_MIB}MiB timeout=${GATE_TIMEOUT}s"
+              declare -A first_seen
+
+              vram_free() {
+                local v
+                v="$(curl -fsS --max-time 4 -G "${VM_URL}/api/v1/query" \
+                      --data-urlencode 'query=max(DCGM_FI_DEV_FB_FREE)' 2>/dev/null \
+                     | jq -r '.data.result[0].value[1] // empty' 2>/dev/null)"
+                v="${v%%.*}"
+                case "$v" in ''|*[!0-9]*) echo -1 ;; *) echo "$v" ;; esac
+              }
+
+              while true; do
+                pods="$(kubectl get pods -n "$GAME_NS" -l "$GAME_SELECTOR" \
+                          -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' 2>/dev/null || true)"
+                count=0
+                [ -n "$pods" ] && count="$(printf '%s\n' "$pods" | grep -c .)"
+                desired=1
+                [ "$count" -gt 0 ] && desired=0
+                current="$(kubectl get deploy "$VLLM_DEPLOY" -n "$VLLM_NS" \
+                             -o jsonpath='{.spec.replicas}' 2>/dev/null || echo '')"
+                if [ -n "$current" ] && [ "$current" != "$desired" ]; then
+                  echo "$(date -u +%T) scale ${VLLM_DEPLOY} ${current}->${desired} (gaming=${count})"
+                  kubectl scale deploy "$VLLM_DEPLOY" -n "$VLLM_NS" --replicas="$desired" || true
+                fi
+
+                if [ "$count" -gt 0 ]; then
+                  free="$(vram_free)"
+                  now="$(date -u +%s)"
+                  while IFS= read -r pod; do
+                    [ -z "$pod" ] && continue
+                    names="$(kubectl get pod "$pod" -n "$GAME_NS" \
+                               -o jsonpath='{.spec.schedulingGates[*].name}' 2>/dev/null || true)"
+                    case " $names " in *" $GATE "*) : ;; *) continue ;; esac
+                    [ -z "${first_seen[$pod]:-}" ] && first_seen[$pod]="$now"
+                    age=$(( now - ${first_seen[$pod]} ))
+                    if [ "$free" -ge "$FREE_MIB" ] || [ "$age" -ge "$GATE_TIMEOUT" ]; then
+                      if [ "$free" -ge "$FREE_MIB" ]; then why="free=${free}MiB"; else why="timeout ${age}s free=${free}MiB"; fi
+                      echo "$(date -u +%T) ungate ${pod} (${why})"
+                      kubectl patch pod "$pod" -n "$GAME_NS" --type=merge \
+                        -p '{"spec":{"schedulingGates":[]}}' || true
+                    else
+                      echo "$(date -u +%T) wait VRAM ${pod} (free=${free}MiB<${FREE_MIB} age=${age}s)"
+                    fi
+                  done <<< "$pods"
+                fi
+                sleep "$INTERVAL"
+              done
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

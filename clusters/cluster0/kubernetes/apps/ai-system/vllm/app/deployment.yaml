@@ -7,7 +7,12 @@ metadata:
   labels:
     app: vllm
 spec:
-  replicas: 1
+  # replicas is intentionally OMITTED: the gpu-arbiter
+  # (clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter) owns this
+  # Deployment's replica count, scaling it to 0 during Wolf gaming sessions and
+  # back to 1 afterward. Declaring replicas here would make Flux fight the
+  # arbiter on every reconcile. Unmanaged, a Deployment defaults to 1 replica,
+  # so the idle state is a single vLLM.
   # Weights live on a RWO host-path volume on nv-01; never run two at once.
   strategy:
     type: Recreate
