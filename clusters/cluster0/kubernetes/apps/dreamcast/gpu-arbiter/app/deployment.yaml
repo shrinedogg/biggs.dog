@@ -42,12 +42,14 @@ spec:
             # vLLM up free is ~518 MiB; after scale-to-0 it jumps to ~32000 MiB.
             - name: FREE_MIB
               value: "8000"
-            # Safety: ungate anyway after this many seconds so a stuck/absent
-            # metric never blocks a game from starting (degrades to the race).
+            # Safety fallback: ungate anyway after this many seconds (kept under
+            # direwolf's 60s session reaper) so a stuck metric degrades to the
+            # old software-encode path instead of 401-ing the session.
             - name: GATE_TIMEOUT
-              value: "180"
+              value: "45"
+            # Tight poll so we ungate within ~2s of vLLM releasing VRAM.
             - name: INTERVAL
-              value: "5"
+              value: "2"
           command:
             - /bin/bash
             - -c
@@ -56,7 +58,7 @@ spec:
               : "${VLLM_NS:=ai-system}" "${VLLM_DEPLOY:=vllm}" "${GAME_NS:=dreamcast}" \
                 "${GAME_SELECTOR:=app=direwolf-worker}" "${GATE:=gpu.biggs.dog/await-vram}" \
                 "${VM_URL:=http://vmsingle-stack.observability.svc:8428}" \
-                "${FREE_MIB:=8000}" "${GATE_TIMEOUT:=180}" "${INTERVAL:=5}"
+                "${FREE_MIB:=8000}" "${GATE_TIMEOUT:=45}" "${INTERVAL:=2}"
               echo "gpu-arbiter: scale ${VLLM_NS}/${VLLM_DEPLOY} on ${GAME_NS}[${GAME_SELECTOR}]; gate=${GATE} free>=${FREE_MIB}MiB timeout=${GATE_TIMEOUT}s"
               declare -A first_seen
 
@@ -67,6 +69,16 @@ spec:
                      | jq -r '.data.result[0].value[1] // empty' 2>/dev/null)"
                 v="${v%%.*}"
                 case "$v" in ''|*[!0-9]*) echo -1 ;; *) echo "$v" ;; esac
+              }
+
+              # vLLM is "down" (VRAM released) once its Deployment reports no
+              # non-terminated pods. This is a FRESH signal (~1-2s) unlike the
+              # DCGM scrape (~30s lag), so the gate opens right after vLLM exits.
+              vllm_down() {
+                local r
+                r="$(kubectl get deploy "$VLLM_DEPLOY" -n "$VLLM_NS" \
+                       -o jsonpath='{.status.replicas}' 2>/dev/null)"
+                [ -z "$r" ] || [ "$r" = "0" ]
               }
 
               while true; do
@@ -93,13 +105,18 @@ spec:
                     case " $names " in *" $GATE "*) : ;; *) continue ;; esac
                     [ -z "${first_seen[$pod]:-}" ] && first_seen[$pod]="$now"
                     age=$(( now - ${first_seen[$pod]} ))
-                    if [ "$free" -ge "$FREE_MIB" ] || [ "$age" -ge "$GATE_TIMEOUT" ]; then
-                      if [ "$free" -ge "$FREE_MIB" ]; then why="free=${free}MiB"; else why="timeout ${age}s free=${free}MiB"; fi
+                    # Primary: vLLM actually gone (VRAM freed). Secondary: DCGM
+                    # free crossed the threshold. Fallback: bounded timeout.
+                    if vllm_down; then why="vllm-down free=${free}MiB"
+                    elif [ "$free" -ge "$FREE_MIB" ]; then why="free=${free}MiB"
+                    elif [ "$age" -ge "$GATE_TIMEOUT" ]; then why="timeout ${age}s free=${free}MiB"
+                    else why=""; fi
+                    if [ -n "$why" ]; then
                       echo "$(date -u +%T) ungate ${pod} (${why})"
                       kubectl patch pod "$pod" -n "$GAME_NS" --type=merge \
                         -p '{"spec":{"schedulingGates":[]}}' || true
                     else
-                      echo "$(date -u +%T) wait VRAM ${pod} (free=${free}MiB<${FREE_MIB} age=${age}s)"
+                      echo "$(date -u +%T) wait VRAM ${pod} (free=${free}MiB<${FREE_MIB} age=${age}s vllm_up)"
                     fi
                   done <<< "$pods"
                 fi

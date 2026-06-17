@@ -31,7 +31,12 @@ spec:
       # Pin to the single RTX 5090 node.
       nodeSelector:
         kubernetes.io/hostname: nv-01
-      terminationGracePeriodSeconds: 60
+      # Short grace so vLLM RELEASES VRAM fast when the gpu-arbiter scales it to
+      # 0 for a gaming session: the gaming pod is held by a scheduling gate until
+      # VRAM is free, and direwolf reaps the session after 60s, so vLLM must let
+      # go well before then. vLLM is stateless (weights on the PVC), so a quick
+      # SIGTERM/SIGKILL is fine; it reloads on scale-up.
+      terminationGracePeriodSeconds: 10
       containers:
         - name: vllm
           # CUDA 12.9 build supports the 5090 (Blackwell, sm_120).
