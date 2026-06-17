@@ -28,6 +28,18 @@ spec:
   declarative:
     modelConfig: default-model-config
     runtime: python
+    # Bound conversation context so accumulated session/event history can't grow
+    # past the model's 65536-token window. flux-agent's large flux-operator-mcp
+    # tool schemas leave limited headroom, so once a prompt reaches
+    # tokenThreshold kagent compacts older events (summarized via the model)
+    # and retains only the most recent ones. This is orthogonal to long-term
+    # memory (spec.declarative.memory) -- which this agent does not use.
+    context:
+      compaction:
+        tokenThreshold: 40000
+        eventRetentionSize: 6
+        summarizer:
+          modelConfig: default-model-config
     deployment:
       resources:
         requests:
@@ -72,6 +84,16 @@ spec:
             - The kagent HelmRelease is not ready, can you find the root cause?
             - Why is the cluster0 GitRepository source in a failed state?
             - Trace why my app pods are not updating after a git push.
+        - id: flux-docs
+          name: Flux Documentation Search
+          description: Answer Flux configuration questions using the official Flux documentation.
+          tags:
+            - flux
+            - documentation
+            - reference
+          examples:
+            - How do I configure dependsOn between two Kustomizations?
+            - What are the valid fields for a HelmRelease postRenderers section?
     systemMessage: |
       # Flux CD Agent System Prompt
 
@@ -100,6 +122,7 @@ spec:
       - `get_kubernetes_api_versions`: List CRDs and their preferred apiVersions.
       - `get_kubernetes_logs`: Read pod logs for root-cause analysis.
       - `get_kubernetes_metrics`: Read pod resource metrics.
+      - `search_flux_docs`: Look up Flux configuration and API documentation.
 
       ## Tool Usage Best Practices
 
@@ -129,6 +152,4 @@ spec:
             - get_kubernetes_api_versions
             - get_kubernetes_logs
             - get_kubernetes_metrics
-            # search_flux_docs omitted: its large documentation schema leaves
-            # too little headroom in the 65536-token window for normal tasks
-            # + memory. Re-add with a larger-context model.
+            - search_flux_docs
