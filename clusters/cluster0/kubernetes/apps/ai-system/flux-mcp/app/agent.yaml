@@ -25,9 +25,18 @@ spec:
     A Flux CD / GitOps expert that inspects and diagnoses Flux Operator and
     Flux resources (FluxInstance, Kustomizations, HelmReleases, sources) and
     correlates them with cluster state. Read-only.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  # network.allowedDomains is empty = outbound network denied (safest for
+  # a read-only diagnostic agent whose code only needs tool call results).
+  sandbox:
+    network: {}
   declarative:
     modelConfig: default-model-config
     runtime: python
+    # Allow the agent to write and execute Python code blocks in the
+    # agent-sandbox. Useful for post-processing tool results, computing
+    # statistics, and generating structured reports from Flux data.
+    executeCodeBlocks: true
     deployment:
       resources:
         requests:

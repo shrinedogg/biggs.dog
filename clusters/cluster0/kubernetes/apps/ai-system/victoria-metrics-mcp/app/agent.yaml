@@ -18,9 +18,20 @@ spec:
     cardinality, and searches embedded VictoriaMetrics documentation. Use for
     raw metric queries and VM-specific diagnostics. For Grafana dashboards or
     broader Kubernetes observability correlation, prefer observability-agent.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  # Allow cluster-internal services so code can query VictoriaMetrics
+  # directly (e.g. via requests/httpx) in addition to tool calls.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
   declarative:
     modelConfig: default-model-config
     runtime: python
+    # Allow the agent to write and execute Python code blocks in the
+    # agent-sandbox. Enables complex metric analysis, statistical
+    # computations, and report generation beyond raw tool calls.
+    executeCodeBlocks: true
     deployment:
       resources:
         requests:
