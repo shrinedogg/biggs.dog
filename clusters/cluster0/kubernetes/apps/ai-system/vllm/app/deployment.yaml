@@ -50,16 +50,15 @@ spec:
             # fp8 KV cache + sliding-window attention keep the KV pool small
             # even at long context.
             - --kv-cache-dtype=fp8
-            # 128K context. Native max is 256K; 128K already gives flux-agent
-            # (~64K of tool schemas) huge headroom, and the 14B weights +
-            # sliding-window KV leave ample room on 32 GB. Bump toward 262144
-            # later if memory allows.
-            - --max-model-len=131072
+            # 256K context (the model's native max). The 14B weights + fp8 KV
+            # + sliding-window attention (most layers bounded at 1024 tokens)
+            # leave ample room on 32 GB for the full window. Lower if it OOMs.
+            - --max-model-len=262144
             # nv-01 is a headless Talos node with a DEDICATED GPU; the CUDA
-            # driver context caps usable util near 0.984. 0.95 leaves margin
-            # while the smaller model + sliding-window KV give ample context.
-            # If it OOMs on boot, lower this; if KV is short, raise toward 0.98.
-            - --gpu-memory-utilization=0.95
+            # driver context caps usable util near 0.984. 0.98 maximizes the KV
+            # pool while staying just under that ceiling. If boot OOMs, drop
+            # back toward 0.95.
+            - --gpu-memory-utilization=0.98
             - --max-num-batched-tokens=4096
             # More KV headroom than the old 27B, so allow more concurrency.
             # Keep max-cudagraph-capture-size == max-num-seqs.
