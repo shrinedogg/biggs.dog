@@ -53,7 +53,7 @@ spec:
               # assert(wl->drm_render_name == NULL). Overlay built from
               # https://github.com/shrinedogg/gst-wayland-display
               # (branch fix/optional-wl-drm) on ghcr.io/games-on-whales/wolf:stable.
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.1.0
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.0
       moonlight_proxy:
         containers:
           proxy:
