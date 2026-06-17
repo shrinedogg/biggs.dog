@@ -33,77 +33,51 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: NeuralNet-Hub NVFP4 build of Qwen3.6-27B, served per its
-            # model card's recommended vLLM config:
-            #   https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4
-            # NVFP4 requires Blackwell (sm_100+); nv-01's RTX 5090 (sm_120,
-            # 32 GB) qualifies. We keep the card's useful settings (NVFP4 auto-
-            # detect, fp8 KV cache, parsers, thinking off) but TUNE FOR 32 GB
-            # while keeping CUDA graphs ENABLED: the levers below (small
-            # max-num-seqs, matching capture-size cap, fp8 KV, lower context +
-            # util) shrink both the KV pool and the graph-capture footprint so
-            # capture has room. Earlier capture OOMs used vLLM's large defaults
-            # (200 seqs / ~512 capture) with no fp8 KV cache. --served-model-
-            # name must match the kagent HelmRelease provider.
+            # MODEL: NVIDIA's NVFP4 quant of Google's Gemma-4-26B-A4B-IT, served
+            # per the model card's vLLM command:
+            #   https://huggingface.co/nvidia/Gemma-4-26B-A4B-NVFP4
+            # Replaces the oversized NeuralNet-Hub/Qwen3.6-27B-NVFP4 (a 48 GB-
+            # class quant its author only ran on 48 GB). This is a 26B MoE with
+            # only ~3.8B active params (fast), 14B on disk, and 256K native
+            # context using HYBRID sliding-window (1024) + global attention --
+            # most layers keep bounded KV, making long context cheap on this
+            # 32 GB card. NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
+            # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=NeuralNet-Hub/Qwen3.6-27B-NVFP4
-            - --served-model-name=NeuralNet-Hub/Qwen3.6-27B-NVFP4
-            # Card-recommended dtype/KV-cache. NOTE: the card's
-            # `--quantization nvfp4` is WRONG for this checkpoint -- its config
-            # declares quantization_config=compressed-tensors, and vLLM rejects
-            # the mismatch at startup. Omitting --quantization lets vLLM
-            # auto-detect compressed-tensors, which still selects the NVFP4
-            # kernel (FlashInferCutlassNvFp4LinearKernel), so we get FP4 either
-            # way. Do NOT re-add --quantization here.
-            - --dtype=bfloat16
+            - --model=nvidia/Gemma-4-26B-A4B-NVFP4
+            - --served-model-name=nvidia/Gemma-4-26B-A4B-NVFP4
+            # No --quantization: vLLM auto-detects the NVFP4 modelopt config.
+            # fp8 KV cache + sliding-window attention keep the KV pool small
+            # even at long context.
             - --kv-cache-dtype=fp8
-            # Effective context window = 65536 tokens (confirmed at runtime).
-            # At 0.97 util (1.9 GiB KV), vLLM auto-reduced to 62720; at the
-            # current util (0.9833, ~2.33 GiB KV) the full 65536 is supported.
-            # KV ceiling on this card: ~67-68K tokens -- 65536 is essentially
-            # the safe maximum. To change, edit this value and reconcile; a
-            # vLLM restart is required.
-            - --max-model-len=65536
-            # nv-01 is a headless Talos node with a DEDICATED GPU -- no
-            # desktop/OS holding VRAM -- so we can push utilization high.
-            # vLLM v0.23.0 reserves CUDA-graph capture memory UP FRONT (graph
-            # memory profiling), then sizes the KV pool from what's left, so
-            # raising util feeds the KV pool without risking a capture OOM.
-            # History: 0.85 → no cache blocks; 0.92 → 0.33 GiB KV (short);
-            # 0.97 → 1.90 GiB KV (working); 0.99 → exceeded CUDA driver
-            # ceiling (only 30.86/31.36 GiB free at boot, ceiling = 0.984).
-            # 0.9833 × 31.36 = 30.84 GiB -- just under the ceiling, yields
-            # ~2.33 GiB KV and supports the full 65536-token context window.
-            # If it OOMs, fall back to --enforce-eager.
-            - --gpu-memory-utilization=0.9833
+            # 128K context. Native max is 256K; 128K already gives flux-agent
+            # (~64K of tool schemas) huge headroom, and the 14B weights +
+            # sliding-window KV leave ample room on 32 GB. Bump toward 262144
+            # later if memory allows.
+            - --max-model-len=131072
+            # nv-01 is a headless Talos node with a DEDICATED GPU; the CUDA
+            # driver context caps usable util near 0.984. 0.95 leaves margin
+            # while the smaller model + sliding-window KV give ample context.
+            # If it OOMs on boot, lower this; if KV is short, raise toward 0.98.
+            - --gpu-memory-utilization=0.95
             - --max-num-batched-tokens=4096
-            # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
-            # concurrency at 8. This bounds the batch sizes vLLM captures (and
-            # therefore capture memory) far below the card's 200/209. Keep
-            # max-cudagraph-capture-size == max-num-seqs so nothing larger is
-            # captured.
-            - --max-num-seqs=8
-            - --max-cudagraph-capture-size=8
+            # More KV headroom than the old 27B, so allow more concurrency.
+            # Keep max-cudagraph-capture-size == max-num-seqs.
+            - --max-num-seqs=16
+            - --max-cudagraph-capture-size=16
             - --enable-prefix-caching
-            # Qwen3.6 ships custom modeling code (model_type qwen3_5); the card
-            # requires trust-remote-code. NOTE: this executes repo-provided
-            # Python from the checkpoint -- acceptable only for trusted models.
+            # Gemma-4 ships custom modeling code; the card requires
+            # trust-remote-code. NOTE: executes repo-provided Python.
             - --trust-remote-code
-            # Thinking disabled (card's config.yaml does the same): kagent only
-            # needs tool calls, and reasoning traces would just add latency.
-            - '--default-chat-template-kwargs={"enable_thinking": false}'
-            - --reasoning-parser=qwen3
-            # Required for kagent tool calling; this checkpoint emits
-            # Qwen3-Coder XML tool calls, matching the card's parser choice.
+            # Gemma-4 tool-call + reasoning parsers, per the NVIDIA card
+            # (replaces the Qwen qwen3_coder/qwen3 parsers).
             - --enable-auto-tool-choice
-            - --tool-call-parser=qwen3_coder
-            # DEVIATION (workload + memory): the card leaves vision enabled,
-            # but kagent traffic is text-only. Forbidding image/video skips the
-            # multimodal profiling + encoder cache, reclaiming the slim margin
-            # on a "barely fits" 32 GB budget at no functional cost here.
+            - --tool-call-parser=gemma4
+            - --reasoning-parser=gemma4
+            # Text-only kagent traffic; forbid image/video on this multimodal
+            # model to skip the vision encoder + multimodal profiling.
             - '--limit-mm-per-prompt={"image":0,"video":0}'
-            # DEVIATION: card uses port 18000; keep 8000 to match the Service
-            # and the kagent provider baseUrl.
+            # Keep port 8000 to match the Service and the kagent provider baseUrl.
             - --host=0.0.0.0
             - --port=8000
           env:

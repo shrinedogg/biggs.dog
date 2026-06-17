@@ -40,7 +40,7 @@ spec:
       openAI:
         provider: OpenAI
         # Must match vLLM's --served-model-name.
-        model: "NeuralNet-Hub/Qwen3.6-27B-NVFP4"
+        model: "nvidia/Gemma-4-26B-A4B-NVFP4"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
@@ -49,19 +49,16 @@ spec:
     # dev Postgres. The full connection URL (incl. password) is provided at
     # runtime from a mounted secret file, so no credentials live in git.
     #
-    # vectorEnabled=false: long-term (cross-session) vector memory is DISABLED.
-    # With it on, kagent's memory subsystem inflates every request's context to
-    # the model's full window (max_model_len + 1 tokens), overflowing the
-    # heavy-schema agents (e.g. flux-agent) on the 65536-token model this
-    # cluster runs. Within-session conversation memory still works; only
-    # semantic recall across separate sessions is lost -- negligible for the
-    # one-shot operational tasks these agents handle via MCP. Re-enable only
-    # with a longer-context model (see vllm/app/deployment.yaml notes).
+    # vectorEnabled=true: long-term (cross-session) vector memory via pgvector.
+    # The model is now Gemma-4-26B-A4B-NVFP4 with a 128K context window (vs the
+    # old 65536), so flux-agent's ~64K tool schemas + memory + tasks fit with
+    # room to spare -- the context-overflow that previously plagued the heavy
+    # agents on the 27B/65K model is resolved by the model swap.
     database:
       postgres:
         bundled:
           enabled: false
-        vectorEnabled: false
+        vectorEnabled: true
         urlFile: /etc/kagent-db/url
     controller:
       volumes:
