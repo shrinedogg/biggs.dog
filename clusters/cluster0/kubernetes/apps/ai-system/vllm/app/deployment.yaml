@@ -55,7 +55,11 @@ spec:
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
             - --model=nvidia/Gemma-4-26B-A4B-NVFP4
-            - --served-model-name=nvidia/Gemma-4-26B-A4B-NVFP4
+            # served-model-name is intentionally different from --model:
+            # the slash in the HuggingFace path (nvidia/) gets stripped by some
+            # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
+            # clients; kagent and Zed both use this name, not the weights path.
+            - --served-model-name=gemma-4-local
             # No --quantization: vLLM auto-detects the NVFP4 modelopt config.
             # fp8 KV cache + sliding-window attention keep the KV pool small
             # even at long context.

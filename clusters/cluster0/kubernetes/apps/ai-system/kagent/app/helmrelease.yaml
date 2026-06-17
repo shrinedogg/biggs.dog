@@ -39,8 +39,9 @@ spec:
       default: openAI
       openAI:
         provider: OpenAI
-        # Must match vLLM's --served-model-name.
-        model: "nvidia/Gemma-4-26B-A4B-NVFP4"
+        # Must match vLLM's --served-model-name (not the HuggingFace weights
+        # path -- see vllm/app/deployment.yaml for why they differ).
+        model: "gemma-4-local"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
