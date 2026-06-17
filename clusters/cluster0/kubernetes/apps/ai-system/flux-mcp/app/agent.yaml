@@ -28,18 +28,6 @@ spec:
   declarative:
     modelConfig: default-model-config
     runtime: python
-    # Bound conversation context so accumulated session/event history can't grow
-    # past the model's 65536-token window. flux-agent's large flux-operator-mcp
-    # tool schemas leave limited headroom, so once a prompt reaches
-    # tokenThreshold kagent compacts older events (summarized via the model)
-    # and retains only the most recent ones. This is orthogonal to long-term
-    # memory (spec.declarative.memory) -- which this agent does not use.
-    context:
-      compaction:
-        tokenThreshold: 40000
-        eventRetentionSize: 6
-        summarizer:
-          modelConfig: default-model-config
     deployment:
       resources:
         requests:

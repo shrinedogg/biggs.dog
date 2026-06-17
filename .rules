@@ -1,0 +1,84 @@
+# biggs.dog — agent routing rules
+
+This is a Flux GitOps repo for a Kubernetes homelab (`clusters/cluster0`).
+The kagent MCP server (`https://kagent-mcp.biggs.dog/mcp`) exposes specialized
+agents. When a task matches one of the domains below, prefer invoking that
+kagent agent over answering from memory or using generic tools.
+
+All agents share a single in-cluster vLLM backend (currently
+`nvidia/Gemma-4-26B-A4B-NVFP4` -- a 26B MoE with ~3.8B active params and a 128K
+context window -- on `nv-01`'s RTX 5090); inference never leaves the cluster.
+Keep agent tasks reasonably scoped (terse output) so multi-step loops finish
+within the MCP request timeout (the `kagent-mcp` HTTPRoute allows 300s).
+
+Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 128K
+context comfortably fits even the heavy agents (e.g. flux-agent's ~64K of
+`flux-operator-mcp` tool schemas), which overflowed the previous 27B/65K model;
+that limitation is resolved by the model swap.
+
+Most agents are built-in and controlled by per-agent `*.enabled` toggles in the
+kagent `HelmRelease` (`clusters/cluster0/kubernetes/apps/ai-system/kagent/app/
+helmrelease.yaml`); Flux owns those `Agent` CRs, so disable them there rather
+than with `kubectl delete`. The exception is `flux-agent`, a custom (non-chart)
+Agent defined in the `flux-mcp` app
+(`clusters/cluster0/kubernetes/apps/ai-system/flux-mcp/`). Verify the live set
+with `kubectl get agents -n ai-system`. Keep the entries below in sync with it.
+
+## Agent selection
+
+Pick the single most specific agent for the task:
+
+- **k8s-agent** — General Kubernetes cluster operations, resource
+  inspection, and troubleshooting (pods, deployments, services, events,
+  nodes). Default for "what's wrong in the cluster" questions that aren't
+  covered by a more specific agent below.
+
+- **observability-agent** — Monitoring and observability work: querying
+  metrics, building/verifying Grafana dashboards, checking alerting, and
+  correlating cluster state with metrics via Prometheus + Grafana.
+
+- **promql-agent** — Use specifically when the deliverable is a PromQL
+  query generated from a natural-language description. For broader
+  metrics/dashboard work, use observability-agent instead.
+
+- **helm-agent** — Helm release management and troubleshooting (install,
+  upgrade, rollback, values, failed releases). Note: this repo drives Helm
+  via Flux `HelmRelease`, so prefer helm-agent for live release state and
+  edit the `HelmRelease` YAML for desired state.
+
+- **vm-agent** — Direct VictoriaMetrics access: execute PromQL/MetricsQL
+  queries, discover metrics/labels/series, inspect alerting and recording
+  rules, analyze TSDB cardinality, find unused or high-cardinality metrics,
+  and diagnose slow queries. Backed by embedded VictoriaMetrics documentation.
+  Use for raw metric questions and VM-specific diagnostics. For Grafana
+  dashboards or cross-Kubernetes observability correlation, use
+  observability-agent instead.
+
+- **flux-agent** — Flux CD / GitOps inspection and troubleshooting via the
+  Flux Operator MCP server: status of `FluxInstance`, sources
+  (`GitRepository`/`OCIRepository`/`HelmRepository`), `Kustomization`s,
+  `HelmRelease`s, and `ResourceSet`s, plus end-to-end reconciliation
+  root-cause analysis and Flux docs lookup. Read-only. Use for "why isn't
+  this reconciling / syncing from git" questions. (For Helm release internals
+  specifically, prefer helm-agent.)
+
+## Cilium — choose carefully (three overlapping agents)
+
+- **cilium-manager-agent** — Installing, configuring, upgrading, and
+  routine monitoring of Cilium. Use for "set up / change Cilium" tasks.
+
+- **cilium-debug-agent** — Diagnosing a broken or degraded Cilium install:
+  connectivity failures, dropped traffic, advanced diagnostics, Hubble
+  flow inspection. Use for "Cilium is misbehaving" tasks.
+
+- **cilium-policy-agent** — Authoring `CiliumNetworkPolicy` and
+  `CiliumClusterwideNetworkPolicy` resources from a natural-language intent.
+  Use only when the deliverable is a policy manifest.
+
+## Repo conventions
+
+- Desired state lives in Git (`clusters/cluster0/**`); Flux reconciles it.
+  Use agents to inspect/diagnose *live* state, but make persistent changes
+  by editing the YAML here, not by mutating the cluster directly.
+- Secrets are managed via External Secrets + 1Password; never hardcode
+  credentials in manifests.

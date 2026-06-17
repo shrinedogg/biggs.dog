@@ -2,6 +2,5 @@
 .talos/
 .sops*
 .zed/
-.rules
 age.agekey
 bootstrap-flux.sh
