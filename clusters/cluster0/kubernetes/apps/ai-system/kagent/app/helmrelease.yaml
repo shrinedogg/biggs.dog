@@ -48,13 +48,20 @@ spec:
     # Use the cluster's CNPG operator (cnpg-kagent) instead of the bundled
     # dev Postgres. The full connection URL (incl. password) is provided at
     # runtime from a mounted secret file, so no credentials live in git.
-    # vectorEnabled requires pgvector, which cnpg-kagent loads via its
-    # postgresql.extensions image (long-term memory support).
+    #
+    # vectorEnabled=false: long-term (cross-session) vector memory is DISABLED.
+    # With it on, kagent's memory subsystem inflates every request's context to
+    # the model's full window (max_model_len + 1 tokens), overflowing the
+    # heavy-schema agents (e.g. flux-agent) on the 65536-token model this
+    # cluster runs. Within-session conversation memory still works; only
+    # semantic recall across separate sessions is lost -- negligible for the
+    # one-shot operational tasks these agents handle via MCP. Re-enable only
+    # with a longer-context model (see vllm/app/deployment.yaml notes).
     database:
       postgres:
         bundled:
           enabled: false
-        vectorEnabled: true
+        vectorEnabled: false
         urlFile: /etc/kagent-db/url
     controller:
       volumes:
