@@ -112,6 +112,14 @@ spec:
       - `get_kubernetes_metrics`: Read pod resource metrics.
       - `search_flux_docs`: Look up Flux configuration and API documentation.
 
+      ## Tool Usage Best Practices
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      ## Safety Protocols
+
+      {{include "builtin/safety-guardrails"}}
+
       ## Response Format
 
       1. Briefly restate the question.

@@ -57,14 +57,12 @@ spec:
             # way. Do NOT re-add --quantization here.
             - --dtype=bfloat16
             - --kv-cache-dtype=fp8
-            # Context window. vLLM auto-reduces this to the model's
-            # architectural RoPE/position-embedding cap of 62720 tokens
-            # regardless of what value is set here (confirmed at boot).
-            # 65536 is used as the requested value; effective = 62720.
-            # NOTE: flux-agent's system prompt + tool schemas = 62721 tokens
-            # (1 over the cap). To fix flux-agent, trim ~5 tokens from its
-            # systemMessage in flux-mcp/app/agent.yaml rather than fighting
-            # the model's architectural limit here.
+            # Effective context window = 65536 tokens (confirmed at runtime).
+            # At 0.97 util (1.9 GiB KV), vLLM auto-reduced to 62720; at the
+            # current util (0.9833, ~2.33 GiB KV) the full 65536 is supported.
+            # KV ceiling on this card: ~67-68K tokens -- 65536 is essentially
+            # the safe maximum. To change, edit this value and reconcile; a
+            # vLLM restart is required.
             - --max-model-len=65536
             # nv-01 is a headless Talos node with a DEDICATED GPU -- no
             # desktop/OS holding VRAM -- so we can push utilization high.
@@ -72,11 +70,10 @@ spec:
             # memory profiling), then sizes the KV pool from what's left, so
             # raising util feeds the KV pool without risking a capture OOM.
             # History: 0.85 → no cache blocks; 0.92 → 0.33 GiB KV (short);
-            # 0.97 → 1.90 GiB KV (working). Hard ceiling: the CUDA driver
-            # context consumes ~500 MB before vLLM starts, leaving only
-            # 30.86/31.36 GiB free at boot (ceiling = 0.984). 0.99 exceeded
-            # that and errored; 0.98 × 31.36 = 30.73 GiB clears it with
-            # margin and yields ~2.21 GiB KV -- enough for the 83K window.
+            # 0.97 → 1.90 GiB KV (working); 0.99 → exceeded CUDA driver
+            # ceiling (only 30.86/31.36 GiB free at boot, ceiling = 0.984).
+            # 0.9833 × 31.36 = 30.84 GiB -- just under the ceiling, yields
+            # ~2.33 GiB KV and supports the full 65536-token context window.
             # If it OOMs, fall back to --enforce-eager.
             - --gpu-memory-utilization=0.9833
             - --max-num-batched-tokens=4096
@@ -103,7 +100,7 @@ spec:
             # DEVIATION (workload + memory): the card leaves vision enabled,
             # but kagent traffic is text-only. Forbidding image/video skips the
             # multimodal profiling + encoder cache, reclaiming the slim margin
-            # on a "barely fits" 48 GB budget at no functional cost here.
+            # on a "barely fits" 32 GB budget at no functional cost here.
             - '--limit-mm-per-prompt={"image":0,"video":0}'
             # DEVIATION: card uses port 18000; keep 8000 to match the Service
             # and the kagent provider baseUrl.
