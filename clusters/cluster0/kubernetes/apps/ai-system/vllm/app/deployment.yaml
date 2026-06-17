@@ -78,7 +78,7 @@ spec:
             # that and errored; 0.98 × 31.36 = 30.73 GiB clears it with
             # margin and yields ~2.21 GiB KV -- enough for the 83K window.
             # If it OOMs, fall back to --enforce-eager.
-            - --gpu-memory-utilization=0.985
+            - --gpu-memory-utilization=0.9825
             - --max-num-batched-tokens=4096
             # KEY to fitting graphs on 32 GB: kagent is single-user, so cap
             # concurrency at 8. This bounds the batch sizes vLLM captures (and
