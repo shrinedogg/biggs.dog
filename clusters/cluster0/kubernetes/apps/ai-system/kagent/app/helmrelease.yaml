@@ -54,12 +54,7 @@ spec:
       postgres:
         bundled:
           enabled: false
-        # TEMPORARILY false: diagnostic to confirm whether pgvector long-term
-        # memory retrieval is what fills the context to the model's limit for
-        # heavy agents (flux-agent/k8s-agent hit exactly max_context+1 tokens).
-        # If disabling this makes them work, memory is the cause and we decide
-        # how to keep it within budget. Re-enable once confirmed.
-        vectorEnabled: false
+        vectorEnabled: true
         urlFile: /etc/kagent-db/url
     controller:
       volumes:
