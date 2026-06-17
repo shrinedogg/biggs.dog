@@ -24,7 +24,7 @@ spec:
         - name: arbiter
           # alpine/k8s bundles kubectl + curl + jq + bash. Bump the tag to track
           # the cluster; basic get/scale/patch work fine across version skew.
-          image: alpine/k8s:1.31.1
+          image: alpine/k8s:1.36.2
           env:
             - name: VLLM_NS
               value: ai-system
