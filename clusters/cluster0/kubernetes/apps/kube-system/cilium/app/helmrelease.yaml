@@ -31,7 +31,7 @@ spec:
       enabled: true
       bbr: true
     bpf:
-      datapathMode: netkit  # netkit can have issues with external LB traffic
+      datapathMode: netkit # netkit can have issues with external LB traffic
       lbExternalClusterIP: true
       # Allow per-Service forwarding mode via the
       # service.cilium.io/forwarding-mode annotation. Default stays SNAT
@@ -58,6 +58,7 @@ spec:
     devices: "eth+ enp+ enx+ eno+ ens+ bond+"
     endpointRoutes:
       enabled: true
+    endpointSlicePolicy: true
     envoy:
       enabled: true
       prometheus:
