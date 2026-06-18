@@ -23,10 +23,9 @@ spec:
           image: mcp/dockerhub@sha256:6590cd61887254c906e72f5887023749b17be025cfb9156abde85f0388946b03
           imagePullPolicy: IfNotPresent
           command:
-            - node
-          args:
-            - dist/index.js
-            - --port=9090
+            - sleep
+            - "3600"
+          args: []
           env:
             - name: MINIMAX_API_KEY
               valueFrom:
@@ -45,10 +44,14 @@ spec:
               cpu: 100m
               memory: 128Mi
           livenessProbe:
-            tcpSocket:
-              port: http
+            exec:
+              command:
+                - sleep
+                - "1"
             initialDelaySeconds: 10
           readinessProbe:
-            tcpSocket:
-              port: http
+            exec:
+              command:
+                - sleep
+                - "1"
             initialDelaySeconds: 5
