@@ -27,6 +27,15 @@ Agent defined in the `flux-mcp` app
 (`clusters/cluster0/kubernetes/apps/ai-system/flux-mcp/`). Verify the live set
 with `kubectl get agents -n ai-system`. Keep the entries below in sync with it.
 
+## Minimax M3 Agent Patterns
+
+When using the Minimax M3 MCP server, follow these reasoning patterns to maximize its capabilities within the GitOps and Kagent framework:
+
+- **State Correlation (Perception $\\rightarrow$ Cognition):** Do not use M3 for simple lookups. Use it to correlate high-level reasoning with low-level data. For example, use `observability-agent` to gather metrics, then provide that data to M3 to identify patterns (e.g., "Correlate these Prometheus CPU spikes with the recent `CiliumNetworkPolicy` changes").
+- **Policy-First Architecture:** Use M3 as the "Architect" for security. Use it to reason through the required communication flows, then pass that logic to the `cilium-policy-agent` to generate the final `CiliumNetworkPolicy` manifests.
+- **GitOps-Centric Troubleshooting:** M3 should provide *proposals*, not *actions*. If M3 identifies a misconfiguration, the recommendation must always be a change to the desired state in Git (e.g., "Update the manifest at `clusters/cluster0/...`"), rather than a `kubectl` command.
+- **Sandbox Reasoning:** Since the agent is outbound-only (accessing `api.minimax.ai`), use it to analyze large volumes of logs or events retrieved by `k8s-agent` to synthesize hypotheses for complex failures.
+
 ## Agent selection
 
 Pick the single most specific agent for the task:

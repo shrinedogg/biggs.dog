@@ -93,7 +93,7 @@ spec:
         name: "affine"
         password: ""
       redis:
-        host: "dragonfly-db.dragonfly.svc.cluster.local"
+        host: "dragonfly-db.dragonfly-isolated.svc.cluster.local"
         port: "6379"
         username: ""
         password: ""
