@@ -49,9 +49,4 @@ spec:
                 - sleep
                 - "1"
             initialDelaySeconds: 10
-          readinessProbe:
-            exec:
-              command:
-                - sleep
-                - "1"
-            initialDelaySeconds: 5
+          readinessProbe: null
