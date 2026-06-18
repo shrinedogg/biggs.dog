@@ -1,0 +1,75 @@
+# Namespace: affine
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "default-deny"
+  namespace: "affine"
+spec:
+  endpointSelector: {}
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-egress-to-postgres"
+  namespace: "affine"
+spec:
+  endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        "io.cnpg.namespace": "cnpg-system"
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-egress-to-nfs"
+  namespace: "affine"
+spec:
+  endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        app: nfs
+        "k8s:io.kubernetes.pod.namespace": "media"
+    toPorts:
+    - ports:
+      - port: "2049"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-ingress-from-gateway"
+  namespace: "affine"
+spec:
+  endpointSelector:
+    matchLabels:
+      app: affine-app
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        component: gateway
+        "k8s:io.kubernetes.pod.namespace": "networking"
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-prometheus-scraping"
+  namespace: "affine"
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "observability"
+    toPorts:
+    - ports:
+      - port: "9100"
+        protocol: TCP
+      - port: "8080"
+        protocol: TCP

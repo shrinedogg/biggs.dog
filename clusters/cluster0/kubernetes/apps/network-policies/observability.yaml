@@ -1,0 +1,21 @@
+# Namespace: observability
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "default-deny"
+  namespace: "observability"
+spec:
+  endpointSelector: {}
+---
+# Allows observability pods to reach the rest of the cluster (for scraping)
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-egress-to-cluster"
+  namespace: "observability"
+spec:
+  endpointSelector: {}
+  egress:
+  - toEntities:
+    - cluster

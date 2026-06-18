@@ -1,0 +1,43 @@
+# Namespace: renovate
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "default-deny"
+  namespace: "renovate"
+spec:
+  endpointSelector: {}
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-egress-to-postgres"
+  namespace: "renovate"
+spec:
+  endpointSelector: {}
+  egress:
+  - toEndpoints:
+    - matchLabels:
+        "io.cnpg.namespace": "cnpg-system"
+    toPorts:
+    - ports:
+      - port: "5432"
+        protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-prometheus-scraping"
+  namespace: "renovate"
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "observability"
+    toPorts:
+    - ports:
+      - port: "9100"
+        protocol: TCP
+      - port: "8080"
+        protocol: TCP
