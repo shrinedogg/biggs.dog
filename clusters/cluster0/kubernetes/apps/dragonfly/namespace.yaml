@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: dragonfly-isolated
+  name: dragonfly
   labels:
     app.kubernetes.io/name: dragonfly
     security.biggs.dog/isolated: "true"

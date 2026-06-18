@@ -2,36 +2,36 @@ apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: allow-affine-to-dragonfly-db
-  namespace: dragonfly-isolated
+  namespace: dragonfly
 spec:
   endpointSelector:
     matchLabels:
       app: dragonfly-db
       app.kubernetes.io/name: dragonfly
   ingress:
-  - fromEndpoints:
-    - matchLabels:
-        "io.kubernetes.pod.namespace": affine
-    toPorts:
-    - ports:
-      - port: "6379"
-        protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            "io.kubernetes.pod.namespace": affine
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
   name: allow-auth-to-dragonfly-db
-  namespace: dragonfly-isolated
+  namespace: dragonfly
 spec:
   endpointSelector:
     matchLabels:
       app: dragonfly-db
       app.kubernetes.io/name: dragonfly
   ingress:
-  - fromEndpoints:
-    - matchLabels:
-        "io.kubernetes.pod.namespace": auth
-    toPorts:
-    - ports:
-      - port: "6379"
-        protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            "io.kubernetes.pod.namespace": auth
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP

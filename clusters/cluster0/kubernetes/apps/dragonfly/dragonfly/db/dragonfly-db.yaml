@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
     app.kubernetes.io/created-by: dragonfly-operator
   name: dragonfly-db
-  namespace: dragonfly-isolated
+  namespace: dragonfly
 spec:
   replicas: 2
   args:
