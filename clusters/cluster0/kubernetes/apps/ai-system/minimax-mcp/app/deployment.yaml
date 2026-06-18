@@ -20,7 +20,7 @@ spec:
       containers:
         - name: mcp-server
           # Using a pinned digest for Renovate to manage updates via PRs.
-          image: mcp/dockerhub@sha256:46684745d3d34549863756231f547b846416e37e37a927785d34e28568f801c8
+          image: mcp/dockerhub@sha256:6590cd61887254c906e72f5887023749b17be025cfb9156abde85f0388946b03
           imagePullPolicy: IfNotPresent
           args:
             - --port=9090
