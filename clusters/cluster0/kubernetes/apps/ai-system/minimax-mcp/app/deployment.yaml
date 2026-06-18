@@ -1,0 +1,51 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: minimax-mcp-server
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: minimax-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minimax-mcp
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: minimax-mcp
+    spec:
+      serviceAccountName: minimax-mcp-sa
+      containers:
+        - name: mcp-server
+          # Using a pinned version for Renovate to manage updates.
+          image: webski101/minimax-mcp-server-m3:1.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - --port=9090
+          env:
+            - name: MINIMAX_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: minimax-api-key
+                  key: api-key
+          ports:
+            - containerPort: 9090
+              name: http
+              protocol: TCP
+          resources:
+            limits:
+              cpu: 500m
+              memory: 512Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5

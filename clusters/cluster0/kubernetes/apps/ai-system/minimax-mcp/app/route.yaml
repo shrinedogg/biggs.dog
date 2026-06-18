@@ -1,0 +1,34 @@
+---
+apiVersion: cilium.io/v2
+kind: CiliumEndpointSlicePolicy
+metadata:
+  name: minimax-mcp-policy
+  namespace: ai-system
+spec:
+  description: Policy for Minimax MCP
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: minimax-mcp
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: kagent
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+          execute: true
+---
+apiVersion: io.cilium.gatewayapi.io/v1alpha1
+kind: HTTPRoute
+metadata:
+  name: minimax-mcp-route
+  namespace: ai-system
+spec:
+  parentRefs:
+    - name: wildcard-biggs-dog
+      namespace: networking # Updated to match actual cluster Gateway location
+  rules:
+    - backendRefs:
+        - name: minimax-mcp-service
+          port: 9090

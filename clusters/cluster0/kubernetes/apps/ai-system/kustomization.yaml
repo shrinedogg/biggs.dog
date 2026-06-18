@@ -11,3 +11,4 @@ resources:
   - ./kagent/ks.yaml
   - ./flux-mcp/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
+  - ./minimax-mcp/ks.yaml
