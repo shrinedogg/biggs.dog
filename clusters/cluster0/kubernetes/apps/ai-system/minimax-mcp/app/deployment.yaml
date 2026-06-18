@@ -28,8 +28,8 @@ spec:
             - name: MINIMAX_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: minimax-api-key
-                  key: api-key
+                  name: minimax-apikey
+                  key: apikey
           ports:
             - containerPort: 9090
               name: http
