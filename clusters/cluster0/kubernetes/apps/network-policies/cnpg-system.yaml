@@ -1,0 +1,46 @@
+# Namespace: cnpg-system
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "default-deny"
+  namespace: "cnpg-system"
+spec:
+  endpointSelector: {}
+---
+# Allow ingress from known application namespaces
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-ingress-from-apps"
+  namespace: "cnpg-system"
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "affine"
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "biggs"
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "auth"
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "renovate"
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-prometheus-scraping"
+  namespace: "cnpg-system"
+spec:
+  endpointSelector: {}
+  ingress:
+  - fromEndpoints:
+    - matchLabels:
+        "k8s:io.kubernetes.pod.namespace": "observability"
+    toPorts:
+    - ports:
+      - port: "9100"
+        protocol: TCP
+      - port: "8080"
+        protocol: TCP

@@ -1,0 +1,33 @@
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: jitsi-baseline-policy
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+  egress:
+    # 1. DNS
+    - toEndpoints:
+        - matchLabels:
+            "io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    # 2. K8s API
+    - toEntities:
+        - kube-apiserver
+    # 3. Internal Signaling to Prosody
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/component: prosody
+            "io.kubernetes.pod.namespace": jitsi
+      toPorts:
+        - ports:
+            - port: "5222"
+              protocol: TCP
+            - port: "5269"
+              protocol: TCP

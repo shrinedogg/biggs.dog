@@ -35,3 +35,52 @@ spec:
         - ports:
             - port: "6379"
               protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: dragonfly-egress-policy
+  namespace: dragonfly
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "io.kubernetes.pod.namespace": kube-system
+            "k8s:k8s-app": kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            app: dragonfly-db
+            "io.kubernetes.pod.namespace": dragonfly
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-observability-to-operator
+  namespace: dragonfly
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly-operator
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "io.kubernetes.pod.namespace": observability
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+            - port: "8081"
+              protocol: TCP

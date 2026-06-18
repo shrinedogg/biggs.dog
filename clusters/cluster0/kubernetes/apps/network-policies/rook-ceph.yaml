@@ -1,0 +1,43 @@
+# Namespace: rook-ceph
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "default-deny"
+  namespace: "rook-ceph"
+spec:
+  endpointSelector: {}
+---
+# Tightened: Only allow communication between specific Ceph components via labels
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-internal-ceph-comm"
+  namespace: "rook-ceph"
+spec:
+  endpointSelector:
+    matchLabels:
+      app: rook-ceph
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "rook-ceph"
+            app: rook-ceph
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "allow-prometheus-scraping"
+  namespace: "rook-ceph"
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "observability"
+      toPorts:
+        - ports:
+            - port: "9100"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP

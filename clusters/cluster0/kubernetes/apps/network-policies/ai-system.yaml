@@ -1,10 +1,10 @@
-# Namespace: affine
+# Namespace: ai-system
 ---
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
   name: "default-deny"
-  namespace: "affine"
+  namespace: "ai-system"
 spec:
   endpointSelector: {}
 ---
@@ -12,7 +12,7 @@ apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
   name: "allow-egress-dns"
-  namespace: "affine"
+  namespace: "ai-system"
 spec:
   endpointSelector: {}
   egress:
@@ -31,7 +31,7 @@ apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
   name: "allow-egress-to-postgres"
-  namespace: "affine"
+  namespace: "ai-system"
 spec:
   endpointSelector: {}
   egress:
@@ -46,40 +46,42 @@ spec:
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
-  name: "allow-egress-to-nfs"
-  namespace: "affine"
+  name: "allow-egress-to-vllm"
+  namespace: "ai-system"
 spec:
   endpointSelector: {}
   egress:
     - toEndpoints:
         - matchLabels:
-            app: nfs
-            "k8s:io.kubernetes.pod.namespace": "media"
+            app: vllm
+            "k8s:io.kubernetes.pod.namespace": "ai-system"
       toPorts:
         - ports:
-            - port: "2049"
+            - port: "8000"
               protocol: TCP
 ---
+# Allow ingress from specific application namespaces for inference/training requests
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
-  name: "allow-ingress-from-gateway"
-  namespace: "affine"
+  name: "allow-ingress-from-apps"
+  namespace: "ai-system"
 spec:
-  endpointSelector:
-    matchLabels:
-      app: affine-app
+  endpointSelector: {}
   ingress:
     - fromEndpoints:
         - matchLabels:
-            component: gateway
-            "k8s:io.kubernetes.pod.namespace": "networking"
+            "k8s:io.kubernetes.pod.namespace": "affine"
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "biggs"
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "auth"
 ---
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
   name: "allow-prometheus-scraping"
-  namespace: "affine"
+  namespace: "ai-system"
 spec:
   endpointSelector: {}
   ingress:

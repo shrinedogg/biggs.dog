@@ -11,18 +11,37 @@ spec:
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
 metadata:
+  name: "allow-egress-dns"
+  namespace: "biggs"
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "kube-system"
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
   name: "allow-egress-to-postgres"
   namespace: "biggs"
 spec:
   endpointSelector: {}
   egress:
-  - toEndpoints:
-    - matchLabels:
-        "io.cnpg.namespace": "cnpg-system"
-    toPorts:
-    - ports:
-      - port: "5432"
-        protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            "io.cnpg.namespace": "cnpg-system"
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
 ---
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
@@ -34,10 +53,10 @@ spec:
     matchLabels:
       app: biggs-app
   ingress:
-  - fromEndpoints:
-    - matchLabels:
-        component: gateway
-        "k8s:io.kubernetes.pod.namespace": "networking"
+    - fromEndpoints:
+        - matchLabels:
+            component: gateway
+            "k8s:io.kubernetes.pod.namespace": "networking"
 ---
 apiVersion: "cilium.io/v2"
 kind: CiliumNetworkPolicy
@@ -47,12 +66,12 @@ metadata:
 spec:
   endpointSelector: {}
   ingress:
-  - fromEndpoints:
-    - matchLabels:
-        "k8s:io.kubernetes.pod.namespace": "observability"
-    toPorts:
-    - ports:
-      - port: "9100"
-        protocol: TCP
-      - port: "8080"
-        protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            "k8s:io.kubernetes.pod.namespace": "observability"
+      toPorts:
+        - ports:
+            - port: "9100"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
