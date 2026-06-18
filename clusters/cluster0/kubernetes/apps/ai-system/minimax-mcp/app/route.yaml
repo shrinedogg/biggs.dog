@@ -1,12 +1,12 @@
 ---
 apiVersion: cilium.io/v2
-kind: CiliumEndpointSlicePolicy
+kind: CiliumNetworkPolicy
 metadata:
   name: minimax-mcp-policy
   namespace: ai-system
 spec:
   description: Policy for Minimax MCP
-  selector:
+  endpointSelector:
     matchLabels:
       app.kubernetes.io/name: minimax-mcp
   ingress:
@@ -17,7 +17,6 @@ spec:
         - ports:
             - port: "9090"
               protocol: TCP
-          execute: true
 ---
 apiVersion: io.cilium.gatewayapi.io/v1alpha1
 kind: HTTPRoute
