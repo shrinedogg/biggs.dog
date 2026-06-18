@@ -60,7 +60,7 @@ spec:
       redis:
         clientType: standalone
         standalone:
-          connectionUrl: redis://dragonfly-db.dragonfly-isolated.svc.cluster.local:6379
+          connectionUrl: redis://dragonfly-db.dragonfly.svc.cluster.local:6379
     # The redis wait init container is only needed for redis session storage.
     initContainers:
       waitForRedis:
