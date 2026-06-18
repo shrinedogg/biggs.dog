@@ -13,9 +13,7 @@ spec:
   replicas: 2
   args:
     - "--default_lua_flags=allow-undeclared-keys"
-    - "--replicaof"
-    - "dragonfly-db.dragonfly.svc.cluster.local"
-    - "6379"
+    - "--replicaof=dragonfly-db.dragonfly.svc.cluster.local:6379"
   resources:
     requests:
       cpu: 500m
