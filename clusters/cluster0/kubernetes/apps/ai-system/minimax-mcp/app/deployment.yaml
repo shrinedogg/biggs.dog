@@ -19,8 +19,8 @@ spec:
       serviceAccountName: minimax-mcp-sa
       containers:
         - name: mcp-server
-          # Using a pinned version for Renovate to manage updates.
-          image: webski101/minimax-mcp-server-m3:1.0.0
+          # Using a pinned digest for Renovate to manage updates via PRs.
+          image: mcp/dockerhub@sha256:46684745d3d34549863756231f547b846416e37e37a927785d34e28568f801c8
           imagePullPolicy: IfNotPresent
           args:
             - --port=9090
