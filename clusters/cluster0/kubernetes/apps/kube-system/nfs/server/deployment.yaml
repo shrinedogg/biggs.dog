@@ -29,6 +29,10 @@ spec:
       # namespace is labelled with the 'privileged' Pod Security Standard. We still
       # drop the service-account token, which the server never needs.
       automountServiceAccountToken: false
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
       containers:
         - image: quay.io/aminvakil/alpine-nfs-server:latest
           imagePullPolicy: Always
