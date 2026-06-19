@@ -35,9 +35,11 @@ spec:
               - matchPattern: "*"
 ---
 # oauth2-proxy performs OIDC discovery / token / JWKS / userinfo against the
-# public issuer https://id.biggs.dog, which resolves to Cloudflare (the request
-# hairpins out and back in to pocket-id via the gateway). toFQDNs needs the L7
-# DNS rule on allow-egress-dns above so Cilium can learn the issuer's IPs.
+# public issuer https://id.biggs.dog. With CoreDNS conditional-forwarding
+# biggs.dog -> k8s-gateway (192.168.2.6), this resolves to the internal gateway
+# LB (192.168.2.7) and stays in-cluster; without it, it resolves to Cloudflare
+# and hairpins. toFQDNs allows whichever IP DNS returns, so it works either way,
+# but it requires the L7 DNS rule on allow-egress-dns above to learn the IPs.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
