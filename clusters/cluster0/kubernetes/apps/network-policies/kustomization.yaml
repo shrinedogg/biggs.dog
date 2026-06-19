@@ -4,4 +4,10 @@ kind: Kustomization
 resources:
   # Flux-Kustomizations
   - ./apps-ks.yaml
-  - ./infra-ks.yaml
+  # INFRA TIER DISABLED (incident rollback): the infra-tier default-deny
+  # policies severed the agentgateway edge + ai-system control plane, taking
+  # down Emby, oauth2-proxy, and the kagent MCP backend. With prune: true,
+  # removing this entry garbage-collects network-policies-infra and all its
+  # CNPs, returning networking/ai-system/etc. to allow-all. Re-enable only as
+  # a staged, one-namespace-at-a-time rollout with cilium-dbg drop monitoring.
+  # - ./infra-ks.yaml
