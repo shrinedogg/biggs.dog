@@ -120,6 +120,27 @@ spec:
             - port: "20252"
               protocol: TCP
 ---
+# volsync (restic mover Jobs) backs up to Backblaze B2 (b2:biggs-dog). Allow the
+# mover pods outbound HTTPS to the B2 API/data endpoints. toFQDNs relies on the
+# L7 DNS rule on allow-egress-dns above.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-volsync-b2
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/created-by: volsync
+  egress:
+    - toFQDNs:
+        - matchName: backblazeb2.com
+        - matchPattern: "*.backblazeb2.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
