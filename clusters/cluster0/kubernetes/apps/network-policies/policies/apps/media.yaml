@@ -30,6 +30,25 @@ spec:
             dns:
               - matchPattern: "*"
 ---
+# Intra-namespace mesh: Ersatz streams from Emby, and media pods reach the
+# in-cluster NFS server pod directly (pod-to-pod, distinct from the node mount
+# path covered by allow-nfs-from-nodes).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: media
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: media
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: media
+---
 # bookboss -> cnpg-bookboss Postgres
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
