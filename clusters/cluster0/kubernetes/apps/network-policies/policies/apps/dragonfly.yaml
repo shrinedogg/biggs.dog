@@ -7,6 +7,8 @@ metadata:
   namespace: dragonfly
 spec:
   endpointSelector: {}
+  ingress: []
+  egress: []
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

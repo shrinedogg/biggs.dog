@@ -7,6 +7,8 @@ metadata:
   namespace: rook-ceph
 spec:
   endpointSelector: {}
+  ingress: []
+  egress: []
 ---
 # Full intra-namespace mesh: mons/osds/mgr/mds/operator talk on many dynamic ports
 apiVersion: cilium.io/v2

@@ -9,6 +9,8 @@ metadata:
   namespace: networking
 spec:
   endpointSelector: {}
+  ingress: []
+  egress: []
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
