@@ -7,6 +7,8 @@ metadata:
   namespace: cnpg-system
 spec:
   endpointSelector: {}
+  ingress: []
+  egress: []
 ---
 # Intra-namespace streaming replication + operator<->instance traffic (primary/replica)
 apiVersion: cilium.io/v2

@@ -7,6 +7,8 @@ metadata:
   namespace: renovate
 spec:
   endpointSelector: {}
+  ingress: []
+  egress: []
 ---
 # DNS MUST carry the L7 dns rule so Cilium's DNS proxy observes lookups and can
 # populate the toFQDNs policy below. Without this, GitHub egress silently fails.
