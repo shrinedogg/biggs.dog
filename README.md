@@ -126,6 +126,7 @@ Key conventions learned while hardening this (each is documented inline in the p
 - **L7 DNS on every `allow-egress-dns`.** A bare L3/L4 DNS allow lets Go resolvers' rapid parallel A/AAAA replies miss the egress conntrack entry and get dropped as new ingress. Routing DNS through the Cilium DNS proxy (`rules.dns: matchPattern "*"`) fixes that and enables `toFQDNs` (used for GitHub, the OIDC issuer, Backblaze B2, etc.).
 - **ClusterIP service return paths.** With `bpf-lb` + default-deny ingress, replies from a ClusterIP service (e.g. CNPG `-rw` Postgres) arrive reverse-NAT'd from the service VIP and miss conntrack, so DB clients carry an explicit `allow-ingress-from-postgres` return-path rule.
 - **Gateway data planes** are selected by `gateway.networking.k8s.io/gateway-class-name: agentgateway` (one Deployment per Gateway, e.g. `wildcard-biggs-dog`) — distinct from the control-plane `agentgateway` pod — so `*.biggs.dog` ingress and backend forwarding are authorized.
+- **Internet pulls hide behind caches.** Default-deny egress silently breaks anything that reaches out only occasionally — e.g. vLLM downloads a *new* model from Hugging Face but loads already-cached ones from its PVC, so blocked egress only surfaces on a model swap. Such components (`allow-egress-vllm-huggingface`, renovate's `allow-egress-https`, volsync→Backblaze B2) carry an explicit egress allow, scoped to the pod and kept broad on `:443` where the upstream uses rotating CDN/Xet hosts with no stable FQDN set.
 
 
 ### Identity & SSO
