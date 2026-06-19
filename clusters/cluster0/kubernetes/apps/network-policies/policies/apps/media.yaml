@@ -1,6 +1,4 @@
-# Namespace: media  (emby, bookboss, ersatz, nsyncd)
-# NFS is CSI-based: mount traffic originates from the node/host, not these pods,
-# so no pod-level egress-to-NFS rule is required.
+# Namespace: media  (emby, bookboss, ersatz, nsyncd, in-cluster nfs server)
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
@@ -81,6 +79,46 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
+---
+# In-cluster NFS server (app=nfs, ClusterIP :2049). Nodes/kubelet mount it for
+# media volumes, so the mount traffic arrives from host/remote-node (post
+# socketLB translation it lands on the pod's 2049).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-nfs-from-nodes
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nfs
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "2049"
+              protocol: TCP
+---
+# nsyncd is a scheduled sync Job that pushes/pulls media from an external host
+# (observed: <remote>:20252). DNS is covered by allow-egress-dns above.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-nsyncd
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: nsyncd
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "20252"
+              protocol: TCP
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

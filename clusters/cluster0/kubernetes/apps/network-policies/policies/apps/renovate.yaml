@@ -92,6 +92,28 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# Renovate resolves and updates dependencies from many package registries
+# (npm, PyPI, container/Helm/Maven registries, release CDNs, etc.), not just
+# GitHub, so it needs broad outbound HTTPS. Scoped to the renovate app only.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-https
+  namespace: renovate
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: renovate
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "80"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
