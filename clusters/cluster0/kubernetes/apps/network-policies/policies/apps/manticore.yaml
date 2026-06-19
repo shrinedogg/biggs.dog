@@ -23,6 +23,12 @@ spec:
               protocol: UDP
             - port: "53"
               protocol: TCP
+          # L7 DNS proxy — Cilium injects replies directly to the pod, avoiding
+          # the conntrack reply-drop that breaks Go resolvers behind default-deny
+          # ingress (see auth.yaml), and enables toFQDNs.
+          rules:
+            dns:
+              - matchPattern: "*"
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

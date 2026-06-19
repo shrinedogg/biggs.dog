@@ -4,10 +4,11 @@ kind: Kustomization
 resources:
   # Flux-Kustomizations
   - ./apps-ks.yaml
-  # INFRA TIER DISABLED (incident rollback): the infra-tier default-deny
-  # policies severed the agentgateway edge + ai-system control plane, taking
-  # down Emby, oauth2-proxy, and the kagent MCP backend. With prune: true,
-  # removing this entry garbage-collects network-policies-infra and all its
-  # CNPs, returning networking/ai-system/etc. to allow-all. Re-enable only as
-  # a staged, one-namespace-at-a-time rollout with cilium-dbg drop monitoring.
-  # - ./infra-ks.yaml
+  # INFRA TIER re-enabled after the root cause was fixed: the earlier outage was
+  # the DNS reply-drop (Go resolvers behind default-deny ingress) plus invalid
+  # empty default-deny CNPs. Both are resolved now — the invalid default-deny
+  # policies were removed (deny is implicit via the endpointSelector:{} allows)
+  # and every allow-egress-dns carries the L7 DNS rule. Watch the agentgateway
+  # edge + ai-system control plane on first reconcile; if anything regresses:
+  #   flux suspend kustomization network-policies-infra
+  - ./infra-ks.yaml
