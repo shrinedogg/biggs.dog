@@ -81,13 +81,12 @@ spec:
             # disk weights (vs Gemma's 14B). Raise toward 0.98 once stable; drop
             # if boot OOMs.
             - --gpu-memory-utilization=0.95
-            # Per-step token budget for (chunked) prefill + decode. Raised 4096 ->
-            # 8192 so cold large-context prefills (e.g. flux-agent's ~64K tool
-            # schemas before the prefix cache warms) process in ~half the steps,
-            # cutting TTFT on agent bursts. Measured: prefix-cache hit ~84% and
-            # KV peaked only ~26% at a 16-way 62K-token burst, so the extra
-            # per-step activation memory is well within budget.
-            - --max-num-batched-tokens=8192
+            # Per-step token budget for (chunked) prefill + decode. Tested 8192 to
+            # cut cold large-prefix TTFT, but it made no difference: cold-prefix
+            # TTFT is prefill-compute-bound (same total FLOPs), not chunk-
+            # scheduling-bound, so a bigger budget just makes fewer/longer steps.
+            # Kept at 4096 (less per-step activation memory, same latency).
+            - --max-num-batched-tokens=4096
             # 64-way concurrency (matches the benchmark sweep + smooths agent
             # fan-out). At 131K max-model-len the ~838K-token KV pool covers
             # ~6.4 full-context reqs; the benchmark's short reqs fit far more.
