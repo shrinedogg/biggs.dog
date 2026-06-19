@@ -132,14 +132,17 @@ spec:
 
       # Affinity rules for the Connect pod
       affinity:
-        preferredDuringSchedulingIgnoredDuringExecution:
-          - weight: 100
-            preference:
-              matchExpressions:
-                - key: kubernetes.io/hostname
-                  operator: NotIn
-                  values:
-                    - control-01
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - onepassword-connect
+                topologyKey: kubernetes.io/hostname
 
       ## Horizontal Pod Autoscaling for the Connect pod
       hpa:

@@ -45,12 +45,17 @@ spec:
         nodeSelector:
           kubernetes.io/os: linux
         affinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              preference:
-                matchExpressions:
-                  - key: node-role.kubernetes.io/control-plane
-                    operator: DoesNotExist
+          podAntiAffinity:
+            preferredDuringSchedulingIgnoredDuringExecution:
+              - weight: 100
+                podAffinityTerm:
+                  labelSelector:
+                    matchExpressions:
+                      - key: app.kubernetes.io/name
+                        operator: In
+                        values:
+                          - openebs
+                  topologyKey: kubernetes.io/hostname
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
