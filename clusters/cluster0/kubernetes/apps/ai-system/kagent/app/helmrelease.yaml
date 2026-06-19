@@ -45,7 +45,7 @@ spec:
         provider: OpenAI
         # Must match vLLM's --served-model-name (not the HuggingFace weights
         # path -- see vllm/app/deployment.yaml for why they differ).
-        model: "gemma-4-local"
+        model: "qwen36-local"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
@@ -55,10 +55,9 @@ spec:
     # runtime from a mounted secret file, so no credentials live in git.
     #
     # vectorEnabled=true: long-term (cross-session) vector memory via pgvector.
-    # The model is now Gemma-4-26B-A4B-NVFP4 with a 128K context window (vs the
-    # old 65536), so flux-agent's ~64K tool schemas + memory + tasks fit with
-    # room to spare -- the context-overflow that previously plagued the heavy
-    # agents on the 27B/65K model is resolved by the model swap.
+    # The model is now nvidia/Qwen3.6-35B-A3B-NVFP4 with a 262K context window,
+    # so flux-agent's ~64K tool schemas + memory + tasks fit with room to spare
+    # -- no context-overflow on the heavy agents.
     database:
       postgres:
         bundled:

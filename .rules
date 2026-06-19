@@ -6,7 +6,7 @@ agents. When a task matches one of the domains below, prefer invoking that
 kagent agent over answering from memory or using generic tools.
 
 All agents share a single in-cluster vLLM backend (currently
-`nvidia/Gemma-4-26B-A4B-NVFP4` -- a 26B MoE with ~3.8B active params and a 256K
+`nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params and a 262K
 context window -- on `nv-01`'s RTX 5090); inference never leaves the cluster.
 It's fast (~140 tok/s single-stream, sub-second TTFT) with ample context, so
 full multi-step agent tasks work fine -- including heavy ones like flux-agent

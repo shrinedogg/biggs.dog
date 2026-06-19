@@ -43,54 +43,58 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: NVIDIA's NVFP4 quant of Google's Gemma-4-26B-A4B-IT, served
+            # MODEL: NVIDIA's NVFP4 quant of Alibaba's Qwen3.6-35B-A3B, served
             # per the model card's vLLM command:
-            #   https://huggingface.co/nvidia/Gemma-4-26B-A4B-NVFP4
-            # Replaces the oversized NeuralNet-Hub/Qwen3.6-27B-NVFP4 (a 48 GB-
-            # class quant its author only ran on 48 GB). This is a 26B MoE with
-            # only ~3.8B active params (fast), 14B on disk, and 256K native
-            # context using HYBRID sliding-window (1024) + global attention --
-            # most layers keep bounded KV, making long context cheap on this
-            # 32 GB card. NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
+            #   https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4
+            # A 35B MoE with only ~3B active params (fast), ~19B on disk (NVFP4
+            # ~3x smaller than BF16), Mamba-hybrid attention, and 262K native
+            # context -- most layers keep bounded KV, making long context cheap
+            # on this 32 GB card. NVFP4 needs Blackwell (nv-01's RTX 5090,
+            # sm_120). The checkpoint is multimodal (text/image/video) but we
+            # serve text-only for kagent (see --limit-mm-per-prompt below).
+            # NOTE: NVIDIA serves this with vllm/vllm-openai:nightly; we pin a
+            # release below. If v0.23.0 lacks qwen3_5_moe arch or the qwen3_xml
+            # tool parser, bump the image tag (or use :nightly).
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=nvidia/Gemma-4-26B-A4B-NVFP4
+            - --model=nvidia/Qwen3.6-35B-A3B-NVFP4
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (nvidia/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
             # clients; kagent and Zed both use this name, not the weights path.
-            - --served-model-name=gemma-4-local
-            # No --quantization: vLLM auto-detects the NVFP4 modelopt config.
-            # fp8 KV cache + sliding-window attention keep the KV pool small
-            # even at long context.
+            - --served-model-name=qwen36-local
+            # Explicit per the model card (vLLM also auto-detects modelopt's
+            # NVFP4 config, but the card serves with this flag set).
+            - --quantization=modelopt
+            # fp8 KV cache + hybrid attention keep the KV pool small even at
+            # long context.
             - --kv-cache-dtype=fp8
-            # 256K context (the model's native max). The 14B weights + fp8 KV
-            # + sliding-window attention (most layers bounded at 1024 tokens)
-            # leave ample room on 32 GB for the full window. Lower if it OOMs.
+            # 262K context (the model's native max). ~19B NVFP4 weights + fp8 KV
+            # + Mamba-hybrid attention (most layers keep bounded KV) leave room
+            # on 32 GB for the full window. Lower if it OOMs.
             - --max-model-len=262144
-            # nv-01 is a headless Talos node with a DEDICATED GPU; the CUDA
-            # driver context caps usable util near 0.984. 0.98 maximizes the KV
-            # pool while staying just under that ceiling. If boot OOMs, drop
-            # back toward 0.95.
-            - --gpu-memory-utilization=0.98
+            # nv-01 is a headless Talos node with a DEDICATED GPU; usable util
+            # caps near 0.984. 0.95 leaves headroom for the larger 35B/~19B-on-
+            # disk weights (vs Gemma's 14B). Raise toward 0.98 once stable; drop
+            # if boot OOMs.
+            - --gpu-memory-utilization=0.95
             - --max-num-batched-tokens=4096
-            # KV peaked at only ~20% under real agent load, so there's ample
-            # headroom for concurrency. Raised to 64 to smooth TTFT tails when
-            # many agents fan out at once and to allow high-throughput
-            # benchmarking. Keep capture-size == max-num-seqs; if CUDA-graph
-            # capture OOMs at boot (more batch sizes captured = more memory),
-            # lower both.
-            - --max-num-seqs=64
-            - --max-cudagraph-capture-size=64
+            # Conservative concurrency for the first boot of the larger model
+            # (Gemma ran 64 at 14B; this is ~5 GB more weights, so less KV pool).
+            # KV peaked ~20% under agent load, so there's room to raise this once
+            # stable. Keep capture-size == max-num-seqs; lower both if CUDA-graph
+            # capture OOMs at boot.
+            - --max-num-seqs=16
+            - --max-cudagraph-capture-size=16
             - --enable-prefix-caching
-            # Gemma-4 ships custom modeling code; the card requires
-            # trust-remote-code. NOTE: executes repo-provided Python.
+            # Qwen3.6 hybrid-MoE may ship custom modeling code; the model card's
+            # DGX command sets trust-remote-code. NOTE: executes repo Python.
             - --trust-remote-code
-            # Gemma-4 tool-call + reasoning parsers, per the NVIDIA card
-            # (replaces the Qwen qwen3_coder/qwen3 parsers).
+            # Qwen3.6 tool-call + reasoning parsers, per the NVIDIA model card
+            # (tool parser is qwen3_xml, paired with the model's chat template).
             - --enable-auto-tool-choice
-            - --tool-call-parser=gemma4
-            - --reasoning-parser=gemma4
+            - --tool-call-parser=qwen3_xml
+            - --reasoning-parser=qwen3
             # Text-only kagent traffic; forbid image/video on this multimodal
             # model to skip the vision encoder + multimodal profiling.
             - '--limit-mm-per-prompt={"image":0,"video":0}'
