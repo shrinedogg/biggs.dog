@@ -42,6 +42,15 @@ spec:
     zfs-localpv:
       enabled: true
       zfsController:
+        nodeSelector:
+          kubernetes.io/os: linux
+        affinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: node-role.kubernetes.io/control-plane
+                    operator: DoesNotExist
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists

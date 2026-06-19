@@ -17,6 +17,9 @@ spec:
         name: rook-ceph
         namespace: flux-system
   values:
+    operator:
+      nodeSelector:
+        kubernetes.io/hostname: worker-01
     crds:
       enabled: true
     csi:

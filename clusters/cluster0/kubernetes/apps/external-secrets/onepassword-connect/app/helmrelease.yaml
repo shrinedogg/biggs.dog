@@ -127,10 +127,19 @@ spec:
 
       # Node selector stanza for the Connect pod
       # See: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#nodeselector
-      nodeSelector: {}
+      nodeSelector:
+        kubernetes.io/os: linux
 
       # Affinity rules for the Connect pod
-      affinity: {}
+      affinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            preference:
+              matchExpressions:
+                - key: kubernetes.io/hostname
+                  operator: NotIn
+                  values:
+                    - control-01
 
       ## Horizontal Pod Autoscaling for the Connect pod
       hpa:
