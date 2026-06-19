@@ -1,0 +1,113 @@
+# Namespace: cnpg-system  (CloudNativePG operator + all Postgres clusters)
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: cnpg-system
+spec:
+  endpointSelector: {}
+---
+# Intra-namespace streaming replication + operator<->instance traffic (primary/replica)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: cnpg-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+---
+# Postgres clients from consuming namespaces
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-apps
+  namespace: cnpg-system
+spec:
+  endpointSelector:
+    matchLabels:
+      cnpg.io/podRole: instance
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: affine
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: renovate
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: media
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+# API server -> operator admission webhook
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-webhook-from-apiserver
+  namespace: cnpg-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudnative-pg
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP
+---
+# DNS + kube-apiserver (operator) + object-store backups (Barman -> S3/HTTPS)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-infra
+  namespace: cnpg-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+    # Barman object-store backups / WAL archiving (S3-compatible over HTTPS).
+    # Narrow to your bucket CIDR if it is on-LAN; world covers external object stores.
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: cnpg-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability

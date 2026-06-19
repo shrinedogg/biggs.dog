@@ -2,19 +2,19 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app cloudflared
+  name: &app network-policies-apps
   namespace: flux-system
 spec:
-  targetNamespace: networking
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/networking/cloudflared/app
+  # Policies carry their own explicit metadata.namespace, so no targetNamespace.
+  path: ./clusters/cluster0/kubernetes/apps/network-policies/policies/apps
   prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system
-  wait: true
+  wait: false
   interval: 3m
   retryInterval: 1m
   timeout: 2m
