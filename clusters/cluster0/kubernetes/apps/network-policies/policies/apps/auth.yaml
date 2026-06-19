@@ -23,6 +23,37 @@ spec:
               protocol: UDP
             - port: "53"
               protocol: TCP
+          # L7 DNS proxy. Without this, Cilium relies on plain UDP conntrack for
+          # DNS replies. Go's resolver (oauth2-proxy/go-redis) fires rapid
+          # parallel A/AAAA queries whose replies arrive from the kube-dns
+          # service VIP un-reverse-translated, so they miss the egress conntrack
+          # entry and get dropped by the default-deny ingress ("Policy denied",
+          # identity kube-dns -> app). Routing DNS through the L7 proxy makes
+          # Cilium inject replies directly to the pod, fixing the drop.
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# oauth2-proxy performs OIDC discovery / token / JWKS / userinfo against the
+# public issuer https://id.biggs.dog, which resolves to Cloudflare (the request
+# hairpins out and back in to pocket-id via the gateway). toFQDNs needs the L7
+# DNS rule on allow-egress-dns above so Cilium can learn the issuer's IPs.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-oidc
+  namespace: auth
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+  egress:
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
