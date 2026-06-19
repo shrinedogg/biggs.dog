@@ -30,6 +30,19 @@ spec:
             dns:
               - matchPattern: "*"
 ---
+# The manticoresearch balancer queries the Kubernetes API to discover worker
+# pods/endpoints; without this it loops on "Policy denied -> kube-apiserver:6443".
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-kube-apiserver
+  namespace: manticore
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

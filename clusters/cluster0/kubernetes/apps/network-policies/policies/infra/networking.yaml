@@ -76,7 +76,14 @@ spec:
         - host
         - remote-node
       toPorts:
+        # k8s-gateway's container listens on 1053 (non-root); the Service maps
+        # 53 -> 1053, and Cilium enforces ingress on the TRANSLATED pod port.
+        # Allowing only 53 silently drops every forwarded DNS query.
         - ports:
+            - port: "1053"
+              protocol: UDP
+            - port: "1053"
+              protocol: TCP
             - port: "53"
               protocol: UDP
             - port: "53"

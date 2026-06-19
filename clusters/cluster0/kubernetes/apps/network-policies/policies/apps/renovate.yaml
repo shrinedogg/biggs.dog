@@ -57,6 +57,22 @@ spec:
             - port: "5432"
               protocol: TCP
 ---
+# CNPG's -rw Service is a ClusterIP; with bpf-LB + default-deny ingress the
+# Postgres reply arrives reverse-NAT'd from the VIP and misses egress conntrack,
+# so it's dropped as new ingress. Allow the DB return path (see ai-system.yaml).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-postgres
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-renovate
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
