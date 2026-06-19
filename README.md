@@ -41,6 +41,7 @@ clusters/
             ├── manticore/
             ├── matrix/
             ├── media/
+            ├── network-policies/    # Tiered Cilium NetworkPolicies (apps + infra)
             ├── networking/
             ├── observability/
             ├── openebs/
@@ -68,13 +69,14 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 ### Networking
 
 
-| Component                                                | Description                                            |
-| -------------------------------------------------------- | ------------------------------------------------------ |
-| [Cilium](https://cilium.io/)                             | CNI with BGP support for LoadBalancer IP advertisement |
-| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | DNS for Kubernetes services                            |
-| [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                   |
-| [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts   |
-| [Cloudflared](https://github.com/cloudflare/cloudflared) | Cloudflare Tunnel for external access                  |
+| Component                                                | Description                                                  |
+| -------------------------------------------------------- | ------------------------------------------------------------ |
+| [Cilium](https://cilium.io/)                             | CNI (kube-proxy replacement) with BGP for LoadBalancer IPs   |
+| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.2.6`) |
+| [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                         |
+| [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts         |
+
+The UDM router conditionally forwards `biggs.dog` to k8s-gateway for LAN clients. In-cluster, **CoreDNS** is patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` to k8s-gateway as well, so pods resolve `*.biggs.dog` to the internal gateway LB (`192.168.2.7`) and stay in-cluster instead of hairpinning out through Cloudflare.
 
 
 ### Storage
@@ -109,6 +111,21 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | [External Secrets](https://external-secrets.io/)                   | Sync secrets from external providers            |
 | [1Password Connect](https://developer.1password.com/docs/connect/) | Secret backend for External Secrets             |
 | [SOPS](https://github.com/getsops/sops)                            | Encrypted secrets (age key)                     |
+
+
+### Network Policies
+
+The cluster runs a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
+
+- **`network-policies-apps`** (`policies/apps/`) — lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate).
+- **`network-policies-infra`** (`policies/infra/`) — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph). Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
+
+Key conventions learned while hardening this (each is documented inline in the policy files):
+
+- **Default-deny is implicit.** Cilium rejects an empty deny-all (`ingress: [] / egress: []` → `VALID: False`), so there is no standalone deny-all policy. Every namespace's `allow-*` policies select `endpointSelector: {}`, which puts all pods into default-deny for any traffic not explicitly allowed.
+- **L7 DNS on every `allow-egress-dns`.** A bare L3/L4 DNS allow lets Go resolvers' rapid parallel A/AAAA replies miss the egress conntrack entry and get dropped as new ingress. Routing DNS through the Cilium DNS proxy (`rules.dns: matchPattern "*"`) fixes that and enables `toFQDNs` (used for GitHub, the OIDC issuer, Backblaze B2, etc.).
+- **ClusterIP service return paths.** With `bpf-lb` + default-deny ingress, replies from a ClusterIP service (e.g. CNPG `-rw` Postgres) arrive reverse-NAT'd from the service VIP and miss conntrack, so DB clients carry an explicit `allow-ingress-from-postgres` return-path rule.
+- **Gateway data planes** are selected by `gateway.networking.k8s.io/gateway-class-name: agentgateway` (one Deployment per Gateway, e.g. `wildcard-biggs-dog`) — distinct from the control-plane `agentgateway` pod — so `*.biggs.dog` ingress and backend forwarding are authorized.
 
 
 ### Identity & SSO
