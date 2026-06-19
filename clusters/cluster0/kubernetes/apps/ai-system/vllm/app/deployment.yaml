@@ -69,23 +69,26 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 262K context (the model's native max). ~19B NVFP4 weights + fp8 KV
-            # + Mamba-hybrid attention (most layers keep bounded KV) leave room
-            # on 32 GB for the full window. Lower if it OOMs.
-            - --max-model-len=262144
+            # 131K context. The model's native max is 262K, but at 262K the KV
+            # pool (~838K tokens on this 32 GB card) only covers ~3.2 concurrent
+            # full-context requests, so high concurrency KV-exhausts/preempts.
+            # 131K doubles that to ~6.4x while staying well above flux-agent's
+            # ~64K tool-schema need. Raise back toward 262K only if you also drop
+            # max-num-seqs.
+            - --max-model-len=131072
             # nv-01 is a headless Talos node with a DEDICATED GPU; usable util
             # caps near 0.984. 0.95 leaves headroom for the larger 35B/~19B-on-
             # disk weights (vs Gemma's 14B). Raise toward 0.98 once stable; drop
             # if boot OOMs.
             - --gpu-memory-utilization=0.95
             - --max-num-batched-tokens=4096
-            # Conservative concurrency for the first boot of the larger model
-            # (Gemma ran 64 at 14B; this is ~5 GB more weights, so less KV pool).
-            # KV peaked ~20% under agent load, so there's room to raise this once
-            # stable. Keep capture-size == max-num-seqs; lower both if CUDA-graph
-            # capture OOMs at boot.
-            - --max-num-seqs=16
-            - --max-cudagraph-capture-size=16
+            # 64-way concurrency (matches the benchmark sweep + smooths agent
+            # fan-out). At 131K max-model-len the ~838K-token KV pool covers
+            # ~6.4 full-context reqs; the benchmark's short reqs fit far more.
+            # Keep capture-size == max-num-seqs; lower both if CUDA-graph capture
+            # OOMs at boot.
+            - --max-num-seqs=64
+            - --max-cudagraph-capture-size=64
             - --enable-prefix-caching
             # Qwen3.6 hybrid-MoE may ship custom modeling code; the model card's
             # DGX command sets trust-remote-code. NOTE: executes repo Python.
