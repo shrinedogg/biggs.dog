@@ -1,14 +1,9 @@
 # Namespace: renovate  (gateway-fronted, cnpg-renovate Postgres, GitHub via FQDN)
 ---
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: default-deny
-  namespace: renovate
-spec:
-  endpointSelector: {}
-  ingress: []
-  egress: []
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
 ---
 # DNS MUST carry the L7 dns rule so Cilium's DNS proxy observes lookups and can
 # populate the toFQDNs policy below. Without this, GitHub egress silently fails.

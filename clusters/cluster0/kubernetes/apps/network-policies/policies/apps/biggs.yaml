@@ -1,14 +1,9 @@
 # Namespace: biggs  (biggs.dog site, gateway-fronted; no Postgres cluster exists for it)
 ---
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: default-deny
-  namespace: biggs
-spec:
-  endpointSelector: {}
-  ingress: []
-  egress: []
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
