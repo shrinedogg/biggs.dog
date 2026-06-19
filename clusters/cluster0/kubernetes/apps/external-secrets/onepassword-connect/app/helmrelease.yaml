@@ -170,7 +170,7 @@ spec:
         readiness: true
 
       # priorityClassName to apply to the Connect API deployment resource.
-      priorityClassName: ''
+      priorityClassName: ""
 
       # Additional annotations to be added to the Connect API deployment resource.
       annotations: {}
@@ -185,7 +185,10 @@ spec:
       podLabels: {}
 
       # List of tolerations to be added to the Connect API pods.
-      tolerations: []
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
 
       # 1Password Connect volume shared between 1Password Connect Containers
       dataVolume:
@@ -343,10 +346,13 @@ spec:
       podLabels: {}
 
       # priorityClassName to apply to the Operator pods.
-      priorityClassName: ''
+      priorityClassName: ""
 
       # List of tolerations to be added to the Operator pods.
-      tolerations: []
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
 
       # A list of namespaces for the 1Password Operator to watch and manage. Use the empty list to watch all namespaces.
       watchNamespace: []
@@ -428,4 +434,4 @@ spec:
         enabled: true
         image:
           repository: curlimages/curl
-          tag: 'latest'
+          tag: "latest"

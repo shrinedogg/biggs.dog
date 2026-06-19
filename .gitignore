@@ -1,5 +1,6 @@
 .wip/
 .talos/
+.scripts/
 .sops*
 .zed/
 age.agekey
