@@ -6,15 +6,17 @@ agents. When a task matches one of the domains below, prefer invoking that
 kagent agent over answering from memory or using generic tools.
 
 All agents share a single in-cluster vLLM backend (currently
-`nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params and a 262K
-context window -- on `nv-01`'s RTX 5090); inference never leaves the cluster.
-It's fast (~140 tok/s single-stream, sub-second TTFT) with ample context, so
+`nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params, served at a
+131K context window (262K native, capped for KV concurrency headroom) -- on
+`nv-01`'s RTX 5090); inference never leaves the cluster. It's fast (~250 tok/s
+single-stream, ~65 ms TTFT; ~3,070 tok/s aggregate at 64-way) with ample
+context, so
 full multi-step agent tasks work fine -- including heavy ones like flux-agent
 (whose `flux-operator-mcp` tool schemas alone are ~64K tokens). No need to keep
 tasks minimal anymore; the `kagent-mcp` HTTPRoute allows 300s, so even long
 agentic loops complete. (Still prefer terse output over needless verbosity.)
 
-Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 256K
+Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 131K
 window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%
 under load), so the context-overflow that broke heavy agents on the previous
 27B/65K model is fully resolved.
