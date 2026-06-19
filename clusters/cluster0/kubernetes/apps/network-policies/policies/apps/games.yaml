@@ -44,6 +44,9 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

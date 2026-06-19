@@ -59,6 +59,37 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# agentgateway DATA PLANES: one Deployment per Gateway resource (e.g.
+# wildcard-biggs-dog) selected by the shared gateway-class label. They receive
+# external :443 and forward to in-cluster backends, and dial the agentgateway
+# control plane for xDS (:9978, covered by toEntities cluster). The control-plane
+# policy above only matches app.kubernetes.io/name=agentgateway, so without this
+# every Gateway data plane is default-denied and *.biggs.dog ingress breaks.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: agentgateway-dataplane
+  namespace: networking
+spec:
+  endpointSelector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-class-name: agentgateway
+  ingress:
+    - fromEntities:
+        - world
+        - cluster
+        - host
+        - remote-node
+  egress:
+    - toEntities:
+        - cluster
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # k8s-gateway: split-horizon DNS server; watches Gateway/HTTPRoute via API
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
