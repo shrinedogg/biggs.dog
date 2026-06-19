@@ -81,7 +81,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      app.kubernetes.io/name: renovate
+      app: renovate
   egress:
     - toFQDNs:
         - matchName: github.com
@@ -103,7 +103,7 @@ metadata:
 spec:
   endpointSelector:
     matchLabels:
-      app.kubernetes.io/name: renovate
+      app: renovate
   egress:
     - toEntities:
         - world
