@@ -128,6 +128,29 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
 ---
+# vLLM pulls model weights from Hugging Face on first load of a NEW model,
+# caching to the vllm-models PVC (already-cached models need no egress -- which
+# is why this only surfaced on a model swap). HF serves metadata from
+# huggingface.co but the weight bytes come from rotating Xet/LFS CDN hosts
+# (*.xethub.hf.co, CloudFront, etc.) with no stable FQDN set, so this is a broad
+# :443 egress scoped to the single vLLM pod.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-vllm-huggingface
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: vllm
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # kagent MCP server exposed via the kagent-mcp.biggs.dog HTTPRoute
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
