@@ -95,6 +95,26 @@ spec:
             k8s:io.kubernetes.pod.namespace: cnpg-system
             cnpg.io/cluster: cnpg-kagent
 ---
+# flux-agent drives the Flux Operator MCP server (flux-operator-mcp) which runs
+# in flux-system on :9090. flux-system has no policies (allow-all), so only this
+# egress allow is needed.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-flux-mcp
+  namespace: ai-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: flux-system
+            app.kubernetes.io/name: flux-operator-mcp
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+---
 # vm-mcp queries VictoriaMetrics in observability
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
