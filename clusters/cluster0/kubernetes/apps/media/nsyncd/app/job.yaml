@@ -21,6 +21,10 @@ spec:
           restartPolicy: OnFailure
           hostPID: true
           automountServiceAccountToken: false
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
           nodeSelector:
             kubernetes.io/hostname: control-01
           containers:
