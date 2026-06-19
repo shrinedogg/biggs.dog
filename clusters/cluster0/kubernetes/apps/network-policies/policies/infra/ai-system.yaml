@@ -151,6 +151,26 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# kagent agents need internet access for external APIs (Minimax, GitHub, etc.).
+# This allows outbound HTTPS to the world for all agent pods. DNS is already
+# allowed by allow-egress-dns.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-internet
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/managed-by: kagent
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # kagent MCP server exposed via the kagent-mcp.biggs.dog HTTPRoute
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
