@@ -61,10 +61,49 @@ spec:
         clientType: standalone
         standalone:
           connectionUrl: redis://dragonfly-db.dragonfly.svc.cluster.local:6379
-    # The redis wait init container is only needed for redis session storage.
+    # The chart's built-in waitForRedis init container only renders for the
+    # bundled redis subchart (it watches the redis master pod via the API), so
+    # it does nothing for our external Dragonfly. Keep it disabled.
     initContainers:
       waitForRedis:
         enabled: false
+    # Custom gate for external Dragonfly. This guards against a Cilium
+    # pod-startup race: a freshly-created endpoint's egress (incl. DNS) is
+    # briefly denied for the first ~15s. oauth2-proxy's go-redis client fires
+    # immediately, exhausts its 5 retries on DNS i/o timeout, and exits (code 2)
+    # before the window clears -> CrashLoopBackOff. This retry loop blocks until
+    # dragonfly-db:6379 resolves + accepts a TCP connection, so the main
+    # container boots into a working network and connects to Redis first try.
+    extraInitContainers:
+      - name: wait-for-dragonfly
+        image: busybox:1.36
+        command:
+          - sh
+          - -c
+          - |
+            echo "waiting for dragonfly-db.dragonfly.svc.cluster.local:6379 ..."
+            until nc -z -w2 dragonfly-db.dragonfly.svc.cluster.local 6379; do
+              echo "  not reachable yet (DNS/egress warming up), retrying in 2s"
+              sleep 2
+            done
+            echo "dragonfly reachable; starting oauth2-proxy"
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          capabilities:
+            drop:
+              - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi
+          limits:
+            memory: 32Mi
     podDisruptionBudget:
       enabled: false
     resources:
