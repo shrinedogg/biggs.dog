@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - renovate-config-pvc.yaml
+  - renovate-deployment.yaml
+  - renovate-github-key.yaml
+  - renovate-github-secret.yaml
+  - renovate-github-token.yaml
+  - renovate-route.yaml
+  - renovate-service.yaml

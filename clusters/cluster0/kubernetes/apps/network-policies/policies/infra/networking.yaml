@@ -1,0 +1,103 @@
+# Namespace: networking  (agentgateway data-plane + controller, k8s-gateway DNS)
+# This is the cluster ingress edge; rules are intentionally broad so external
+# entry and backend routing are never severed. cloudflared has been removed.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: networking
+spec:
+  endpointSelector: {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: networking
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+# agentgateway: accept external/LB traffic and route to any in-cluster backend
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: agentgateway
+  namespace: networking
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: agentgateway
+  ingress:
+    - fromEntities:
+        - world
+        - cluster
+        - host
+        - remote-node
+  egress:
+    - toEntities:
+        - cluster
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# k8s-gateway: split-horizon DNS server; watches Gateway/HTTPRoute via API
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: k8s-gateway
+  namespace: networking
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: k8s-gateway
+  ingress:
+    - fromEntities:
+        - world
+        - cluster
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+  egress:
+    - toEntities:
+        - kube-apiserver
+        - cluster
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: networking
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability

@@ -1,0 +1,121 @@
+# Namespace: jitsi  (web, prosody, jicofo, jvb, coturn)
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+---
+# Internal signaling mesh (web <-> prosody <-> jicofo <-> jvb)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: jitsi
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: jitsi
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+---
+# JVB receives RTP media from clients on UDP 10000
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: jvb-media-ingress
+  namespace: jitsi
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: jvb
+  ingress:
+    - fromEntities:
+        - world
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "10000"
+              protocol: UDP
+---
+# coturn: STUN/TURN to the internet + relay to the JVB LoadBalancer
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: coturn-media-egress
+  namespace: jitsi
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: coturn
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "3478"
+              protocol: UDP
+            - port: "3478"
+              protocol: TCP
+            - port: "5349"
+              protocol: TCP
+            - port: "50000"
+              endPort: 54999
+              protocol: UDP
+    - toCIDR:
+        - 192.168.2.9/32
+      toPorts:
+        - ports:
+            - port: "10000"
+              protocol: UDP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: jitsi
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability

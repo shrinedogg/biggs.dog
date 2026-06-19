@@ -1,0 +1,105 @@
+# Namespace: renovate  (gateway-fronted, cnpg-renovate Postgres, GitHub via FQDN)
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: default-deny
+  namespace: renovate
+spec:
+  endpointSelector: {}
+---
+# DNS MUST carry the L7 dns rule so Cilium's DNS proxy observes lookups and can
+# populate the toFQDNs policy below. Without this, GitHub egress silently fails.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-kube-apiserver
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-postgres
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-renovate
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-github
+  namespace: renovate
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: renovate
+  egress:
+    - toFQDNs:
+        - matchName: github.com
+        - matchName: api.github.com
+        - matchPattern: "*.githubusercontent.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: renovate
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
