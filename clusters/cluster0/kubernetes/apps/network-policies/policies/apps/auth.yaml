@@ -40,6 +40,10 @@ spec:
 # LB (192.168.2.7) and stays in-cluster; without it, it resolves to Cloudflare
 # and hairpins. toFQDNs allows whichever IP DNS returns, so it works either way,
 # but it requires the L7 DNS rule on allow-egress-dns above to learn the IPs.
+#
+# Also allow egress to the internal Pocket ID service on port 1411 so that
+# oauth2-proxy can do OIDC discovery directly in-cluster without hitting
+# the external gateway IP (which is unreachable from the pod network).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -55,6 +59,14 @@ spec:
       toPorts:
         - ports:
             - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+            app: pocket-id
+      toPorts:
+        - ports:
+            - port: "1411"
               protocol: TCP
 ---
 apiVersion: cilium.io/v2
