@@ -122,6 +122,20 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
+  name: allow-ingress-to-pocket-id
+  namespace: auth
+spec:
+  endpointSelector:
+    matchLabels:
+      app: pocket-id
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: oauth2-proxy
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
   name: allow-ingress-from-gateway
   namespace: auth
 spec:
