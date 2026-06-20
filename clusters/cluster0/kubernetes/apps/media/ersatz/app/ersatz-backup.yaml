@@ -28,8 +28,6 @@ spec:
       remoteRef:
         key: biggs-dogg-restic-pass
         property: password
-    - secretKey: AWS_ENDPOINT_URL
-      staticValue: https://s3.eu-central-003.backblazeb2.com
 ---
 apiVersion: volsync.backube/v1alpha1
 kind: ReplicationSource
@@ -41,6 +39,9 @@ spec:
   trigger:
     schedule: "0 8 * * *" # Every day at 8am
   restic:
+    extraEnv:
+      - name: AWS_ENDPOINT_URL
+        value: "https://s3.eu-central-003.backblazeb2.com"
     pruneIntervalDays: 60 # Retain backups for 60 days
     repository: b2-backup-ersatz
     retain:
