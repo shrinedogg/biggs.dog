@@ -141,9 +141,17 @@ spec:
 ---
 # volsync (restic mover Jobs) backs up to Backblaze B2 (b2:biggs-dog).
 # Allow the mover pods outbound HTTPS to the B2 API/data endpoints.
-# Restic uses the EU region endpoint (s3.eu-central-003.backblazeb2.com)
-# as well as bucket-specific hostnames (*.backblazeb2.com). toFQDNs relies
-# on the L7 DNS rule on allow-egress-dns above.
+#
+# IMPORTANT: the native restic b2: backend spreads operations across TWO
+# domains. Auth, listing and downloads hit *.backblazeb2.com
+# (api/apiNNN/fNNN.backblazeb2.com), but b2_get_upload_url returns UPLOAD
+# hosts on *.backblaze.com (e.g. pod-xxxx.backblaze.com). Without the
+# *.backblaze.com allow, reads succeed but every WRITE -- including the repo
+# LOCK created during restic's "check for dir initialized" -- is silently
+# dropped by default-deny egress and hangs, so the mover never gets past the
+# repository existence check. The S3 endpoint (s3.eu-central-003.backblazeb2.com)
+# is also allowed in case the repo is switched to the s3: backend.
+# toFQDNs relies on the L7 DNS rule on allow-egress-dns above.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -158,6 +166,9 @@ spec:
         - matchName: s3.eu-central-003.backblazeb2.com
         - matchName: backblazeb2.com
         - matchPattern: "*.backblazeb2.com"
+        # B2 native-API upload pods live on *.backblaze.com (NOT backblazeb2.com).
+        - matchName: backblaze.com
+        - matchPattern: "*.backblaze.com"
       toPorts:
         - ports:
             - port: "443"
