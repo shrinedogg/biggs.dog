@@ -76,7 +76,7 @@ spec:
     # container boots into a working network and connects to Redis first try.
     extraInitContainers:
       - name: wait-for-dragonfly
-        image: busybox:1.36
+        image: busybox:1.38
         command:
           - sh
           - -c
