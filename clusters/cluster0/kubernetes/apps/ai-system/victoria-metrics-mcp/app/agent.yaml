@@ -46,20 +46,26 @@ spec:
       # prompt-injectable LLM. The agent needs network + API access, not host
       # kernel access.
       #
-      # NOTE: runAsNonRoot is intentionally NOT set. The kagent app image
-      # declares its user by name ("python") rather than a numeric UID, so
-      # `runAsNonRoot: true` makes the kubelet fail with "image has non-numeric
-      # user (python), cannot verify user is non-root". The image already runs
-      # as that non-root python user; to get the kubelet-enforced guarantee back,
-      # set an explicit numeric runAsUser matching the image's python UID.
-      # readOnlyRootFilesystem is also intentionally NOT set: the python ADK
-      # runtime + executeCodeBlocks sandbox write to the container filesystem.
+      # runAsUser 1001 is the kagent-adk image's built-in non-root "python" user
+      # (Dockerfile: adduser -u 1001 -G pythongroup, home /.kagent). Setting the
+      # explicit numeric UID both satisfies the kubelet's runAsNonRoot check
+      # (which fails on the image's name-based USER with "image has non-numeric
+      # user (python)") and keeps /.kagent ownership correct. fsGroup 1001
+      # matches pythongroup for any mounted volumes.
+      # readOnlyRootFilesystem is intentionally NOT set: the python ADK runtime
+      # + executeCodeBlocks sandbox write to the container filesystem.
       podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
       securityContext:
         privileged: false
         allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
         capabilities:
           drop:
             - ALL
