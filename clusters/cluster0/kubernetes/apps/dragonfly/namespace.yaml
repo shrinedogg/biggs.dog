@@ -4,4 +4,3 @@ metadata:
   name: dragonfly
   labels:
     app.kubernetes.io/name: dragonfly
-    security.biggs.dog/isolated: "true"
