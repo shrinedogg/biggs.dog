@@ -1,0 +1,36 @@
+---
+# Scrape Hubble's Prometheus /metrics endpoint into Victoria Metrics.
+# Hubble was enabled in helmrelease.yaml (hubble.metrics.enabled), which stands
+# up the headless `hubble-metrics` Service on :9965. The VM Operator's vmagent
+# runs selectAllByDefault=true, so this VMServiceScrape is auto-discovered with
+# no vmagent config change -- mirroring the vllm/nv-gpu-operator pattern.
+#
+# Without this, the metrics Hubble exports are produced but never collected, so
+# the (already-enabled) Cilium/Hubble Grafana dashboards stay empty and
+# vm-agent can't query the flow data.
+#
+# Metrics exported (per hubble.metrics.enabled): hubble_flows_processed_total,
+# hubble_drop_total, hubble_tcp_flags_total, hubble_dns_queries_total /
+# hubble_dns_responses_total, hubble_port_distribution_total, hubble_icmp_total,
+# and hubble_http_* . NOTE: with the current (context-free) metrics config these
+# carry coarse labels (protocol/verdict/type), good for an aggregate service
+# map but not for exact per-port peers -- for precise least-privilege policy
+# authoring use `hubble observe` / the Hubble UI flow logs.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: hubble-metrics
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: hubble
+spec:
+  selector:
+    matchLabels:
+      k8s-app: hubble
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  endpoints:
+    - port: hubble-metrics
+      path: /metrics
+      interval: 30s

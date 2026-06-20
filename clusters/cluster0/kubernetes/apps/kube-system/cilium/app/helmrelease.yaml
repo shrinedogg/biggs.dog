@@ -70,11 +70,17 @@ spec:
     hubble:
       enabled: true
       metrics:
+        # Namespace source/destination context is added to flow/drop/tcp so the
+        # metrics carry source_namespace / destination_namespace labels -- enough
+        # to render an aggregate "which namespace talks to which" service map
+        # (and see *where* drops happen) from VictoriaMetrics via vm-agent.
+        # Kept at namespace (not pod) granularity to bound cardinality. For
+        # exact per-port peers (precise policy authoring) use `hubble observe`.
         enabled:
           - dns:query
-          - drop
-          - tcp
-          - flow
+          - drop:sourceContext=namespace;destinationContext=namespace
+          - tcp:sourceContext=namespace;destinationContext=namespace
+          - flow:sourceContext=namespace;destinationContext=namespace
           - port-distribution
           - icmp
           - http
