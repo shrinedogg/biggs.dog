@@ -31,9 +31,13 @@ spec:
       configFile: |-
         provider = "oidc"
         provider_display_name = "Pocket ID"
-        # Use internal Pocket ID service — egress to the external Gateway IP
-        # (192.168.2.7) times out from the pod network.
-        oidc_issuer_url = "http://pocket-id.auth.svc.cluster.local:1411"
+        # The Gateway terminates TLS at id.biggs.dog and routes to pocket-id:1411.
+        # Pocket ID's APP_URL is set to https://id.biggs.dog, so that's the
+        # issuer it returns. Direct internal egress to pocket-id's ClusterIP works
+        # (Cilium policy allow-egress-oidc), but the issuer would then be
+        # http://pocket-id.auth.svc.cluster.local:1411 which doesn't match — so we
+        # go through the Gateway instead.
+        oidc_issuer_url = "https://id.biggs.dog"
         redirect_url = "https://auth.biggs.dog/oauth2/callback"
         # Auth-only forward-auth: return 202 to authenticated probes from the
         # gateway/other apps rather than proxying a real upstream.
