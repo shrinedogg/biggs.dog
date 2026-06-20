@@ -1,0 +1,131 @@
+# Namespace: kube-system  (Hubble relay + UI only)
+#
+# SCOPE / SAFETY: kube-system is otherwise allow-all (no namespace-wide policy).
+# These rules deliberately select ONLY the Hubble relay/ui pods, so Cilium's
+# per-endpoint default-deny applies to *just those two workloads* -- every other
+# kube-system pod (coredns, cilium-agent, device plugins, nfs, ...) is left
+# untouched. This contains the new observability components added with Hubble
+# without taking on a full kube-system lockdown (that needs flow data first).
+#
+# VALIDATE AFTER ROLLOUT: confirm the Hubble UI loads and `hubble observe`
+# (cilium hubble port-forward) still works. If either breaks, roll back with:
+#   flux suspend kustomization network-policies-infra
+# then delete these policies / git revert. The blast radius is Hubble tooling
+# only -- no production workload depends on relay/ui.
+#
+# Cilium specifics baked in below:
+#   * The Hubble *server* runs inside the host-network cilium-agent on :4244,
+#     and peer discovery goes through the hubble-peer ClusterIP (:443 -> 4244).
+#     Both terminate on host-network IPs, so relay egress is to the `host` /
+#     `remote-node` entities, not a pod endpointSelector.
+#   * hubble-ui and `cilium hubble port-forward` are reached via kubectl
+#     port-forward, which arrives from the `host` entity (apiserver/kubelet).
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: kube-system
+spec:
+  endpointSelector:
+    matchExpressions:
+      - key: k8s-app
+        operator: In
+        values:
+          - hubble-relay
+          - hubble-ui
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# hubble-relay: connects out to the per-node Hubble servers (host-network
+# cilium-agent :4244) and the hubble-peer ClusterIP (:443). Both resolve to
+# host-network backends, hence the host/remote-node entities.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-relay-to-hubble-servers
+  namespace: kube-system
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s-app: hubble-relay
+  egress:
+    - toEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "4244"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+---
+# hubble-relay ingress: the UI backend (gRPC :4245) and `cilium hubble
+# port-forward` (arrives from the host entity). The host rule also covers the
+# reverse-NAT reply path from the hubble-peer ClusterIP under bpf-lb.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-to-hubble-relay
+  namespace: kube-system
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s-app: hubble-relay
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: hubble-ui
+      toPorts:
+        - ports:
+            - port: "4245"
+              protocol: TCP
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "4245"
+              protocol: TCP
+---
+# hubble-ui: backend talks to hubble-relay (:4245); frontend (:8081) is reached
+# via kubectl port-forward (host entity).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-hubble-ui
+  namespace: kube-system
+spec:
+  endpointSelector:
+    matchLabels:
+      k8s-app: hubble-ui
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8081"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: hubble-relay
+      toPorts:
+        - ports:
+            - port: "4245"
+              protocol: TCP

@@ -118,7 +118,7 @@ The UDM router conditionally forwards `biggs.dog` to k8s-gateway for LAN clients
 The cluster runs a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
 
 - **`network-policies-apps`** (`policies/apps/`) — lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate).
-- **`network-policies-infra`** (`policies/infra/`) — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph). Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
+- **`network-policies-infra`** (`policies/infra/`) — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering only the Hubble relay/UI pods). Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
 
 Key conventions learned while hardening this (each is documented inline in the policy files):
 

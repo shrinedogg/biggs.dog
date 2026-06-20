@@ -151,6 +151,28 @@ spec:
           gnetId: 20842
           revision: 3
           datasource: VictoriaMetrics
+        # Official Cilium/Hubble dashboards (pinned to the running chart tag,
+        # v1.19.4). The namespace-scoped ones consume the source_namespace /
+        # destination_namespace labels added to the flow/drop/tcp Hubble metrics
+        # (see kube-system/cilium/app/helmrelease.yaml) and are fed by the
+        # hubble-metrics VMServiceScrape. These JSONs use the ${DS_PROMETHEUS}
+        # input, which the chart rewrites to the datasource named below.
+        hubble:
+          url: https://raw.githubusercontent.com/cilium/cilium/v1.19.4/install/kubernetes/cilium/files/hubble/dashboards/hubble-dashboard.json
+          datasource: VictoriaMetrics
+          folder: Cilium
+        hubble-network-overview-namespace:
+          url: https://raw.githubusercontent.com/cilium/cilium/v1.19.4/install/kubernetes/cilium/files/hubble/dashboards/hubble-network-overview-namespace.json
+          datasource: VictoriaMetrics
+          folder: Cilium
+        hubble-dns-namespace:
+          url: https://raw.githubusercontent.com/cilium/cilium/v1.19.4/install/kubernetes/cilium/files/hubble/dashboards/hubble-dns-namespace.json
+          datasource: VictoriaMetrics
+          folder: Cilium
+        hubble-l7-http-metrics-by-workload:
+          url: https://raw.githubusercontent.com/cilium/cilium/v1.19.4/install/kubernetes/cilium/files/hubble/dashboards/hubble-l7-http-metrics-by-workload.json
+          datasource: VictoriaMetrics
+          folder: Cilium
         flux-cluster:
           url: https://raw.githubusercontent.com/fluxcd/flux2-monitoring-example/main/monitoring/configs/dashboards/cluster.json
           datasource: VictoriaMetrics
