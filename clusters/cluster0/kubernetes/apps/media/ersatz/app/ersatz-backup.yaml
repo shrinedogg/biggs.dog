@@ -2,44 +2,45 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-    name: b2-backup-ersatz
-    namespace: media
+  name: b2-backup-ersatz
+  namespace: media
 spec:
-    secretStoreRef:
-        kind: ClusterSecretStore
-        name: onepassword-connect
-    target:
-        name: b2-backup-ersatz
-        creationPolicy: Owner
-    data:
-        - secretKey: B2_ACCOUNT_ID
-          remoteRef:
-            key: b2-backup-ersatz
-            property: keyID
-        - secretKey: B2_ACCOUNT_KEY
-          remoteRef:
-            key: b2-backup-ersatz
-            property: applicationKey
-        - secretKey: RESTIC_REPOSITORY
-          remoteRef:
-            key: b2-backup-ersatz
-            property: repository
-        - secretKey: RESTIC_PASSWORD
-          remoteRef:
-            key: biggs-dogg-restic-pass
-            property: password
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: b2-backup-ersatz
+    creationPolicy: Owner
+  data:
+    - secretKey: B2_ACCOUNT_ID
+      remoteRef:
+        key: b2-backup-ersatz
+        property: keyID
+    - secretKey: B2_ACCOUNT_KEY
+      remoteRef:
+        key: b2-backup-ersatz
+        property: applicationKey
+    - secretKey: RESTIC_REPOSITORY
+      remoteRef:
+        key: b2-backup-ersatz
+        property: repository
+    - secretKey: RESTIC_PASSWORD
+      remoteRef:
+        key: biggs-dogg-restic-pass
+        property: password
 ---
 apiVersion: volsync.backube/v1alpha1
 kind: ReplicationSource
 metadata:
-   name: ersatz-backup-source
-   namespace: media
+  name: ersatz-backup-source
+  namespace: media
 spec:
-   sourcePVC: ersatz-config-pvc
-   trigger:
-      schedule: "0 8 * * *"  # Every day at 8am
-   restic:
-    pruneIntervalDays: 60  # Retain backups for 60 days
+  sourcePVC: ersatz-config-pvc
+  trigger:
+    schedule: "0 8 * * *" # Every day at 8am
+  restic:
+    endpoint: s3.backblaze.com
+    pruneIntervalDays: 60 # Retain backups for 60 days
     repository: b2-backup-ersatz
     retain:
       daily: 1
