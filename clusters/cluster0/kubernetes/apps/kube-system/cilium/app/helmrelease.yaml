@@ -68,31 +68,33 @@ spec:
     gatewayAPI:
       enabled: false
     hubble:
-      enabled: false
-      # metrics:
-      #   enabled:
-      #     - dns:query
-      #     - drop
-      #     - tcp
-      #     - flow
-      #     - port-distribution
-      #     - icmp
-      #     - http
-      #   serviceMonitor:
-      #     enabled: true
-      #   dashboards:
-      #     enabled: true
-      # relay:
-      #   enabled: true
-      #   rollOutPods: true
-      #   prometheus:
-      #     serviceMonitor:
-      #       enabled: true
-      # ui:
-      #   enabled: true
-      #   rollOutPods: true
-      #   ingress:
-      #     enabled: false
+      enabled: true
+      metrics:
+        enabled:
+          - dns:query
+          - drop
+          - tcp
+          - flow
+          - port-distribution
+          - icmp
+          - http
+        # serviceMonitor left disabled to match the rest of this release --
+        # scraping is via vmagent, not Prometheus-operator ServiceMonitors.
+        # serviceMonitor:
+        #   enabled: true
+        dashboards:
+          enabled: true
+      relay:
+        enabled: true
+        rollOutPods: true
+        # prometheus:
+        #   serviceMonitor:
+        #     enabled: true
+      ui:
+        enabled: true
+        rollOutPods: true
+        ingress:
+          enabled: false
     ipam:
       mode: kubernetes
     ipv4NativeRoutingCIDR: 10.244.0.0/16
