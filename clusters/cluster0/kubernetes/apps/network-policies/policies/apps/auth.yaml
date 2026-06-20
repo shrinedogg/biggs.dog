@@ -35,11 +35,9 @@ spec:
               - matchPattern: "*"
 ---
 # oauth2-proxy performs OIDC discovery / token / JWKS / userinfo against the
-# public issuer https://id.biggs.dog. With CoreDNS conditional-forwarding
-# biggs.dog -> k8s-gateway (192.168.2.6), this resolves to the internal gateway
-# LB (192.168.2.7) and stays in-cluster; without it, it resolves to Cloudflare
-# and hairpins. toFQDNs allows whichever IP DNS returns, so it works either way,
-# but it requires the L7 DNS rule on allow-egress-dns above to learn the IPs.
+# public issuer https://id.biggs.dog. CoreDNS resolves this to the gateway
+# LoadBalancer IP (192.168.2.7) which is unreachable from pods, so we also
+# allow egress directly to the gateway dataplane pods via their Cilium labels.
 #
 # Also allow egress to the internal Pocket ID service on port 1411 so that
 # oauth2-proxy can do OIDC discovery directly in-cluster without hitting
@@ -56,6 +54,14 @@ spec:
   egress:
     - toFQDNs:
         - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
       toPorts:
         - ports:
             - port: "443"
