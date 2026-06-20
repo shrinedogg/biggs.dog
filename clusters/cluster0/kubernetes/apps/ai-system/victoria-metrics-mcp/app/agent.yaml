@@ -40,6 +40,24 @@ spec:
         limits:
           cpu: 1000m
           memory: 256Mi
+      # Harden the agent-runner pod. kagent otherwise schedules agent pods
+      # privileged (verified live: vm-agent ran privileged: true), which —
+      # combined with the agents' tool access — is a large blast radius for a
+      # prompt-injectable LLM. The agent needs network + API access, not host
+      # kernel access. readOnlyRootFilesystem is intentionally NOT set: the
+      # python ADK runtime + executeCodeBlocks sandbox write to the container
+      # filesystem at runtime.
+      podSecurityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        capabilities:
+          drop:
+            - ALL
     promptTemplate:
       dataSources:
         - alias: builtin
