@@ -30,14 +30,9 @@ spec:
       configFile: |-
         provider = "oidc"
         provider_display_name = "Pocket ID"
-        # Use internal Pocket ID service to avoid egress to unreachable external
-        # Gateway IP (192.168.2.7).  All downstream endpoints in the OIDC config
-        # (issuer, JWKS, token, userinfo) still advertise id.biggs.dog because
-        # browsers hit the external Gateway — oauth2-proxy only needs the issuer
-        # for discovery and key fetching (JWKS is also at id.biggs.dog, but we
-        # override that separately).
+        # Use internal Pocket ID service — egress to the external Gateway IP
+        # (192.168.2.7) times out from the pod network.
         oidc_issuer_url = "http://pocket-id.auth.svc.cluster.local:1411"
-        oidc_discovery_provider = "http://pocket-id.auth.svc.cluster.local:1411/.well-known/openid-configuration"
         redirect_url = "https://auth.biggs.dog/oauth2/callback"
         # Auth-only forward-auth: return 202 to authenticated probes from the
         # gateway/other apps rather than proxying a real upstream.
