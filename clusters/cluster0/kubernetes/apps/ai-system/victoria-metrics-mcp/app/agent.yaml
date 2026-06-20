@@ -44,17 +44,22 @@ spec:
       # privileged (verified live: vm-agent ran privileged: true), which —
       # combined with the agents' tool access — is a large blast radius for a
       # prompt-injectable LLM. The agent needs network + API access, not host
-      # kernel access. readOnlyRootFilesystem is intentionally NOT set: the
-      # python ADK runtime + executeCodeBlocks sandbox write to the container
-      # filesystem at runtime.
+      # kernel access.
+      #
+      # NOTE: runAsNonRoot is intentionally NOT set. The kagent app image
+      # declares its user by name ("python") rather than a numeric UID, so
+      # `runAsNonRoot: true` makes the kubelet fail with "image has non-numeric
+      # user (python), cannot verify user is non-root". The image already runs
+      # as that non-root python user; to get the kubelet-enforced guarantee back,
+      # set an explicit numeric runAsUser matching the image's python UID.
+      # readOnlyRootFilesystem is also intentionally NOT set: the python ADK
+      # runtime + executeCodeBlocks sandbox write to the container filesystem.
       podSecurityContext:
-        runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
       securityContext:
         privileged: false
         allowPrivilegeEscalation: false
-        runAsNonRoot: true
         capabilities:
           drop:
             - ALL
