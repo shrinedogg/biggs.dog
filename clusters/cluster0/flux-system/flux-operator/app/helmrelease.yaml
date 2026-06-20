@@ -5,14 +5,10 @@ metadata:
   namespace: flux-system
 spec:
   interval: 10m
-  chart:
-    spec:
-      chart: flux-operator
-      version: 0.52.0
-      sourceRef:
-        kind: OCIRepository
-        name: flux-operator
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator
+    namespace: flux-system
   install:
     remediation:
       retries: 3
