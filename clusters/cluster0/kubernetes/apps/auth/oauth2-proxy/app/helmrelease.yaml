@@ -22,7 +22,7 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-  extraArgs: []
+
   values:
     # client-id / client-secret / cookie-secret come from the oauth2-proxy
     # ExternalSecret (1Password item oauth2-proxy).
