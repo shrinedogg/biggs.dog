@@ -137,16 +137,32 @@ spec:
             # First boot downloads weights; allow up to ~30 min.
             periodSeconds: 15
             failureThreshold: 120
+            # /health can be briefly slow even once serving; default 1s is tight.
+            timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 10
+            # Same rationale as liveness below: with a SINGLE replica, flapping
+            # out of the Service endpoints on a slow-but-alive /health just fails
+            # all traffic, so give the check headroom instead of the default 1s.
+            timeoutSeconds: 5
           livenessProbe:
             httpGet:
               path: /health
               port: http
             periodSeconds: 30
+            # vLLM serves /health from the SAME async event loop that runs
+            # inference; under heavy concurrent load (e.g. agent fan-out) it can
+            # blow past the default 1s probe timeout. The default 1s timeout + 3
+            # failures was SIGTERM-killing the pod under load -- a clean exit 0
+            # "Completed" restart, i.e. a self-inflicted restart storm, NOT a
+            # real hang. Give it real headroom so liveness only fires on a
+            # genuine deadlock: 10s timeout x 6 failures = ~3 min of sustained
+            # unresponsiveness before a restart.
+            timeoutSeconds: 10
+            failureThreshold: 6
           volumeMounts:
             - name: models
               mountPath: /models
