@@ -23,8 +23,11 @@ spec:
   storage:
     storageClass: host-path
     size: 5Gi
-  plugins:
-  - name: barman-cloud.cloudnative-pg.io
-    isWALArchiver: true
+  postgresql:
     parameters:
-      barmanObjectName: barman-object-store
+      archive_mode: "off"
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: barman-object-store
