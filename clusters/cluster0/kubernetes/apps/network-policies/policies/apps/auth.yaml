@@ -62,6 +62,7 @@ spec:
               protocol: TCP
     - toEndpoints:
         - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
             app: pocket-id
       toPorts:
         - ports:
@@ -86,6 +87,7 @@ spec:
   egress:
     - toEndpoints:
         - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
             app: pocket-id
       toPorts:
         - ports:

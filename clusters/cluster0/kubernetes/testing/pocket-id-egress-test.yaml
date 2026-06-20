@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pocket-id-test
+  namespace: auth
+  labels:
+    app: pocket-id
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+  - name: tester
+    image: nicolaka/netshoot:latest
+    command: ["sh", "-c", "echo waiting && sleep 300"]
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop: ["ALL"]
+  restartPolicy: Never
