@@ -11,6 +11,9 @@ spec:
   target:
     name: b2-backup-ersatz
     creationPolicy: Owner
+    template:
+      data:
+        AWS_ENDPOINT_URL: "https://s3.eu-central-003.backblazeb2.com"
   data:
     - secretKey: B2_ACCOUNT_ID
       remoteRef:
@@ -39,9 +42,6 @@ spec:
   trigger:
     schedule: "0 8 * * *" # Every day at 8am
   restic:
-    extraEnv:
-      - name: AWS_ENDPOINT_URL
-        value: "https://s3.eu-central-003.backblazeb2.com"
     pruneIntervalDays: 60 # Retain backups for 60 days
     repository: b2-backup-ersatz
     retain:
