@@ -32,8 +32,5 @@ spec:
   postgresql:
     extensions:
       - name: pgvector
-  plugins:
-  - name: barman-cloud.cloudnative-pg.io
-    isWALArchiver: true
     parameters:
-      barmanObjectName: barman-object-store
+      archive_mode: "off"
