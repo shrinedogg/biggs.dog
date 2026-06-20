@@ -39,7 +39,7 @@ spec:
   trigger:
     schedule: "0 8 * * *" # Every day at 8am
   restic:
-    endpoint: s3.backblaze.com
+    endpoint: s3.eu-central-003.backblazeb2.com
     pruneIntervalDays: 60 # Retain backups for 60 days
     repository: b2-backup-ersatz
     retain:

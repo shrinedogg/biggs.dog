@@ -40,7 +40,7 @@ spec:
   trigger:
     schedule: "0 8 * * *"
   restic:
-    endpoint: s3.backblaze.com
+    endpoint: s3.eu-central-003.backblazeb2.com
     pruneIntervalDays: 60
     repository: b2-backup-bookboss
     retain:

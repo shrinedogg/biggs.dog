@@ -139,10 +139,11 @@ spec:
             - port: "20252"
               protocol: TCP
 ---
-# volsync (restic mover Jobs) backs up to Backblaze B2 (b2:biggs-dog). Allow the
-# mover pods outbound HTTPS to the B2 API/data endpoints. Restic uses the S3-
-# compatible endpoint (s3.backblaze.com) as well as bucket-specific hostnames
-# (*.backblazeb2.com). toFQDNs relies on the L7 DNS rule on allow-egress-dns above.
+# volsync (restic mover Jobs) backs up to Backblaze B2 (b2:biggs-dog).
+# Allow the mover pods outbound HTTPS to the B2 API/data endpoints.
+# Restic uses the EU region endpoint (s3.eu-central-003.backblazeb2.com)
+# as well as bucket-specific hostnames (*.backblazeb2.com). toFQDNs relies
+# on the L7 DNS rule on allow-egress-dns above.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -154,7 +155,7 @@ spec:
       app.kubernetes.io/created-by: volsync
   egress:
     - toFQDNs:
-        - matchName: s3.backblaze.com
+        - matchName: s3.eu-central-003.backblazeb2.com
         - matchName: backblazeb2.com
         - matchPattern: "*.backblazeb2.com"
       toPorts:
