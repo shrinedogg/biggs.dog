@@ -142,6 +142,9 @@ spec:
             - port: "6379"
               protocol: TCP
 ---
+# Allow ingress to pocket-id from oauth2-proxy and from pocket-id itself
+# (required for self-loop via ClusterIP — when pocket-id reaches its own
+# ClusterIP, Cilium routes through the service LB which checks ingress rules).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -155,6 +158,8 @@ spec:
     - fromEndpoints:
         - matchLabels:
             app.kubernetes.io/name: oauth2-proxy
+        - matchLabels:
+            app: pocket-id
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
