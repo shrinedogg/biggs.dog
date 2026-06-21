@@ -7,7 +7,7 @@ metadata:
 spec:
   dependsOn:
     # kagent provides the RemoteMCPServer CRD and the default-model-config
-    # the flux-agent (not defined here; exists in-cluster) consumes.
+    # the flux-agent Agent CR (app/agent.yaml) consumes.
     - name: kagent
   # No targetNamespace: each manifest sets its own namespace. This app
   # spans namespaces by design — the MCP server Deployment/Service live in

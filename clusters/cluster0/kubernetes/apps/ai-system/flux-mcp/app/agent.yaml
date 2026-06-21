@@ -1,0 +1,152 @@
+---
+# Custom kagent Agent that consumes the Flux MCP tools. Not chart-managed, so
+# it is owned by this Flux Kustomization (unlike the built-in agents which are
+# toggled in the kagent HelmRelease).
+#
+# Wired to the read-only Flux tool set. Enabling writes requires changes in
+# two places: `readonly: false` in the flux-operator-mcp HelmRelease values
+# (helmrelease.yaml) plus the write tool names added below, e.g.:
+#   - reconcile_flux_source
+#   - reconcile_flux_kustomization
+#   - reconcile_flux_helmrelease
+#   - reconcile_flux_resourceset
+#   - suspend_flux_reconciliation
+#   - resume_flux_reconciliation
+#   - apply_kubernetes_manifest
+#   - delete_kubernetes_resource
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: flux-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    A Flux CD / GitOps expert that inspects and diagnoses Flux Operator and
+    Flux resources (FluxInstance, Kustomizations, HelmReleases, sources) and
+    correlates them with cluster state. Read-only.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  # network.allowedDomains is empty = outbound network denied (safest for
+  # a read-only diagnostic agent whose code only needs tool call results).
+  sandbox:
+    network: {}
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    # Allow the agent to write and execute Python code blocks in the
+    # agent-sandbox. Useful for post-processing tool results, computing
+    # statistics, and generating structured reports from Flux data.
+    executeCodeBlocks: true
+    deployment:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 1000m
+          memory: 256Mi
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: flux-state-inspection
+          name: Flux State Inspection
+          description: >-
+            Inspect the Flux installation and the status of Flux resources
+            (FluxInstance, GitRepository/OCIRepository/HelmRepository sources,
+            Kustomizations, HelmReleases, ResourceSets) across the cluster.
+          tags:
+            - flux
+            - gitops
+            - status
+            - reconciliation
+          examples:
+            - What version of Flux is running and are all controllers healthy?
+            - Which Kustomizations are failing to reconcile and why?
+            - Show me the status of all HelmReleases in the ai-system namespace.
+        - id: gitops-troubleshooting
+          name: GitOps Troubleshooting
+          description: >-
+            Diagnose failed deployments end-to-end by correlating Flux resource
+            conditions with Kubernetes resources, pod logs, and metrics.
+          tags:
+            - flux
+            - troubleshooting
+            - root-cause
+            - logs
+          examples:
+            - The kagent HelmRelease is not ready, can you find the root cause?
+            - Why is the cluster0 GitRepository source in a failed state?
+            - Trace why my app pods are not updating after a git push.
+        - id: flux-docs
+          name: Flux Documentation Search
+          description: Answer Flux configuration questions using the official Flux documentation.
+          tags:
+            - flux
+            - documentation
+            - reference
+          examples:
+            - How do I configure dependsOn between two Kustomizations?
+            - What are the valid fields for a HelmRelease postRenderers section?
+    systemMessage: |
+      # Flux CD Agent System Prompt
+
+      You are FluxAssist, an expert in Flux CD and the ControlPlane Flux
+      Operator. You help users inspect, understand, and troubleshoot GitOps
+      delivery on this cluster. You operate in read-only mode: you can observe
+      and diagnose, but you cannot mutate the cluster.
+
+      ## Core Principles
+
+      - Desired state lives in Git and is reconciled by Flux. Changes must be
+        made via Git, not by mutating live state.
+      - Diagnose from the top down: FluxInstance and controllers -> sources
+        (GitRepository/OCIRepository/HelmRepository) -> Kustomizations and
+        HelmReleases -> the workloads they manage.
+      - Always ground conclusions in resource conditions, events, logs, and
+        metrics from your tools — never guess.
+
+      ## Available Tools
+
+      - `get_flux_instance`: Report on the Flux installation, controllers, CRDs,
+        and their status. Start here for "is Flux healthy" questions.
+      - `get_kubernetes_resources`: Retrieve any Kubernetes/Flux resource and its
+        status conditions. Use `get_kubernetes_api_versions` first if unsure of
+        the apiVersion/kind.
+      - `get_kubernetes_api_versions`: List CRDs and their preferred apiVersions.
+      - `get_kubernetes_logs`: Read pod logs for root-cause analysis.
+      - `get_kubernetes_metrics`: Read pod resource metrics.
+      - `search_flux_docs`: Look up Flux configuration and API documentation.
+
+      ## Tool Usage Best Practices
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      ## Safety Protocols
+
+      {{include "builtin/safety-guardrails"}}
+
+      ## Response Format
+
+      1. Briefly restate the question.
+      2. State which resources/logs you will inspect, then inspect them.
+      3. Analyze the conditions and explain the situation clearly.
+      4. For problems, identify the root cause and the exact Git change or
+         operational action needed to fix it (describe it; you cannot apply it).
+      5. Cite the Flux resources and namespaces.
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: flux-operator-mcp
+          toolNames:
+            - get_flux_instance
+            - get_kubernetes_resources
+            - get_kubernetes_api_versions
+            - get_kubernetes_logs
+            - get_kubernetes_metrics
+            - search_flux_docs
