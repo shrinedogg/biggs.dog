@@ -1,7 +1,8 @@
 ---
 # Patch Agent CRs created by HelmRelease to add missing generic k8s tools.
-# cilium-debug-agent and vm-agent only have domain-specific MCP tools
+# cilium-debug-agent and cilium-policy-agent only have domain-specific MCP tools
 # but lack k8s_get_resources/k8s_describe_resource needed for cluster inspection.
+# vm-agent is fixed via its static manifest (victoria-metrics-mcp/app/agent.yaml).
 # Interval set to 30s to stay ahead of the HelmRelease 3m reconciliation cycle.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -34,10 +35,10 @@ spec:
         - op: add
           path: /spec/declarative/tools/0/mcpServer/toolNames/-
           value: k8s_describe_resource
-    # vm-agent: append generic k8s tools so it can inspect MCP pods/services
+    # cilium-policy-agent: same treatment for policy debugging
     - target:
         kind: Agent
-        name: vm-agent
+        name: cilium-policy-agent
       patch: |-
         - op: add
           path: /spec/declarative/tools/0/mcpServer/toolNames/-
