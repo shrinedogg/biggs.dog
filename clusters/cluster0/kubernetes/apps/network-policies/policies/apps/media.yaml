@@ -106,8 +106,13 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
         - ports:
-            - port: "8443"
+            - port: "443"
               protocol: TCP
 ---
 apiVersion: cilium.io/v2
