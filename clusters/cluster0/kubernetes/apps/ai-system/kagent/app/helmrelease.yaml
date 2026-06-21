@@ -27,7 +27,7 @@ spec:
     argo-rollouts-agent:
       enabled: false
     helm-agent:
-      enabled: false
+      enabled: true
     promql-agent:
       enabled: true
     istio-agent:
