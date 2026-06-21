@@ -51,15 +51,15 @@ spec:
               value: "false"
             - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
               value: "false"
-            - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
-              value: |
-                ["matrix.org"]
-            - name: CONTINUWUITY_FORBIDDEN_REMOTE_ROOM_DIRECTORY_SERVER_NAMES
-              value: |
-                ["matrix.org"]
-            - name: CONTINUWUITY_URL_PREVIEW_DOMAIN_EXPLICIT_DENYLIST
-              value: |
-                ["matrix.org"]
+            # - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
+            #   value: |
+            #     ["matrix.org"]
+            # - name: CONTINUWUITY_FORBIDDEN_REMOTE_ROOM_DIRECTORY_SERVER_NAMES
+            #   value: |
+            #     ["matrix.org"]
+            # - name: CONTINUWUITY_URL_PREVIEW_DOMAIN_EXPLICIT_DENYLIST
+            #   value: |
+            #     ["matrix.org"]
             - name: CONTINUWUITY_SERVER_NAME
               value: "biggs.dog"
             - name: CONTINUWUITY_WELL_KNOWN__CLIENT
