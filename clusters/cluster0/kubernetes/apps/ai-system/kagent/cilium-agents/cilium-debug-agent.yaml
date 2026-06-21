@@ -49,16 +49,19 @@ spec:
           description: >-
             Diagnose and troubleshoot Cilium endpoint, policy, BPF map,
             connectivity, and performance issues using advanced debugging tools.
+          tags: []
         - id: cilium-troubleshooting
           name: Cilium Debugging and Troubleshooting
           description: >-
             Systematic debugging workflow for Cilium issues including endpoint
             health checks, log analysis, and policy validation.
+          tags: []
         - id: cilium-monitoring
           name: Cilium Advanced Monitoring and Diagnostics
           description: >-
             Monitor Cilium cluster health, BPF maps, encryption state, PCAP
             recordings, and cluster-wide diagnostics.
+          tags: []
     systemMessage: |
       # Cilium Debug Agent
 

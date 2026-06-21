@@ -50,16 +50,19 @@ spec:
           description: >-
             Generate CiliumNetworkPolicy YAML configurations from natural
             language descriptions of traffic requirements.
+          tags: []
         - id: create-cilium-clusterwide-network-policy
           name: Create CiliumClusterwideNetworkPolicy
           description: >-
             Generate CiliumClusterwideNetworkPolicy YAML configurations for
             cluster-wide traffic requirements.
+          tags: []
         - id: guide-cilium-policy-type
           name: Guide on Cilium Policy Type
           description: >-
             Help users choose between CiliumNetworkPolicy and
             CiliumClusterwideNetworkPolicy based on their use case.
+          tags: []
     systemMessage: |
       # Cilium Policy Agent
 
