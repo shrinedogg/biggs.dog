@@ -42,7 +42,11 @@ spec:
       lbModeAnnotation: true
       masquerade: true
       preallocateMaps: true
-      mapSizeFlows: 65536 # raised from 4096 -- Hubble flow table was at 100% causing latency
+      # Kernel-side BPF perf event ring (bpf-flow-map-size). Distinct from
+      # hubble.eventBufferCapacity (userspace flow ring shown in `hubble status`).
+      # Larger value gives the kernel more buffering headroom before userspace
+      # drains events.
+      mapSizeFlows: 65536
     bgpControlPlane:
       enabled: true
     cgroup:
@@ -70,10 +74,13 @@ spec:
       enabled: false
     hubble:
       enabled: true
-      maxFlows: 65536 # raised from 4096 -- Hubble flow table was at 100% causing latency
-      server:
-        extraArgs:
-          - --max-flows=65536 # raised from 4095 -- Helm chart v1.19.4 doesn't expose hubble.maxFlows, so pass via CLI
+      # Hubble userspace flow ring capacity (the "Max Flows" in `hubble status`).
+      # Chart v1.19.4 exposes this ONLY as hubble.eventBufferCapacity (a string,
+      # must be one of 2^n - 1: 1, 3, ... 4095, 8191, 16383, 32767, 65535).
+      # Defaults to 4095, which was causing 100% flow-table exhaustion.
+      # NOTE: bpf.mapSizeFlows / bpf-flow-map-size is a SEPARATE thing (the BPF
+      # perf event ring in the kernel) and does NOT affect this counter.
+      eventBufferCapacity: "65535"
       metrics:
         # Namespace source/destination context is added to flow/drop/tcp so the
         # metrics carry source_namespace / destination_namespace labels -- enough
