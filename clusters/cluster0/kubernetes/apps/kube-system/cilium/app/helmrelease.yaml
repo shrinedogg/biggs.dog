@@ -42,6 +42,7 @@ spec:
       lbModeAnnotation: true
       masquerade: true
       preallocateMaps: true
+      mapSizeFlows: 65536 # raised from 4096 -- Hubble flow table was at 100% causing latency
     bgpControlPlane:
       enabled: true
     cgroup:
