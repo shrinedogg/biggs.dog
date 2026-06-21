@@ -8,8 +8,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    - name: kagent          # Ensure kagent CRDs + controller are ready
-    - name: kagent-tool-server  # Ensure RemoteMCPServer exists
+    - name: kagent # CRDs + controller + RemoteMCPServer all come from this HelmRelease
   interval: 3m
   path: ./clusters/cluster0/kubernetes/apps/ai-system/kagent/cilium-agents
   prune: true
