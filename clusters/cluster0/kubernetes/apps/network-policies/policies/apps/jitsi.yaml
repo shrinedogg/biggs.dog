@@ -93,9 +93,11 @@ spec:
   endpointSelector:
     matchLabels:
       app.kubernetes.io/component: coturn
-  egress:
-    - toEntities:
-        - world
+  ingress:
+    # Prosody/jicofo connect to coturn for TURN allocation (in-cluster)
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: jitsi
       toPorts:
         - ports:
             - port: "3478"
@@ -104,9 +106,28 @@ spec:
               protocol: TCP
             - port: "5349"
               protocol: TCP
+    # External clients connect to coturn for STUN/TURN on 3478 + 5349 (TLS)
+    - fromEntities:
+        - world
+        - host
+      toPorts:
+        - ports:
+            - port: "3478"
+              protocol: UDP
+            - port: "3478"
+              protocol: TCP
+            - port: "5349"
+              protocol: TCP
+  egress:
+    # Relay traffic back to clients (response traffic)
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
             - port: "50000"
               endPort: 54999
               protocol: UDP
+    # Coturn → JVB for TURN relay on LAN
     - toCIDR:
         - 192.168.2.9/32
       toPorts:
