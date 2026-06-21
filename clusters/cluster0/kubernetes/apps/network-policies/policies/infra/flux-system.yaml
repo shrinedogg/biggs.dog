@@ -1,0 +1,155 @@
+# Namespace: flux-system  (flux-operator + source/kustomize/helm/notification controllers + flux-operator-mcp)
+#
+# Replaces the native NetworkPolicy shipped by the flux-operator chart
+# (flux-operator-web), which created an ingress default-deny scoped to TCP:9080
+# only and thereby dropped UDP DNS replies from kube-dns -> intermittent
+# name-resolution failures in flux-operator. The chart policy is disabled via
+# web.networkPolicy.create: false on the HelmRelease; CiliumNetworkPolicies
+# here carry the L7 DNS proxy rule that avoids the reply-drop entirely.
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+# DNS for all controllers (source-controller resolving git hosts, etc.).
+# The L7 DNS proxy injects replies directly into the pod, bypassing the
+# conntrack reply-drop that breaks Go resolvers behind default-deny ingress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# All Flux controllers drive the Kubernetes API (watch + reconcile).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-kube-apiserver
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+---
+# source-controller pulls Git/OCI/Helm sources; notification-controller posts
+# to webhook/alert sinks (Slack, Discord, etc.); flux-operator reports status
+# to GitHub/Azure. All HTTPS to the world.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-https
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Intra-namespace: controllers <-> flux-operator (status reporting, source
+# serving charts to helm-controller, etc.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: flux-system
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: flux-system
+---
+# kubelet health/readiness probes (flux-operator :8081, controllers :8081/:8080)
+# and the host-side API server return path arrive from the host entity.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+---
+# kagent (ai-system) -> flux-operator-mcp :9090 (the Flux MCP server drove the
+# original diagnosis of this cluster's latency issues).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-ai-system
+  namespace: flux-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: flux-operator-mcp
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+      toPorts:
+        - ports:
+            - port: "9090"
+              protocol: TCP
+---
+# flux-operator exposes the Flux Status web UI on :9080 and metrics on :8080;
+# the chart previously allowed any namespace in. Keep it reachable from inside
+# the cluster for operators/dashboards.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-to-web
+  namespace: flux-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: flux-operator
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.cilium.k8s.policy.cluster: main
+      toPorts:
+        - ports:
+            - port: "9080"
+              protocol: TCP
+            - port: "8080"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: flux-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
