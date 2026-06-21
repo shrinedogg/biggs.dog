@@ -29,7 +29,7 @@ spec:
     helm-agent:
       enabled: false
     promql-agent:
-      enabled: false
+      enabled: true
     istio-agent:
       enabled: false
     kgateway-agent:

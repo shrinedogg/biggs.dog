@@ -1,0 +1,24 @@
+# Expose cilium-agent port 9962 (Prometheus metrics) as a Service.
+# Port 9965 (`hubble-metrics`) only serves gRPC health metrics, NOT Prometheus data.
+# Port 9962 is the `prometheus` container port on cilium-agent pods and serves all
+# Hubble Prometheus metrics including flow/drop/tcp with source_namespace/destination_namespace labels.
+#
+# This is separate from the Helm-managed `hubble-metrics` Service so we can
+# target it directly from the VMServiceScrape without Helm value overrides.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hubble-prometheus
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: hubble-prometheus
+    k8s-app: cilium
+spec:
+  type: ClusterIP
+  selector:
+    k8s-app: cilium
+  ports:
+    - name: prometheus
+      port: 9962
+      targetPort: 9962
+      protocol: TCP

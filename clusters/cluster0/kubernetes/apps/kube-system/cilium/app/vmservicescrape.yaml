@@ -32,7 +32,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: hubble
+      app.kubernetes.io/name: hubble-prometheus
   namespaceSelector:
     matchNames:
       - kube-system
