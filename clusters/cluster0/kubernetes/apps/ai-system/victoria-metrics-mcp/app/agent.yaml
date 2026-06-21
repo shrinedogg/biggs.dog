@@ -188,3 +188,7 @@ spec:
             - documentation
             - prettify_query
             - explain_query
+            # Generic k8s tools for cluster inspection (VM agent may need to
+            # check k8s resources related to metrics targets, MCP servers, etc.)
+            - k8s_get_resources
+            - k8s_describe_resource

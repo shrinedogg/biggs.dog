@@ -18,6 +18,42 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
+  # Add generic k8s tools to cilium agents so they can inspect pods/deployments
+  # beyond cilium-specific CLI commands. Applied at Helm render time so the
+  # controller owns them natively (no race with external Kustomization patches).
+  patches:
+    # cilium-debug-agent: append generic k8s tools to the MCP tool list
+    - target:
+        kind: Agent
+        name: cilium-debug-agent
+      patch: |
+        apiVersion: kagent.dev/v1alpha2
+        kind: Agent
+        metadata:
+          name: cilium-debug-agent
+        spec:
+          declarative:
+            tools:
+              - mcpServer:
+                  toolNames:
+                    - k8s_get_resources
+                    - k8s_describe_resource
+    # cilium-policy-agent: same treatment for policy debugging
+    - target:
+        kind: Agent
+        name: cilium-policy-agent
+      patch: |
+        apiVersion: kagent.dev/v1alpha2
+        kind: Agent
+        metadata:
+          name: cilium-policy-agent
+        spec:
+          declarative:
+            tools:
+              - mcpServer:
+                  toolNames:
+                    - k8s_get_resources
+                    - k8s_describe_resource
   values:
     # ------------------------------------------------------------------
     # Built-in agents we don't use. Disabling here (rather than
