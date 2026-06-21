@@ -70,6 +70,7 @@ spec:
       enabled: false
     hubble:
       enabled: true
+      maxFlows: 65536 # raised from 4096 -- Hubble flow table was at 100% causing latency
       metrics:
         # Namespace source/destination context is added to flow/drop/tcp so the
         # metrics carry source_namespace / destination_namespace labels -- enough
