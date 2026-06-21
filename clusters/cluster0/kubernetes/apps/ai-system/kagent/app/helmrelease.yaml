@@ -26,47 +26,20 @@ spec:
     # ------------------------------------------------------------------
     argo-rollouts-agent:
       enabled: false
+    cilium-debug-agent:
+      enabled: false
+    cilium-policy-agent:
+      enabled: false
     helm-agent:
       enabled: true
     promql-agent:
       enabled: true
+    istio-agent:
+      enabled: false
+    kgateway-agent:
+      enabled: false
     observability-agent:
       enabled: true
-    # Cilium agents — explicitly enabled with full tool lists including generic
-    # k8s tools (k8s_get_resources, k8s_describe_resource) so they work without
-    # Kustomization patches (which race with Helm's 3m reconciliation).
-    cilium-debug-agent:
-      enabled: true
-      toolNames:
-        - cilium_manage_endpoint_config
-        - cilium_get_endpoint_health
-        - cilium_get_endpoint_logs
-        - cilium_list_identities
-        - cilium_get_identity_details
-        - cilium_request_debugging_information
-        - cilium_display_encryption_state
-        - cilium_flush_ipsec_state
-        - cilium_list_envoy_config
-        - cilium_fqdn_cache
-        - cilium_list_ip_addresses
-        - cilium_show_ip_cache_information
-        - cilium_list_bpf_map_events
-        - cilium_list_metrics
-        - cilium_list_cluster_nodes
-        - cilium_list_node_ids
-        - cilium_list_pcap_recorders
-        - cilium_get_pcap_recorder
-        - cilium_update_pcap_recorder
-        - cilium_delete_pcap_recorder
-        - k8s_get_resources
-        - k8s_describe_resource
-    cilium-policy-agent:
-      enabled: true
-      toolNames:
-        - cilium_display_policy_node_information
-        - cilium_validate_cilium_network_policies
-        - k8s_get_resources
-        - k8s_describe_resource
     # ------------------------------------------------------------------
     # Grafana MCP subchart. The chart defaults GRAFANA_URL to
     # `grafana.kagent:3000/api`, which is broken here on two counts: no

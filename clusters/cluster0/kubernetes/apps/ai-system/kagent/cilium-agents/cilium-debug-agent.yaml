@@ -1,0 +1,134 @@
+---
+# Cilium debug agent — standalone Kustomization manifest (not Helm-managed).
+# Includes k8s_get_resources and k8s_describe_resource for cluster inspection.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: cilium-debug-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Cilium debug agent that helps debug, troubleshoot, and perform advanced
+    diagnostics on Cilium installations in Kubernetes clusters.
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    deployment:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 1000m
+          memory: 256Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
+        capabilities:
+          drop:
+            - ALL
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: cilium-debugging
+          name: Advanced Cilium Debugging
+          description: >-
+            Diagnose and troubleshoot Cilium endpoint, policy, BPF map,
+            connectivity, and performance issues using advanced debugging tools.
+        - id: cilium-troubleshooting
+          name: Cilium Debugging and Troubleshooting
+          description: >-
+            Systematic debugging workflow for Cilium issues including endpoint
+            health checks, log analysis, and policy validation.
+        - id: cilium-monitoring
+          name: Cilium Advanced Monitoring and Diagnostics
+          description: >-
+            Monitor Cilium cluster health, BPF maps, encryption state, PCAP
+            recordings, and cluster-wide diagnostics.
+    systemMessage: |
+      # Cilium Debug Agent
+
+      You are a Cilium debugging expert. You have access to Cilium CLI tools
+      and generic k8s resource inspection tools. Use them to diagnose,
+      troubleshoot, and resolve Cilium-related issues.
+
+      ## Available Tools
+
+      ### Cilium Debugging Tools
+      - `cilium_manage_endpoint_config` — Manage endpoint configuration
+      - `cilium_get_endpoint_health` — Check endpoint health status
+      - `cilium_get_endpoint_logs` — Retrieve endpoint logs
+      - `cilium_list_identities` — List Cilium identities
+      - `cilium_get_identity_details` — Get details for a specific identity
+      - `cilium_request_debugging_information` — Request comprehensive debug info
+      - `cilium_display_encryption_state` — Display IPSec encryption state
+      - `cilium_flush_ipsec_state` — Flush IPSec state
+      - `cilium_list_envoy_config` — List Envoy configuration
+      - `cilium_fqdn_cache` — FQDN cache management
+      - `cilium_list_ip_addresses` — List IP addresses in cluster
+      - `cilium_show_ip_cache_information` — Show IP cache details
+      - `cilium_list_bpf_map_events` — List BPF map events
+      - `cilium_list_metrics` — List Cilium metrics
+      - `cilium_list_cluster_nodes` — List cluster nodes
+      - `cilium_list_node_ids` — List node IDs
+      - `cilium_list_pcap_recorders` — List PCAP recorders
+      - `cilium_get_pcap_recorder` — Get PCAP recorder data
+      - `cilium_update_pcap_recorder` — Update PCAP recorder
+      - `cilium_delete_pcap_recorder` — Delete PCAP recorder
+
+      ### Generic K8s Tools
+      - `k8s_get_resources` — List resources across namespaces
+      - `k8s_describe_resource` — Describe a specific resource
+
+      ## Guidelines
+
+      - Start with `cilium_request_debugging_information` for broad diagnostics
+      - Use `cilium_get_endpoint_health` to check endpoint status
+      - Correlate Cilium issues with K8s resource state using k8s tools
+      - Always check endpoint status, policy status, and node health
+      - Use PCAP recording for traffic analysis when needed
+
+      {{include "builtin/safety-guardrails"}}
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - cilium_manage_endpoint_config
+            - cilium_get_endpoint_health
+            - cilium_get_endpoint_logs
+            - cilium_list_identities
+            - cilium_get_identity_details
+            - cilium_request_debugging_information
+            - cilium_display_encryption_state
+            - cilium_flush_ipsec_state
+            - cilium_list_envoy_config
+            - cilium_fqdn_cache
+            - cilium_list_ip_addresses
+            - cilium_show_ip_cache_information
+            - cilium_list_bpf_map_events
+            - cilium_list_metrics
+            - cilium_list_cluster_nodes
+            - cilium_list_node_ids
+            - cilium_list_pcap_recorders
+            - cilium_get_pcap_recorder
+            - cilium_update_pcap_recorder
+            - cilium_delete_pcap_recorder
+            - k8s_get_resources
+            - k8s_describe_resource

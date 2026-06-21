@@ -1,0 +1,21 @@
+---
+# Cilium agents — standalone Agent manifests with full tool lists including
+# k8s tools. Not Helm-managed (Helm agents have fixed tool lists).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cilium-agents
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: kagent          # Ensure kagent CRDs + controller are ready
+    - name: kagent-tool-server  # Ensure RemoteMCPServer exists
+  interval: 3m
+  path: ./clusters/cluster0/kubernetes/apps/ai-system/kagent/cilium-agents
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  targetNamespace: ai-system
+  timeout: 5m
+  wait: false

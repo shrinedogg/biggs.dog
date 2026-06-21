@@ -13,8 +13,8 @@ spec:
   dependsOn:
     - name: kagent
   force: true
-  interval: 30s
-  retryInterval: 30s
+  interval: 5s
+  retryInterval: 5s
   targetNamespace: ai-system
   path: ./clusters/cluster0/kubernetes/apps/ai-system/kagent/patches
   prune: true

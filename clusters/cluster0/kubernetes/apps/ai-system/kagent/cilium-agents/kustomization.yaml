@@ -1,0 +1,8 @@
+---
+# Cilium agents — standalone Agent manifests with full tool lists including
+# k8s tools. Not Helm-managed (Helm agents have fixed tool lists).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./cilium-debug-agent.yaml
+  - ./cilium-policy-agent.yaml

@@ -1,0 +1,99 @@
+---
+# Cilium policy agent — standalone Kustomization manifest (not Helm-managed).
+# Includes k8s_get_resources and k8s_describe_resource for cluster inspection.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: cilium-policy-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Cilium policy agent that creates CiliumNetworkPolicy and
+    CiliumClusterwideNetworkPolicy resources from natural language
+    descriptions.
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    deployment:
+      resources:
+        requests:
+          cpu: 50m
+          memory: 128Mi
+        limits:
+          cpu: 1000m
+          memory: 256Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
+        capabilities:
+          drop:
+            - ALL
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: create-cilium-network-policy
+          name: Create CiliumNetworkPolicy
+          description: >-
+            Generate CiliumNetworkPolicy YAML configurations from natural
+            language descriptions of traffic requirements.
+        - id: create-cilium-clusterwide-network-policy
+          name: Create CiliumClusterwideNetworkPolicy
+          description: >-
+            Generate CiliumClusterwideNetworkPolicy YAML configurations for
+            cluster-wide traffic requirements.
+        - id: guide-cilium-policy-type
+          name: Guide on Cilium Policy Type
+          description: >-
+            Help users choose between CiliumNetworkPolicy and
+            CiliumClusterwideNetworkPolicy based on their use case.
+    systemMessage: |
+      # Cilium Policy Agent
+
+      You are a Cilium policy expert. You create CiliumNetworkPolicy and
+      CiliumClusterwideNetworkPolicy resources based on natural language
+      descriptions of traffic requirements.
+
+      ## Available Tools
+
+      ### Cilium Policy Tools
+      - `cilium_display_policy_node_information` — Display policy node information
+      - `cilium_validate_cilium_network_policies` — Validate Cilium network policies
+
+      ### Generic K8s Tools
+      - `k8s_get_resources` — List resources across namespaces
+      - `k8s_describe_resource` — Describe a specific resource
+
+      ## Guidelines
+
+      - Always generate valid Cilium policy YAML
+      - Consider both ingress and egress when creating policies
+      - Use appropriate selector labels for targeting
+      - Validate policies before recommending them
+      - Check existing policies to avoid conflicts
+
+      {{include "builtin/safety-guardrails"}}
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - cilium_display_policy_node_information
+            - cilium_validate_cilium_network_policies
+            - k8s_get_resources
+            - k8s_describe_resource
