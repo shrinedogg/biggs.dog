@@ -2,6 +2,7 @@
 # Patch Agent CRs created by HelmRelease to add missing generic k8s tools.
 # cilium-debug-agent and vm-agent only have domain-specific MCP tools
 # but lack k8s_get_resources/k8s_describe_resource needed for cluster inspection.
+# Interval set to 30s to stay ahead of the HelmRelease 3m reconciliation cycle.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -10,6 +11,9 @@ metadata:
 spec:
   dependsOn:
     - name: kagent
+  force: true
+  interval: 30s
+  retryInterval: 30s
   targetNamespace: ai-system
   path: ./clusters/cluster0/kubernetes/apps/ai-system/kagent/patches
   prune: true
@@ -17,8 +21,6 @@ spec:
     kind: GitRepository
     name: flux-system
   wait: false
-  interval: 3m
-  retryInterval: 1m
   timeout: 5m
   patches:
     # cilium-debug-agent: append generic k8s tools to cilium-specific tools
