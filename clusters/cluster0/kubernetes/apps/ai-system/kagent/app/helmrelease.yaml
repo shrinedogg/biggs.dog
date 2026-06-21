@@ -11,6 +11,90 @@ spec:
     kind: OCIRepository
     name: kagent
     namespace: flux-system
+  # Enable agent-sandbox code execution (executeCodeBlocks) on every
+  # chart-managed Agent. The chart's agent templates default to
+  # `runtime: python` but don't expose executeCodeBlocks/sandbox values, so we
+  # strategic-merge them onto the rendered Agent CRs here. Egress from each
+  # sandbox is locked to in-cluster services; the vm-agent and the two static
+  # cilium agents set the same fields directly in their own manifests.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Agent
+              name: k8s-agent
+            patch: |
+              apiVersion: kagent.dev/v1alpha2
+              kind: Agent
+              metadata:
+                name: k8s-agent
+              spec:
+                sandbox:
+                  network:
+                    allowedDomains:
+                      - "*.svc.cluster.local"
+                declarative:
+                  executeCodeBlocks: true
+          - target:
+              kind: Agent
+              name: observability-agent
+            patch: |
+              apiVersion: kagent.dev/v1alpha2
+              kind: Agent
+              metadata:
+                name: observability-agent
+              spec:
+                sandbox:
+                  network:
+                    allowedDomains:
+                      - "*.svc.cluster.local"
+                declarative:
+                  executeCodeBlocks: true
+          - target:
+              kind: Agent
+              name: promql-agent
+            patch: |
+              apiVersion: kagent.dev/v1alpha2
+              kind: Agent
+              metadata:
+                name: promql-agent
+              spec:
+                sandbox:
+                  network:
+                    allowedDomains:
+                      - "*.svc.cluster.local"
+                declarative:
+                  executeCodeBlocks: true
+          - target:
+              kind: Agent
+              name: helm-agent
+            patch: |
+              apiVersion: kagent.dev/v1alpha2
+              kind: Agent
+              metadata:
+                name: helm-agent
+              spec:
+                sandbox:
+                  network:
+                    allowedDomains:
+                      - "*.svc.cluster.local"
+                declarative:
+                  executeCodeBlocks: true
+          - target:
+              kind: Agent
+              name: cilium-manager-agent
+            patch: |
+              apiVersion: kagent.dev/v1alpha2
+              kind: Agent
+              metadata:
+                name: cilium-manager-agent
+              spec:
+                sandbox:
+                  network:
+                    allowedDomains:
+                      - "*.svc.cluster.local"
+                declarative:
+                  executeCodeBlocks: true
   install:
     remediation:
       retries: 3

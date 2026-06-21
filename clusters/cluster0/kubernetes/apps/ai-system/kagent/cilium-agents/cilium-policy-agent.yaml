@@ -12,9 +12,18 @@ spec:
     Cilium policy agent that creates CiliumNetworkPolicy and
     CiliumClusterwideNetworkPolicy resources from natural language
     descriptions.
+  # Sandboxed code execution (agent-sandbox). Egress limited to in-cluster
+  # services so prompt-injected code can't phone out to the internet.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
   declarative:
     modelConfig: default-model-config
     runtime: python
+    # Let the agent write/run Python (e.g. to validate/derive policy YAML,
+    # lint selectors, or reason over flow data) in the agent-sandbox.
+    executeCodeBlocks: true
     deployment:
       resources:
         requests:

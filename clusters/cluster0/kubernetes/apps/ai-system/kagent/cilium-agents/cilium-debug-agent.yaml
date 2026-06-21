@@ -11,9 +11,18 @@ spec:
   description: >-
     Cilium debug agent that helps debug, troubleshoot, and perform advanced
     diagnostics on Cilium installations in Kubernetes clusters.
+  # Sandboxed code execution (agent-sandbox). Egress limited to in-cluster
+  # services so prompt-injected code can't phone out to the internet.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
   declarative:
     modelConfig: default-model-config
     runtime: python
+    # Let the agent write/run Python (e.g. to parse cilium/Hubble output,
+    # correlate flows, or summarize diagnostics) in the agent-sandbox.
+    executeCodeBlocks: true
     deployment:
       resources:
         requests:
