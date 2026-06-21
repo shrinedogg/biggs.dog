@@ -21,22 +21,21 @@ window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%
 under load), so the context-overflow that broke heavy agents on the previous
 27B/65K model is fully resolved.
 
-Most agents are built-in and controlled by per-agent `*.enabled` toggles in the
-kagent `HelmRelease` (`clusters/cluster0/kubernetes/apps/ai-system/kagent/app/
-helmrelease.yaml`); Flux owns those `Agent` CRs, so disable them there rather
-than with `kubectl delete`. The exception is `flux-agent`, a custom (non-chart)
-Agent defined in the `flux-mcp` app
-(`clusters/cluster0/kubernetes/apps/ai-system/flux-mcp/`). Verify the live set
-with `kubectl get agents -n ai-system`. Keep the entries below in sync with it.
-
-## Minimax M3 Agent Patterns
-
-When using the Minimax M3 MCP server, follow these reasoning patterns to maximize its capabilities within the GitOps and Kagent framework:
-
-- **State Correlation (Perception $\\rightarrow$ Cognition):** Do not use M3 for simple lookups. Use it to correlate high-level reasoning with low-level data. For example, use `observability-agent` to gather metrics, then provide that data to M3 to identify patterns (e.g., "Correlate these Prometheus CPU spikes with the recent `CiliumNetworkPolicy` changes").
-- **Policy-First Architecture:** Use M3 as the "Architect" for security. Use it to reason through the required communication flows, then pass that logic to the `cilium-policy-agent` to generate the final `CiliumNetworkPolicy` manifests.
-- **GitOps-Centric Troubleshooting:** M3 should provide *proposals*, not *actions*. If M3 identifies a misconfiguration, the recommendation must always be a change to the desired state in Git (e.g., "Update the manifest at `clusters/cluster0/...`"), rather than a `kubectl` command.
-- **Sandbox Reasoning:** Since the agent is outbound-only (accessing `api.minimax.ai`), use it to analyze large volumes of logs or events retrieved by `k8s-agent` to synthesize hypotheses for complex failures.
+The live, invocable agent set (`kubectl get agents -n ai-system`) is the nine
+listed below. Most are chart-managed via per-agent `*.enabled` toggles in the
+kagent `HelmRelease`
+(`clusters/cluster0/kubernetes/apps/ai-system/kagent/app/helmrelease.yaml`);
+Flux owns those `Agent` CRs, so disable them there rather than with
+`kubectl delete`. A few are custom (non-chart) `Agent` manifests, deployed as
+their own Flux Kustomizations:
+- `flux-agent` -- `apps/ai-system/flux-mcp/` (read-only Flux inspection).
+- `vm-agent` -- `apps/ai-system/victoria-metrics-mcp/` (VictoriaMetrics MCP).
+- `cilium-debug-agent` and `cilium-policy-agent` --
+  `apps/ai-system/kagent/cilium-agents/` (the chart versions are disabled and
+  re-defined statically so they carry generic `k8s_*` tools alongside the
+  Cilium-specific ones).
+The chart's `argo-rollouts-agent`, `istio-agent`, and `kgateway-agent` are
+disabled and not deployed. Keep the entries below in sync with the live set.
 
 ## Agent selection
 
