@@ -83,6 +83,25 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
+  name: allow-egress-to-manticore
+  namespace: affine
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: manticore
+            app.kubernetes.io/name: manticoresearch
+      toPorts:
+        - ports:
+            - port: "9306"
+              protocol: TCP
+            - port: "9308"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
   name: allow-ingress-from-gateway
   namespace: affine
 spec:
