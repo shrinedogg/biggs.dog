@@ -56,6 +56,30 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
 ---
+# API server -> operator admission webhook (VMAgent, VMCluster, VMPodScrape, ...).
+# Without this, kube-apiserver SYN packets to the operator's :9443 webhook
+# server are dropped by the implicit default-deny (the other allow-* policies
+# only cover intra-namespace + gateway ingress). Each of the operator's 24
+# validating webhooks has failurePolicy=Ignore + timeoutSeconds=10, so a dropped
+# webhook call blocks the API request for 10s before giving up -- this was the
+# root cause of the control-plane / terminal latency on 192.168.2.29.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-webhook-from-apiserver
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: victoria-metrics-operator
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP
+---
 # Grafana exposed via HTTPRoute
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
