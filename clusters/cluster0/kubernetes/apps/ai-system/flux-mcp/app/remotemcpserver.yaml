@@ -1,0 +1,26 @@
+---
+# Registers the in-cluster flux-operator-mcp server as a kagent tool source.
+# The backing Deployment+Service are created in the flux-system namespace by
+# the HelmRelease above; the RemoteMCPServer itself lives in ai-system (where
+# kagent and the Agent CRs live). This matches the "flux-mcp spans namespaces"
+# pattern noted in victoria-metrics-mcp/ks.yaml.
+#
+# The URL (flux-operator-mcp.flux-system:9090) is the path explicitly allowed
+# by the ai-system CNP 'allow-egress-to-flux-mcp', which scopes egress to
+# flux-system pods labeled app.kubernetes.io/name=flux-operator-mcp on :9090.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: flux-operator-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Flux Operator MCP server — inspect FluxInstance, sources
+    (GitRepository/OCIRepository/HelmRepository), Kustomizations,
+    HelmReleases, and ResourceSets; reconcile them; and run end-to-end
+    root-cause analysis. Read-only.
+  protocol: STREAMABLE_HTTP
+  url: http://flux-operator-mcp.flux-system:9090/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s

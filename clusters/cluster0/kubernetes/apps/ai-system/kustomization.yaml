@@ -10,3 +10,4 @@ resources:
   - ./kagent-crds/ks.yaml
   - ./kagent/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
+  - ./flux-mcp/ks.yaml

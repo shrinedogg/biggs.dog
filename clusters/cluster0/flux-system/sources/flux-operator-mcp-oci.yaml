@@ -1,0 +1,21 @@
+---
+# OCIRepository for the flux-operator-mcp Helm chart (same publisher as
+# flux-operator). The chart is published to ghcr.io under the
+# controlplaneio-fluxcd/charts path. A semver wildcard resolves the latest
+# release — the upstream ResourceSet example uses the same pattern. Pin
+# ref.tag after the first successful reconcile (check the OCIRepository
+# status .artifact.metadata for the resolved version) to match the repo's
+# pin-by-tag convention for the other charts.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: flux-operator-mcp
+  namespace: flux-system
+spec:
+  interval: 1h
+  layerSelector:
+    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
+    operation: copy
+  ref:
+    semver: "*"
+  url: oci://ghcr.io/controlplaneio-fluxcd/charts/flux-operator-mcp
