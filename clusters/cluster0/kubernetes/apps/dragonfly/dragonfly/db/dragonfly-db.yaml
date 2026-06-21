@@ -19,7 +19,10 @@ spec:
   networkPolicyEnabled: false
   args:
     - "--default_lua_flags=allow-undeclared-keys"
-    - "--replicaof=dragonfly-db.dragonfly.svc.cluster.local:6379"
+    # NOTE: No --replicaof — let the Dragonfly operator manage master/replica
+    # topology automatically. Hardcoding --replicaof to the ClusterIP service
+    # causes every pod (including the master) to try replicating to itself
+    # through the service VIP, making Redis unusable.
   resources:
     requests:
       cpu: 500m
