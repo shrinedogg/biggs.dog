@@ -87,13 +87,17 @@ spec:
             # are unaffected (they complete in one step). Long prompts benefit
             # from fewer scheduling rounds.
             - --max-num-batched-tokens=8192
-            # 64-way concurrency (matches the benchmark sweep + smooths agent
-            # fan-out). At 131K max-model-len the ~838K-token KV pool covers
-            # ~6.4 full-context reqs; the benchmark's short reqs fit far more.
-            # Keep capture-size == max-num-seqs; lower both if CUDA-graph capture
-            # OOMs at boot.
-            - --max-num-seqs=64
-            - --max-cudagraph-capture-size=64
+            # Concurrency cap. Bumped from 64 to 32 after a vLLM stall/restart
+            # under parallel kagent fan-out (6-9 agents firing long-context tool-
+            # schema prompts simultaneously). At 64-way the GPU compute saturated
+            # during prefill of multiple long prompts, stalling the async event
+            # loop for 3+ min -- past even the generous 10s×6 liveness headroom --
+            # and the pod restarted (exit 0, "Completed"). 32-way still matches or
+            # exceeds realistic concurrent agent count, lets vLLM QUEUE excess
+            # requests instead of compute-locking, and keeps /health responsive.
+            # Keep capture-size == max-num-seqs.
+            - --max-num-seqs=32
+            - --max-cudagraph-capture-size=32
             - --enable-prefix-caching
             # Qwen3.6 hybrid-MoE may ship custom modeling code; the model card's
             # DGX command sets trust-remote-code. NOTE: executes repo Python.
