@@ -1,21 +1,27 @@
 ---
 # Scrape Hubble's Prometheus /metrics endpoint into Victoria Metrics.
-# Hubble was enabled in helmrelease.yaml (hubble.metrics.enabled), which stands
-# up the headless `hubble-metrics` Service on :9965. The VM Operator's vmagent
-# runs selectAllByDefault=true, so this VMServiceScrape is auto-discovered with
-# no vmagent config change -- mirroring the vllm/nv-gpu-operator pattern.
+# Hubble was enabled in helmrelease.yaml (hubble.metrics.enabled), which enables
+# prometheus metrics on :9962 (the `prometheus` container port of cilium-agent).
+# The VM Operator's vmagent runs selectAllByDefault=true, so this VMServiceScrape
+# is auto-discovered with no vmagent config change.
 #
-# Without this, the metrics Hubble exports are produced but never collected, so
-# the (already-enabled) Cilium/Hubble Grafana dashboards stay empty and
-# vm-agent can't query the flow data.
+# NOTE: Port 9965 (`hubble-metrics`) is the gRPC health/check port — it serves
+# gRPC server metrics, NOT Prometheus scrape data. Prometheus metrics are on
+# port 9962 (container port `prometheus`, targetPort `prometheus`).
 #
-# Metrics exported (per hubble.metrics.enabled): hubble_flows_processed_total,
-# hubble_drop_total, hubble_tcp_flags_total, hubble_dns_queries_total /
-# hubble_dns_responses_total, hubble_port_distribution_total, hubble_icmp_total,
-# and hubble_http_* . NOTE: with the current (context-free) metrics config these
-# carry coarse labels (protocol/verdict/type), good for an aggregate service
-# map but not for exact per-port peers -- for precise least-privilege policy
-# authoring use `hubble observe` / the Hubble UI flow logs.
+# Metrics exported (per hubble.metrics.enabled):
+#   - hubble_flows_processed_total
+#   - hubble_drop_total (with source_namespace/destination_namespace labels)
+#   - hubble_tcp_flags_total
+#   - hubble_dns_queries_total / hubble_dns_responses_total
+#   - hubble_port_distribution_total
+#   - hubble_icmp_total
+#   - hubble_http_*
+#   - cilium_* (BPF counters, agent metrics)
+#
+# With the current context-free metrics config these carry coarse labels.
+# For namespace-aware flows use source_namespace/destination_namespace labels
+# available on hubble_drop_total, hubble_tcp_flags_total, and hubble_flow_total.
 apiVersion: operator.victoriametrics.com/v1beta1
 kind: VMServiceScrape
 metadata:
@@ -31,6 +37,6 @@ spec:
     matchNames:
       - kube-system
   endpoints:
-    - port: hubble-metrics
+    - port: prometheus
       path: /metrics
       interval: 30s

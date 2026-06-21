@@ -83,6 +83,27 @@ spec:
             k8s:io.kubernetes.pod.namespace: cnpg-system
             cnpg.io/cluster: cnpg-bookboss
 ---
+# BookBoss's native OIDC SSO discovers the Pocket ID provider via HTTPS.
+# id.biggs.dog terminates TLS at the Gateway which routes to pocket-id:1411.
+# Without this rule, the OIDC discovery request is silently dropped and SSO
+# never appears in the UI.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-pocket-id
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: bookboss
+  egress:
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
