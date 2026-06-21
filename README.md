@@ -36,12 +36,13 @@ clusters/
             ├── dragonfly/
             ├── dreamcast/         # GPU game streaming (Fenrir/Wolf + NVIDIA GPU Operator)
             ├── external-secrets/
+            ├── games/             # Dedicated game servers (Windrose)
             ├── jitsi/
             ├── kube-system/
             ├── manticore/
             ├── matrix/
             ├── media/
-            ├── network-policies/    # TieredTe Cilium NetworkPolicies (apps + infra)
+            ├── network-policies/    # Tiered Cilium NetworkPolicies (apps + infra)
             ├── networking/
             ├── observability/
             ├── openebs/
@@ -62,7 +63,7 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | `worker-03`  | worker        | Intel Core i7-1360P (Raptor Lake-P, 16T)    | 32 GB  | Intel Iris Xe Graphics iGPU (`8086:a7a0`)                                    |
 | `worker-04`  | worker        | Intel Core Ultra 5 125H (Meteor Lake, 18T)  | 32 GB  | Intel Arc Graphics iGPU (`8086:7d55`)                                        |
 
-> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas shared between the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack) and the in-cluster LLM (vLLM/kagent, see [AI & Agents](#-ai--agents)). The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
+> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas. vLLM (the in-cluster LLM, see [AI & Agents](#-ai--agents)) and the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack) can't coexist on the 32 GB card (vLLM alone pins ~31 GB), so a `gpu-arbiter` scales vLLM to 0 for the duration of any gaming session and restores it after; the time-slices then serve the session's Wolf sidecar + game container plus an always-on GPU-tuning DaemonSet. The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
 
 ## 🔧 Core Components
 
@@ -203,6 +204,10 @@ OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cooki
 
 - **Fenrir / Wolf** - GPU-accelerated game streaming to [Moonlight](https://moonlight-stream.org/) clients (Firefox, Steam Big Picture, a test pattern). See [Dreamcast Game Streaming Stack](#-dreamcast-game-streaming-stack) below.
 
+### Game Servers
+
+- **Windrose** - Dedicated server for Windrose Online (persistent-world MMO) in the `games` namespace; a Wine-backed server instance exposed via a Cilium LoadBalancer.
+
 ### Other
 
 - **biggs** - Biggs the dog.
@@ -214,11 +219,13 @@ The `dreamcast` namespace is the newest addition to the cluster: an on-demand, G
 ### Components
 
 
-| Component                                                               | Description                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator)           | `gpu-operator` Helm chart with `driver` and `toolkit` **disabled** — on Talos the driver ships via the `nonfree-kmod-nvidia` system extension and the container toolkit via a system extension + machine config, so the operator only runs NFD + device plugin. The single physical GPU is **time-sliced into 4 `nvidia.com/gpu` replicas** so each session can give one slice to the Wolf sidecar and one to the game container. |
-| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (installed from an OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`.                                                                                                                                                                                                                                                                        |
-| [Wolf](https://games-on-whales.github.io/wolf/)                         | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input.                                                                                                                                                                                                                                                                                                       |
+| Component | Description |
+| --------- | ----------- |
+| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | `gpu-operator` Helm chart with `driver` and `toolkit` **disabled** — on Talos the driver ships via the `nonfree-kmod-nvidia` system extension and the container toolkit via a system extension + machine config, so the operator only runs NFD + device plugin. The single physical GPU is **time-sliced into 4 `nvidia.com/gpu` replicas**: one is held by the `nvidia-gpu-tuning` DaemonSet (below), the rest serve a session's Wolf sidecar + game container. vLLM consumes one when idle but is scaled to 0 during sessions (see `gpu-arbiter`). |
+| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (installed from an OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`. |
+| [Wolf](https://games-on-whales.github.io/wolf/) | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input. |
+| `gpu-arbiter` (custom) | Bash-loop controller (`alpine/k8s`) that scales the `vllm` Deployment to 0 whenever a `direwolf-worker` session pod appears in `dreamcast`, and back to 1 when idle, then lifts a `gpu.biggs.dog/await-vram` scheduling gate once VRAM is free. Without it the session and vLLM would both claim the 32 GB card and OOM. |
+| `nvidia-gpu-tuning` (DaemonSet) | Privileged DaemonSet pinned to `nv-01` running `nvidia-smi -pm 1 -lgc 0,2800` to cap the RTX 5090's boost clock (stock max 3105 MHz), mitigating recurring Xid 109 (CTX SWITCH TIMEOUT) errors under gaming load; re-asserted every 5 min. Consumes one of the 4 GPU time-slices to trigger CDI injection of `nvidia-smi`. |
 
 
 ### Defined Apps (`fenrir/app/apps.yaml`)
@@ -234,18 +241,19 @@ Getting this working end-to-end required a fork of the operator (`[shrinedogg/fe
 **Forked images:**
 
 
-| Image                                    | Tag      | Why                                                                                                                                                                                                    |
-| ---------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Image | Tag | Why |
+| ----- | --- | --- |
 | `docker.io/shrinedogg/direwolf-operator` | `v0.1.0` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent isn't up on the first try) and prunes stale `trackedSessions` entries that spam logs. |
-| `docker.io/shrinedogg/moonlight-proxy`   | `v0.1.1` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session.                        |
-| `docker.io/shrinedogg/wolf-agent`        | `v0.1.0` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers.  |
-| `docker.io/shrinedogg/wolf`              | `v0.1.0` | Overlay on `wolf:stable` with a patched `gst-wayland-display` ([shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display), branch `fix/optional-wl-drm`): skips the legacy `wl_drm` global when dmabuf v4 feedback is active, fixing the wlroots/Sway nested-compositor abort. |
+| `docker.io/shrinedogg/moonlight-proxy` | `v0.1.1` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session. |
+| `docker.io/shrinedogg/wolf-agent` | `v0.1.0` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers. |
+| `docker.io/shrinedogg/wolf` | `v0.1.0` | Overlay on `wolf:stable` with a patched `gst-wayland-display` ([shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display), branch `fix/optional-wl-drm`): skips the legacy `wl_drm` global when dmabuf v4 feedback is active, fixing the wlroots/Sway nested-compositor abort. |
 
 
 **Key fixes captured in the manifests:**
 
 - **LB IP sharing** — the operator's `--lb-sharing-key` is aligned to `direwolf` so Cilium LB-IPAM hands every per-session RTP Service the same external IP as the proxy. Mismatched keys split the IP and the RTSP handshake times out (macOS errno 60).
 - **GPU on the app container** — the game container needs its own `nvidia.com/gpu` request; CDI driver/device injection is per-allocated-container, so without it the app has no render node and produces a black stream.
+- **GPU time-multiplexing with vLLM (`gpu-arbiter`)** — the 32 GB RTX 5090 can't hold both a gaming session and vLLM (~31 GB at idle) at once, so a custom `gpu-arbiter` controller watches for `direwolf-worker` session pods and scales the `vllm` Deployment 0↔1 accordingly. Because Flux owns the Deployment, `replicas` is deliberately omitted from the manifest (otherwise Flux fights the arbiter on every reconcile). A `MutatingAdmissionPolicy` injects a `gpu.biggs.dog/await-vram` scheduling gate onto each session pod at creation (the direwolf operator strips template fields, so it can't be set on the `App` CR); the arbiter removes the gate only once vLLM reports zero pods *or* DCGM free-VRAM clears 8 GiB (45s fallback, kept under direwolf's 60s session reaper), so a session never starts encoding before VRAM is actually released.
 - `**GBM_BACKENDS_PATH`** — set on both the Wolf sidecar and the Steam container; the CDI hook drops the NVIDIA GBM backend in `/usr/local/lib/gbm` while Mesa only searches `/usr/lib/x86_64-linux-gnu/gbm`.
 - **Sway via patched Wolf compositor** — Wolf's `gst-wayland-display` advertised both the legacy `wl_drm` global and `zwp_linux_dmabuf_v1` v4 feedback; nested wlroots (Sway 0.19+) binds both and aborts on the duplicate device announcement (`assert(wl->drm_render_name == NULL)`). The patched `shrinedogg/wolf` image skips `wl_drm` when dmabuf v4 feedback is active (legacy clients can opt back in with `GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1`), letting Steam run under Sway instead of gamescope.
 - `**/dev/shm` sizing** — a 4Gi memory-backed `emptyDir` at `/dev/shm`; the 64Mi runtime default exhausts instantly under Steam's CEF UI, yielding a black screen with only a cursor.
@@ -267,7 +275,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 
 | Component | Description |
 | --------- | ----------- |
-| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **262K context** with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
+| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices. Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the `gpu-arbiter` (the 32 GB card can't fit vLLM and a session at once) and back to 1 when idle. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **262K context** with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
 | [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server at `kagent-mcp.biggs.dog/mcp` (basic-auth) plus a UI behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) memory. |
 | flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. |
 | victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
@@ -286,7 +294,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 - **Config rationale** — `0.97` GPU util (~640 MB more KV than 0.95) cuts KV-exhaustion preemptions that were hurting tail latency (decode min jumped from 146 → 166 tok/s, stddev −29%). `8192` batch tokens halves prefill scheduling rounds for medium prompts (200–400 token range), shaving 2–5% off total time for those scenarios. The decode ceiling (~186 tok/s at full utilization) is the RTX 5090 compute limit for 3B active MoE — no config move changes that.
 - **MCP route timeout** — agent runs are multi-step LLM tool-calling loops that can exceed Envoy's ~15s default; the `kagent-mcp` `HTTPRoute` sets `timeouts.request: 300s`. The MoE's ~3.8B active params make inference fast, easing this.
 - **Observability & measured performance** — vLLM's `/metrics` are scraped into Victoria Metrics via a `VMServiceScrape`, with a Grafana dashboard (`apps/ai-system/vllm/app/grafana-dashboard.yaml`, "AI" folder) charting throughput, TTFT, TPOT, and KV-cache usage. Synthetic workload benchmark (`scripts/vllm-benchmark.py`) simulates 8 kagent-style prompt profiles (50 → 4,000 prompt tokens, 80 → 500 gen tokens) at concurrency 4 with 3 rep/senario: median TTFT **~1.12s** (stddev 0.07s), decode throughput **~186 tok/s** (stddev 10), total request time **~2.44s** median — with `--gpu-memory-utilization 0.97` + `--max-num-batched-tokens=8192`, tail TTFT improved ~11% and decode stddev dropped ~29% vs baseline (fewer KV-preemptions, fewer prefill rounds). Raw `vllm bench serve` on the 5090: single-stream **~250 tok/s @ ~65 ms TTFT** (TPOT ~4 ms); batched aggregate **~2,450 tok/s @ 32-way** and **~3,070 tok/s @ 64-way** concurrency (0 failures); served at **131K context** (~6x KV concurrency headroom) — well within the 32 GB card. **Note:** `max-num-seqs` is now capped at 32 for production stability (64-way stalled under real agent fan-out), but the 64-way benchmark figure remains valid as the theoretical throughput ceiling.
-- **Model right-sizing (history)** — the cluster previously ran `NeuralNet-Hub/Qwen3.6-27B-NVFP4`, but per its author that was a suboptimal `llm-compressor` quant only validated on a **48 GB** card ([discussion](https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4/discussions/1)) — it barely fit the 32 GB 5090 (util pinned near 0.984, 65K context max), causing OOM/`no cache blocks` churn and overflowing `flux-agent`'s ~64K tool schemas. The swap to the smaller, KV-efficient Gemma-4-26B-A4B (14B on disk, sliding-window attention, 256K context) resolved all of it: flux-agent and the other heavy agents now fit with memory on, and inference is faster.
+- **Model right-sizing (history)** — the cluster previously ran `NeuralNet-Hub/Qwen3.6-27B-NVFP4`, but per its author that was a suboptimal `llm-compressor` quant only validated on a **48 GB** card ([discussion](https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4/discussions/1)) — it barely fit the 32 GB 5090 (util pinned near 0.984, 65K context max), causing OOM/`no cache blocks` churn and overflowing `flux-agent`'s ~64K tool schemas. An intermediate swap to the smaller, KV-efficient Gemma-4-26B-A4B (14B on disk, sliding-window attention, 256K context) resolved the OOM/context churn. The current model, NVIDIA's official `nvidia/Qwen3.6-35B-A3B-NVFP4` (NVFP4, ~19B on disk), keeps the KV headroom (Mamba-hybrid attention, served at 131K) while moving back to a stronger MoE base — flux-agent and the other heavy agents now fit with long-term memory on and no overflow.
 - **M3 Cognition Layer** — Unlike standard lookup agents, the `minimax-agent` is designed for high-level reasoning. It follows three core patterns: **State Correlation** (correlating metrics from `observability-agent` with cluster state), **Policy-First Architecture** (reasoning through security requirements before generating `CiliumNetworkPolicy`), and **GitOps-Centric Troubleshooting** (always proposing changes to the desired state in Git rather than manual `kubectl` mutations).
 
 ## 🌐 Networking Configuration
