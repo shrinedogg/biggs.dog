@@ -75,3 +75,27 @@ spec:
         - name: database-url
           mountPath: /etc/kagent-db
           readOnly: true
+  # ------------------------------------------------------------------
+  # The chart renders k8s-agent with an allowlist of k8s_* tools from
+  # kagent-tool-server but omits the `shell` tool ("Execute shell
+  # commands"), which the kagent-tool-server RemoteMCPServer does expose.
+  # We append it via a post-render kustomize JSON Patch so the addition
+  # survives Helm upgrades / Flux reconciliation (an in-cluster `kubectl
+  # patch` would be reverted on every reconcile, since the Agent CR is
+  # owned by this HelmRelease).
+  # Path: spec.declarative.tools[0] is the kagent-tool-server entry; the
+  # `/toolNames/-` suffix appends to the end of that array without needing
+  # to re-list the chart's existing 18 tools.
+  # ------------------------------------------------------------------
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              group: kagent.dev
+              version: v1alpha2
+              kind: Agent
+              name: k8s-agent
+            patch: |
+              - op: add
+                path: /spec/declarative/tools/0/mcpServer/toolNames/-
+                value: shell
