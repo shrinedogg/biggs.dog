@@ -78,6 +78,24 @@ spec:
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
+  name: allow-ingress-from-affine
+  namespace: manticore
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: affine
+      toPorts:
+        - ports:
+            - port: "9306"
+              protocol: TCP
+            - port: "9308"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
   name: allow-prometheus-scraping
   namespace: manticore
 spec:
