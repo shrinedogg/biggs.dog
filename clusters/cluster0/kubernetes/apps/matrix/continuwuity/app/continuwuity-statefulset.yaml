@@ -118,7 +118,6 @@ spec:
           resources:
             limits:
               memory: 3Gi
-              cpu: "1.5"
             requests:
               memory: 3Gi
               cpu: "1.5"

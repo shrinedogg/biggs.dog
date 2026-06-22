@@ -68,7 +68,6 @@ spec:
                   cpu: "250m"
                 limits:
                   memory: "2Gi"
-                  cpu: "1000m"
           volumes:
             - name: ssh-key
               secret:

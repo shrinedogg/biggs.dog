@@ -38,7 +38,6 @@ spec:
           cpu: 50m
           memory: 128Mi
         limits:
-          cpu: 1000m
           memory: 256Mi
       # Harden the agent-runner pod. kagent otherwise schedules agent pods
       # privileged (verified live: vm-agent ran privileged: true), which —

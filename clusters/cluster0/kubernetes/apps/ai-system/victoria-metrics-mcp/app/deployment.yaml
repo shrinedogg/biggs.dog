@@ -95,7 +95,6 @@ spec:
               # documentation vector DB into memory on startup.
               memory: 256Mi
             limits:
-              cpu: 1000m
               memory: 1Gi
           volumeMounts:
             - name: temp

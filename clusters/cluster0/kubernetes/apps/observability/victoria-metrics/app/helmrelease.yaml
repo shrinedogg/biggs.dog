@@ -323,7 +323,7 @@ spec:
       spec:
         resources:
           limits:
-            cpu: 1500m
+            cpu: null
             memory: "3500Mi"
           requests:
             cpu: 500m

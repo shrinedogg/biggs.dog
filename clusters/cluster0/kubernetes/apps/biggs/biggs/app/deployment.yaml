@@ -48,7 +48,6 @@ spec:
               cpu: 10m
             limits:
               memory: 450Mi
-              cpu: 350m
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
