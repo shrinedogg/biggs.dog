@@ -21,7 +21,9 @@ spec:
   # privileged, too large a blast radius for executeCodeBlocks code.
   # Egress from each sandbox is locked to in-cluster services; the vm-agent
   # and the two static cilium agents set the same fields directly in their
-  # own manifests.
+  # own manifests. A nodeSelector also pins every chart-managed agent to the
+  # GPU node (nv-01, via nvidia.com/gpu.present=true); the static
+  # vm-agent/cilium agents set the same selector in their own manifests.
   postRenderers:
     - kustomize:
         patches:
@@ -41,6 +43,8 @@ spec:
                 declarative:
                   executeCodeBlocks: true
                   deployment:
+                    nodeSelector:
+                      nvidia.com/gpu.present: "true"
                     podSecurityContext:
                       runAsNonRoot: true
                       runAsUser: 1001
@@ -72,6 +76,8 @@ spec:
                 declarative:
                   executeCodeBlocks: true
                   deployment:
+                    nodeSelector:
+                      nvidia.com/gpu.present: "true"
                     podSecurityContext:
                       runAsNonRoot: true
                       runAsUser: 1001
@@ -103,6 +109,8 @@ spec:
                 declarative:
                   executeCodeBlocks: true
                   deployment:
+                    nodeSelector:
+                      nvidia.com/gpu.present: "true"
                     podSecurityContext:
                       runAsNonRoot: true
                       runAsUser: 1001
@@ -134,6 +142,8 @@ spec:
                 declarative:
                   executeCodeBlocks: true
                   deployment:
+                    nodeSelector:
+                      nvidia.com/gpu.present: "true"
                     podSecurityContext:
                       runAsNonRoot: true
                       runAsUser: 1001
@@ -165,6 +175,8 @@ spec:
                 declarative:
                   executeCodeBlocks: true
                   deployment:
+                    nodeSelector:
+                      nvidia.com/gpu.present: "true"
                     podSecurityContext:
                       runAsNonRoot: true
                       runAsUser: 1001
@@ -180,6 +192,21 @@ spec:
                       capabilities:
                         drop:
                           - ALL
+          # ----------------------------------------------------------------
+          # Pin every chart-managed Deployment (kagent-controller, kagent-ui,
+          # kagent-tools, kagent-grafana-mcp, kagent-querydoc,
+          # kagent-kmcp-controller-manager) to the GPU node (nv-01) via a JSON
+          # 6902 patch. Targeting kind: Deployment leaves the Agent CRs
+          # (kind: Agent) untouched -- they carry their own nodeSelector above.
+          # op: add is safe: the chart's Deployments set no nodeSelector.
+          # ----------------------------------------------------------------
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/nodeSelector
+                value:
+                  nvidia.com/gpu.present: "true"
   install:
     remediation:
       retries: 3
@@ -200,19 +227,27 @@ spec:
     cilium-policy-agent:
       enabled: false
     # ------------------------------------------------------------------
-    # Strip the CPU LIMIT from every chart-managed agent. Each agent
-    # subchart defaults to limits.cpu=1000m; setting it to null deletes
-    # that key during Helm coalescing (verified via `helm template`), so the
-    # rendered Agent CR keeps limits.memory + requests but has no CPU cap.
-    # CPU requests are left intact (chart default 50m / 128Mi). k8s-agent
-    # and cilium-manager-agent aren't toggled above (they ride the chart's
+    # Per-agent resource overrides for the chart-managed agents:
+    #   - Strip the CPU LIMIT (chart default limits.cpu=1000m -> null) to
+    #     avoid CFS throttling (repo policy: no CPU limit). Setting null
+    #     deletes that key during Helm coalescing (verified via `helm
+    #     template`), so the rendered Agent CR keeps limits.memory + requests
+    #     but has no CPU cap.
+    #   - Double the chart-default memory REQUEST and LIMIT
+    #     (requests 128Mi -> 256Mi, limits 256Mi -> 512Mi). Pinning them here
+    #     makes them durable in git rather than tracking the chart default.
+    # CPU requests are left intact (chart default 50m). k8s-agent and
+    # cilium-manager-agent aren't toggled above (they ride the chart's
     # default enabled:true), so they're listed here just for the override.
     # ------------------------------------------------------------------
     helm-agent:
       enabled: true
       resources:
+        requests:
+          memory: 256Mi
         limits:
           cpu: null
+          memory: 512Mi
       # Bound session growth (see flux-mcp/app/agent.yaml for the full
       # rationale). At tokenThreshold ADK summarizes older events via the
       # local model and drops the originals.
@@ -223,8 +258,11 @@ spec:
     promql-agent:
       enabled: true
       resources:
+        requests:
+          memory: 256Mi
         limits:
           cpu: null
+          memory: 512Mi
       compaction:
         tokenThreshold: 80000
         summarizer:
@@ -236,24 +274,33 @@ spec:
     observability-agent:
       enabled: true
       resources:
+        requests:
+          memory: 256Mi
         limits:
           cpu: null
+          memory: 512Mi
       compaction:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
     k8s-agent:
       resources:
+        requests:
+          memory: 256Mi
         limits:
           cpu: null
+          memory: 512Mi
       compaction:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
     cilium-manager-agent:
       resources:
+        requests:
+          memory: 256Mi
         limits:
           cpu: null
+          memory: 512Mi
       compaction:
         tokenThreshold: 80000
         summarizer:

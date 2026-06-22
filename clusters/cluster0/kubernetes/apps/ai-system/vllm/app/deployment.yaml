@@ -28,9 +28,10 @@ spec:
       # env vars (e.g. VLLM_PORT=tcp://<ip>:8000) that collide with vLLM's own
       # VLLM_PORT config and crash the engine. Disable the injection.
       enableServiceLinks: false
-      # Pin to the single RTX 5090 node.
+      # Pin to the GPU node (nv-01) by capability label rather than hostname,
+      # matching the rest of the ai-system stack.
       nodeSelector:
-        kubernetes.io/hostname: nv-01
+        nvidia.com/gpu.present: "true"
       # Short grace so vLLM RELEASES VRAM fast when the gpu-arbiter scales it to
       # 0 for a gaming session: the gaming pod is held by a scheduling gate until
       # VRAM is free, and direwolf reaps the session after 60s, so vLLM must let

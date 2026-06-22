@@ -35,6 +35,9 @@ spec:
     spec:
       serviceAccountName: victoria-metrics-mcp
       terminationGracePeriodSeconds: 10
+      # Pin to the GPU node (nv-01), matching the rest of the ai-system stack.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:

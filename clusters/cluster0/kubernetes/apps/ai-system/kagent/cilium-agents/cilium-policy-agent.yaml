@@ -34,12 +34,14 @@ spec:
         summarizer:
           modelConfig: default-model-config
     deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
       resources:
         requests:
           cpu: 50m
-          memory: 128Mi
-        limits:
           memory: 256Mi
+        limits:
+          memory: 512Mi
       podSecurityContext:
         runAsNonRoot: true
         runAsUser: 1001

@@ -49,12 +49,14 @@ spec:
       modelConfig: embedding-model
       ttlDays: 30
     deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
       resources:
         requests:
           cpu: 50m
-          memory: 128Mi
-        limits:
           memory: 256Mi
+        limits:
+          memory: 512Mi
       # Harden the agent-runner pod. kagent otherwise schedules agent pods
       # privileged (verified live: vm-agent ran privileged: true), which —
       # combined with the agents' tool access — is a large blast radius for a

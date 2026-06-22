@@ -57,12 +57,14 @@ spec:
       modelConfig: embedding-model
       ttlDays: 30
     deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
       resources:
         requests:
           cpu: 50m
-          memory: 128Mi
-        limits:
           memory: 256Mi
+        limits:
+          memory: 512Mi
     promptTemplate:
       dataSources:
         - alias: builtin

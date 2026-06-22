@@ -18,6 +18,19 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
+  # Pin the flux-operator-mcp server pod to the GPU node (nv-01), matching
+  # the rest of the ai-system stack. JSON 6902 patch (op: add) targets the
+  # chart's Deployment; safe because the chart sets no nodeSelector by default.
+  postRenderers:
+    - kustomize:
+        patches:
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/nodeSelector
+                value:
+                  nvidia.com/gpu.present: "true"
   values:
     # Streamable HTTP transport: matches the RemoteMCPServer protocol
     # (STREAMABLE_HTTP) and the /mcp endpoint the kagent controller calls.
