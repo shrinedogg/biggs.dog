@@ -128,12 +128,12 @@ spec:
               protocol: TCP
           resources:
             requests:
-              cpu: "2"
-              memory: 16Gi
               nvidia.com/gpu: 1
+              memory: 22Gi
             limits:
               # Consumes the last of the 4 time-sliced nvidia.com/gpu replicas.
               nvidia.com/gpu: 1
+              memory: 22Gi
           startupProbe:
             httpGet:
               path: /health

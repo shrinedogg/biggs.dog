@@ -9,7 +9,7 @@
 #   vllm:time_to_first_token_seconds      -- TTFT histogram
 #   vllm:time_per_output_token_seconds    -- per-token latency histogram (inverse = tok/s)
 #   vllm:e2e_request_latency_seconds      -- end-to-end request latency histogram
-#   vllm:gpu_cache_usage_perc             -- KV cache utilisation (watch this -- ~1.9 GiB)
+#   vllm:gpu_cache_usage_perc             -- KV cache utilisation (watch this -- ~838K-token pool)
 #   vllm:num_requests_running             -- in-flight requests
 #   vllm:num_requests_waiting             -- queued requests
 #

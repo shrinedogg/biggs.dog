@@ -15,7 +15,7 @@ data:
   vllm-inference.json: |
     {
       "annotations": { "list": [] },
-      "description": "vLLM inference server — NeuralNet-Hub/Qwen3.6-27B-NVFP4 on nv-01 RTX 5090 (NVFP4 + CUDA graphs)",
+      "description": "vLLM inference server — nvidia/Qwen3.6-35B-A3B-NVFP4 on nv-01 RTX 5090 (NVFP4 MoE + CUDA graphs)",
       "editable": true,
       "graphTooltip": 1,
       "links": [],
@@ -105,7 +105,7 @@ data:
           "id": 3,
           "type": "timeseries",
           "title": "KV Cache Utilisation",
-          "description": "Fraction of the KV cache pool in use. Budget on this host is ~1.9 GiB (gpu_memory_utilization=0.97, max_num_seqs=8, fp8 KV).",
+          "description": "Fraction of the KV cache pool in use. Budget on this host is ~838K tokens (gpu_memory_utilization=0.97, max_num_seqs=32, fp8 KV).",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [

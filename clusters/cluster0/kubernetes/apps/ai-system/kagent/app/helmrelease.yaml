@@ -12,11 +12,16 @@ spec:
     name: kagent
     namespace: flux-system
   # Enable agent-sandbox code execution (executeCodeBlocks) on every
-  # chart-managed Agent. The chart's agent templates default to
-  # `runtime: python` but don't expose executeCodeBlocks/sandbox values, so we
-  # strategic-merge them onto the rendered Agent CRs here. Egress from each
-  # sandbox is locked to in-cluster services; the vm-agent and the two static
-  # cilium agents set the same fields directly in their own manifests.
+  # chart-managed Agent AND de-privilege the runner pods. The chart's agent
+  # templates default to `runtime: python` but don't expose
+  # executeCodeBlocks/sandbox values, and they schedule the pod privileged;
+  # we strategic-merge both fixes onto the rendered Agent CRs here. The
+  # securityContext mirrors the static vm-agent/cilium agents (runAsNonRoot,
+  # drop ALL, privileged: false) -- without it, kagent schedules these pods
+  # privileged, too large a blast radius for executeCodeBlocks code.
+  # Egress from each sandbox is locked to in-cluster services; the vm-agent
+  # and the two static cilium agents set the same fields directly in their
+  # own manifests.
   postRenderers:
     - kustomize:
         patches:
@@ -35,6 +40,22 @@ spec:
                       - "*.svc.cluster.local"
                 declarative:
                   executeCodeBlocks: true
+                  deployment:
+                    podSecurityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      runAsGroup: 1001
+                      fsGroup: 1001
+                      seccompProfile:
+                        type: RuntimeDefault
+                    securityContext:
+                      privileged: false
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      capabilities:
+                        drop:
+                          - ALL
           - target:
               kind: Agent
               name: observability-agent
@@ -50,6 +71,22 @@ spec:
                       - "*.svc.cluster.local"
                 declarative:
                   executeCodeBlocks: true
+                  deployment:
+                    podSecurityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      runAsGroup: 1001
+                      fsGroup: 1001
+                      seccompProfile:
+                        type: RuntimeDefault
+                    securityContext:
+                      privileged: false
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      capabilities:
+                        drop:
+                          - ALL
           - target:
               kind: Agent
               name: promql-agent
@@ -65,6 +102,22 @@ spec:
                       - "*.svc.cluster.local"
                 declarative:
                   executeCodeBlocks: true
+                  deployment:
+                    podSecurityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      runAsGroup: 1001
+                      fsGroup: 1001
+                      seccompProfile:
+                        type: RuntimeDefault
+                    securityContext:
+                      privileged: false
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      capabilities:
+                        drop:
+                          - ALL
           - target:
               kind: Agent
               name: helm-agent
@@ -80,6 +133,22 @@ spec:
                       - "*.svc.cluster.local"
                 declarative:
                   executeCodeBlocks: true
+                  deployment:
+                    podSecurityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      runAsGroup: 1001
+                      fsGroup: 1001
+                      seccompProfile:
+                        type: RuntimeDefault
+                    securityContext:
+                      privileged: false
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      capabilities:
+                        drop:
+                          - ALL
           - target:
               kind: Agent
               name: cilium-manager-agent
@@ -95,6 +164,22 @@ spec:
                       - "*.svc.cluster.local"
                 declarative:
                   executeCodeBlocks: true
+                  deployment:
+                    podSecurityContext:
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      runAsGroup: 1001
+                      fsGroup: 1001
+                      seccompProfile:
+                        type: RuntimeDefault
+                    securityContext:
+                      privileged: false
+                      allowPrivilegeEscalation: false
+                      runAsNonRoot: true
+                      runAsUser: 1001
+                      capabilities:
+                        drop:
+                          - ALL
   install:
     remediation:
       retries: 3

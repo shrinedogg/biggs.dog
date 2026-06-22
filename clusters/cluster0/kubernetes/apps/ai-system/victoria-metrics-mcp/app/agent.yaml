@@ -133,7 +133,7 @@ spec:
 
       Single-node VictoriaMetrics (vmsingle). Notable metric namespaces:
       - `vm_*` / `vmagent_*` — VictoriaMetrics internals and scrape health
-      - `vllm:*` — In-cluster LLM (NeuralNet-Hub/Qwen3.6-27B-NVFP4 on vLLM)
+      - `vllm:*` — In-cluster LLM (nvidia/Qwen3.6-35B-A3B-NVFP4 on vLLM; 35B MoE, ~3B active params)
       - `node_*` — node-exporter (CPU, RAM, disk, network per node)
       - `kube_*` — kube-state-metrics (pod/deployment/PVC/node state)
       - `container_*` — cAdvisor (per-container resource usage)
