@@ -23,6 +23,15 @@ spec:
     # Let the agent write/run Python (e.g. to parse cilium/Hubble output,
     # correlate flows, or summarize diagnostics) in the agent-sandbox.
     executeCodeBlocks: true
+    context:
+      # Bound session growth so large tool results (cilium/Hubble output) can't
+      # accumulate past the model's 131K context window. At tokenThreshold ADK
+      # summarizes older events (via the local model) and drops the originals.
+      # See flux-mcp/app/agent.yaml for full rationale.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     deployment:
       resources:
         requests:

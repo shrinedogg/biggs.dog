@@ -32,6 +32,15 @@ spec:
     # agent-sandbox. Enables complex metric analysis, statistical
     # computations, and report generation beyond raw tool calls.
     executeCodeBlocks: true
+    context:
+      # Bound session growth so large tool results (metric ranges, cardinality
+      # dumps) can't accumulate past the model's 131K context window. At
+      # tokenThreshold ADK summarizes older events (via the local model) and
+      # drops the originals. See flux-mcp/app/agent.yaml for full rationale.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     deployment:
       resources:
         requests:

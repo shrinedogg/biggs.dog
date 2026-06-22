@@ -213,11 +213,22 @@ spec:
       resources:
         limits:
           cpu: null
+      # Bound session growth (see flux-mcp/app/agent.yaml for the full
+      # rationale). At tokenThreshold ADK summarizes older events via the
+      # local model and drops the originals.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     promql-agent:
       enabled: true
       resources:
         limits:
           cpu: null
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     istio-agent:
       enabled: false
     kgateway-agent:
@@ -227,14 +238,26 @@ spec:
       resources:
         limits:
           cpu: null
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     k8s-agent:
       resources:
         limits:
           cpu: null
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     cilium-manager-agent:
       resources:
         limits:
           cpu: null
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     # ------------------------------------------------------------------
     # Grafana MCP subchart. The chart defaults GRAFANA_URL to
     # `grafana.kagent:3000/api`, which is broken here on two counts: no

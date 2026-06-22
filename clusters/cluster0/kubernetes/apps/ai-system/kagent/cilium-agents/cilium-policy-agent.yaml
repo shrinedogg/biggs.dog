@@ -24,6 +24,15 @@ spec:
     # Let the agent write/run Python (e.g. to validate/derive policy YAML,
     # lint selectors, or reason over flow data) in the agent-sandbox.
     executeCodeBlocks: true
+    context:
+      # Bound session growth so large tool results (cilium policy/flow output)
+      # can't accumulate past the model's 131K context window. At
+      # tokenThreshold ADK summarizes older events (via the local model) and
+      # drops the originals. See flux-mcp/app/agent.yaml for full rationale.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     deployment:
       resources:
         requests:
