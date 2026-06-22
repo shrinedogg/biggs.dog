@@ -19,6 +19,11 @@ spec:
   networkPolicyEnabled: false
   args:
     - "--default_lua_flags=allow-undeclared-keys"
+    # Cap io threads. Dragonfly defaults to one proactor per CPU core, and each
+    # thread reserves ~250MiB of stack/resident memory (the startup check is
+    # `threads * 250MiB`). On this node that auto-scaled to 16 threads = 4GiB,
+    # which exceeds the pod memory limit and crashes the container on boot.
+    - "--proactor_threads=4"
     # NOTE: No --replicaof — let the Dragonfly operator manage master/replica
     # topology automatically. Hardcoding --replicaof to the ClusterIP service
     # causes every pod (including the master) to try replicating to itself
@@ -26,6 +31,6 @@ spec:
   resources:
     requests:
       cpu: 500m
-      memory: 500Mi
-    limits:
       memory: 750Mi
+    limits:
+      memory: 1200Mi
