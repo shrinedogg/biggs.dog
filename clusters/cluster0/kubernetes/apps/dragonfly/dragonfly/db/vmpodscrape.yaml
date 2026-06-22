@@ -23,7 +23,7 @@ spec:
   podTargetLabels:
     - app
     - role
-  endpoints:
+  podMetricsEndpoints:
     - port: admin
       path: /metrics
       interval: 30s

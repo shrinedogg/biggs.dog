@@ -32,7 +32,7 @@ spec:
   podTargetLabels:
     - cnpg.io/cluster
     - cnpg.io/podRole
-  endpoints:
+  podMetricsEndpoints:
     - port: metrics
       path: /metrics
       interval: 30s
