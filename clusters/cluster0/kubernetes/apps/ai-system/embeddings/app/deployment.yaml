@@ -99,13 +99,14 @@ spec:
             failureThreshold: 3
           resources:
             requests:
-              # bge-m3 (~568M) on CPU via torch; embeddings are infrequent.
+              # bge-m3 (~2.4GB weights) on CPU via torch; embeddings are infrequent.
               cpu: 500m
-              memory: 2Gi
+              memory: 4Gi
             limits:
               # No CPU limit (repo policy: no CFS throttling). Memory bounded
-              # to protect the node: model + torch runtime headroom.
-              memory: 4Gi
+              # to protect the node: model + torch runtime headroom. Increased
+              # from 4Gi because bge-m3 via torch engine OOMs at 4Gi on load.
+              memory: 8Gi
           # Harden within the privileged namespace. runAsNonRoot /
           # readOnlyRootFilesystem are intentionally NOT set: the Infinity image's
           # runtime user and write paths aren't documented. Capabilities are
@@ -125,7 +126,7 @@ spec:
       volumes:
         - name: data
           emptyDir:
-            sizeLimit: 5Gi
+            sizeLimit: 15Gi
         - name: tmp
           emptyDir:
             medium: Memory
