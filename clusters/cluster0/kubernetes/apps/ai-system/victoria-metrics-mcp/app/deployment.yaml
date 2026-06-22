@@ -62,13 +62,6 @@ spec:
               value: "http"
             - name: MCP_LISTEN_ADDR
               value: "0.0.0.0:8080"
-            # Flush the streamable-HTTP SSE stream frequently. The default
-            # 30s heartbeat interval means tool call responses sit in the
-            # write buffer for up to 30s before being flushed — each MCP
-            # tool call takes ~30s, making multi-tool agent turns time out.
-            # 1s makes SSE event delivery near-instant.
-            - name: MCP_HEARTBEAT_INTERVAL
-              value: "1s"
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000 # Dockerfile.goreleaser: adduser -u 1000 -S mcp
