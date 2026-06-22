@@ -1,0 +1,76 @@
+---
+# Alerting rules for the in-cluster vLLM inference server, evaluated by vmalert
+# (observability/stack runs with selectAllByDefault=true, so this VMRule in
+# ai-system is auto-discovered -- same mechanism as vllm's VMServiceScrape).
+#
+# NOTE: there is intentionally no "vLLM down / replicas == 0" alert. The
+# gpu-arbiter (clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter) scales
+# this Deployment to 0 during Wolf gaming sessions and back to 1 afterward, so
+# replicas==0 is an expected, healthy state. Alert instead on restart storms
+# and CrashLoopBackOff, which indicate the pod is present but failing.
+#
+# Metrics reference: see vmservicescrape.yaml in this directory.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: vllm
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: vllm
+spec:
+  groups:
+    - name: vllm
+      # vllm:* metrics only exist while the pod is serving, so the KV/TTFT/queue
+      # rules are naturally silent when the arbiter has scaled the server to 0.
+      rules:
+        # Restart storm: the documented failure mode under concurrent agent
+        # fan-out -- the async event loop stalls past the liveness headroom and
+        # vLLM exits 0 ("Completed"), a self-inflicted restart. Alert on ANY
+        # restart so a single occurrence is visible before it becomes a storm.
+        - alert: VllmRestarted
+          expr: 'increase(kube_pod_container_status_restarts_total{namespace="ai-system", container="vllm"}[15m]) > 0'
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM restarted"
+            description: "The vLLM container in ai-system restarted in the last 15m. If this repeats, suspect the async-loop stall / liveness-eviction pattern under concurrent agent load (see --max-num-seqs tuning)."
+        # Pod present but failing to come up (e.g. weights PVC missing, GPU
+        # unavailable, startupProbe timing out on a cold download).
+        - alert: VllmCrashLoopBackOff
+          expr: 'kube_pod_container_status_waiting_reason{namespace="ai-system", container="vllm", reason="CrashLoopBackOff"} == 1'
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "vLLM in CrashLoopBackOff"
+            description: "The vLLM container has been in CrashLoopBackOff for 5m. Check the vllm-models PVC, GPU availability on nv-01, and startupProbe progress."
+        # KV cache near full -> requests being preempted/swapped. Budget is
+        # ~838K tokens (fp8 KV, gpu_memory-utilization=0.97, max_num_seqs=32).
+        - alert: VllmKVCacheNearFull
+          expr: 'vllm:gpu_cache_usage_perc > 0.95'
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM KV cache above 95%"
+            description: "KV cache utilization has been above 95% for 2m; requests are likely being preempted. Consider lowering max-num-seqs or max-model-len, or reducing concurrent agent fan-out."
+        # TTFT regression: prefill latency spikes under concurrency / long
+        # prompts. 5s P99 is well above the baseline (~65 ms single-stream).
+        - alert: VllmHighTTFT
+          expr: 'histogram_quantile(0.99, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m]))) > 5'
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM P99 time-to-first-token above 5s"
+            description: "P99 TTFT has been above 5s for 5m, indicating prefill saturation. Check concurrent agent fan-out and max-num-batched-tokens."
+        # Requests queued with none admitted: admission pressure / KV starvation.
+        - alert: VllmRequestsWaiting
+          expr: 'vllm:num_requests_waiting > 0'
+          for: 3m
+          labels:
+            severity: warning
+          annotations:
+            summary: "vLLM requests stuck waiting"
+            description: "Requests have been queued waiting for a KV slot for 3m+; the server is admission-limited."
