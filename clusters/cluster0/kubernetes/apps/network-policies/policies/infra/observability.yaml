@@ -121,3 +121,27 @@ spec:
         - ports:
             - port: "3000"
               protocol: TCP
+---
+# kagent's victoria-metrics-mcp server (ai-system/victoria-metrics-mcp) proxies
+# PromQL/MetricsQL queries to vmsingle-stack on :8428. Without this, vmsingle
+# ingress is locked to intra-namespace only (allow-intra-namespace), so the MCP
+# server's SYN is silently dropped — every tool call hangs for the HTTP client
+# timeout (~120s), making the vm-agent time out on every query.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-vmsingle-from-vm-mcp
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: vmsingle
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: victoria-metrics-mcp
+      toPorts:
+        - ports:
+            - port: "8428"
+              protocol: TCP
