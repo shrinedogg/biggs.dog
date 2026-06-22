@@ -1,0 +1,254 @@
+---
+# Grafana dashboard for the single in-cluster GPU (RTX 5090 on nv-01), fed by
+# the NVIDIA DCGM exporter DaemonSet in this namespace
+# (VMServiceScrape nvidia-dcgm-exporter, port gpu-metrics). Picked up
+# automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard). No Grafana Operator CRD needed.
+#
+# Metric provenance note: DCGM metrics carry namespace="dreamcast" (the
+# DaemonSet's pod namespace) and a hostname="nv-01" label. The single physical
+# GPU is time-sliced into 4 nvidia.com/gpu replicas and shared between the
+# ai-system/vllm inference server and fenrir gaming sessions; the gpu-arbiter
+# scales vLLM to 0 during gaming and back to 1 afterward (see the "GPU Arbiter"
+# row which overlays that hand-off against VRAM).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gpu-health-dashboard
+  namespace: dreamcast
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Dreamcast"
+data:
+  gpu-health.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "NVIDIA RTX 5090 (nv-01) GPU health via DCGM exporter -- VRAM, utilisation, clocks, temperature, power, and Xid errors. Overlayed with the gpu-arbiter vLLM scale-down hand-off.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "timeseries",
+          "title": "VRAM Usage",
+          "description": "Framebuffer used vs free vs reserved (MiB). Total on this 32 GB card is ~32,110 MiB; the gpu-arbiter ungames once DCGM_FI_DEV_FB_FREE >= 8000 (vLLM scaled to 0). Free crashing near 0 under inference is normal (gpu_memory_utilization=0.97), but free staying ~0 while GPU_UTIL is also ~0 can indicate a stuck/leaked VRAM consumer.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_FB_USED{namespace=\"dreamcast\"}", "legendFormat": "Used", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_FB_FREE{namespace=\"dreamcast\"}", "legendFormat": "Free", "refId": "B" },
+            { "expr": "DCGM_FI_DEV_FB_RESERVED{namespace=\"dreamcast\"}", "legendFormat": "Reserved", "refId": "C" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "mib",
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal", "group": "A" }, "showPoints": "never" }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Free" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+            ]
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "GPU Utilisation",
+          "description": "SM (compute) utilisation vs memory-copy utilisation. GPU_UTIL near 0.984 is the saturated ceiling on this headless node. High MEM_COPY_UTIL with low GPU_UTIL = memory-bandwidth stall (relevant to Xid instability).",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_GPU_UTIL{namespace=\"dreamcast\"}", "legendFormat": "GPU (SM)", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_MEM_COPY_UTIL{namespace=\"dreamcast\"}", "legendFormat": "Mem copy", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 3,
+          "type": "timeseries",
+          "title": "XID Errors",
+          "description": "Value of the last XID error code encountered on the GPU. Non-zero = a GPU error occurred; the recurring nv-01 hard-freeze was suspected Xid 109 (CTX_SWITCH_TIMEOUT). See nvidia-gpu-tuning (clock cap 2800 MHz) for the mitigation. Requires the dcgmExporter custom metric profile (nv-gpu-operator/app/helmrelease.yaml).",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_XID_ERRORS{namespace=\"dreamcast\"}", "legendFormat": "Last XID code", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "min": 0,
+              "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } }
+        },
+        {
+          "id": 4,
+          "type": "timeseries",
+          "title": "PCIe Replay Counter",
+          "description": "Total PCIe retries. An increasing counter indicates bus-level errors (loose seating, bad riser, ASPM). Sustained growth correlates with Xid class 43/79 (off-the-bus).",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_PCIE_REPLAY_COUNTER{namespace=\"dreamcast\"}", "legendFormat": "PCIe retries", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 10 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Power Draw",
+          "description": "Power draw (W). RTX 5090 stock TDP is 600 W (power limit left at stock by nvidia-gpu-tuning; only the graphics clock is capped at 2800 MHz). Sustained at ceiling + thermal climb = throttling risk.",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_POWER_USAGE{namespace=\"dreamcast\"}", "legendFormat": "Power", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "watt",
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 15, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 500 }, { "color": "red", "value": 600 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "single", "sort": "none" } }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Clocks (SM & Memory)",
+          "description": "SM and memory clock frequencies (MHz). RTX 5090 stock max boost is 3105 MHz; nvidia-gpu-tuning caps graphics at 2800 MHz to curb Xid 109 boost transients. A clock suddenly dropping under load while temp is high = thermal/power throttling (Xid 13 precursor).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_SM_CLOCK{namespace=\"dreamcast\"}", "legendFormat": "SM (graphics)", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_MEM_CLOCK{namespace=\"dreamcast\"}", "legendFormat": "Memory", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "MHz", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Temperatures (GPU & Memory)",
+          "description": "GPU and memory die temperatures (C). GDDR7 on the 5090 is thermally sensitive; memory temp sustained above 95 C risks throttling and long-term degradation. Watch for the throttling cliff (clocks drop while temp peaks).",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_GPU_TEMP{namespace=\"dreamcast\"}", "legendFormat": "GPU", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_MEMORY_TEMP{namespace=\"dreamcast\"}", "legendFormat": "Memory", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "celsius",
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 90 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Encoder / Decoder Utilisation",
+          "description": "NVENC/NVDEC utilisation (%). Relevant to the fenrir/Wolf game-streaming path (moonlight encode) and to vLLM's multimodal decode (disabled here, but the encoder is shared with gaming).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_DEV_ENC_UTIL{namespace=\"dreamcast\"}", "legendFormat": "Encoder (NVENC)", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_DEC_UTIL{namespace=\"dreamcast\"}", "legendFormat": "Decoder (NVDEC)", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Engine Activity Ratios",
+          "description": "Profiling ratios (0-1): graphics-engine active, tensor-pipe (HMMA) active, and DRAM-interface active. For vLLM inference on this MoE, tensor-pipe activity tracks matrix throughput; DRAM active tracks weight/ KV memory bandwidth. Useful to confirm the GPU is compute-bound (tensor high) vs memory-bound (DRAM high, tensor low).",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "DCGM_FI_PROF_GR_ENGINE_ACTIVE{namespace=\"dreamcast\"}", "legendFormat": "Graphics engine", "refId": "A" },
+            { "expr": "DCGM_FI_PROF_PIPE_TENSOR_ACTIVE{namespace=\"dreamcast\"}", "legendFormat": "Tensor (HMMA)", "refId": "B" },
+            { "expr": "DCGM_FI_PROF_DRAM_ACTIVE{namespace=\"dreamcast\"}", "legendFormat": "DRAM", "refId": "C" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "GPU Arbiter: vLLM Replicas vs Free VRAM",
+          "description": "Operational overlay of the gpu-arbiter hand-off. vLLM desired replicas (ai-system/vllm) drops 1->0 when a fenrir gaming session starts, and free VRAM (MiB) climbs as vLLM releases it; the arbiter ungates the held gaming pod once free >= 8000 MiB (FREE_MIB). Mismatch (replicas stuck at 1 while gaming, or free not recovering) = arbiter/VRAM-release failure.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "kube_deployment_spec_replicas{namespace=\"ai-system\", deployment=\"vllm\"}", "legendFormat": "vLLM desired replicas", "refId": "A" },
+            { "expr": "DCGM_FI_DEV_FB_FREE{namespace=\"dreamcast\"}", "legendFormat": "Free VRAM (MiB)", "refId": "B", "hide": false }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" } },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Free VRAM (MiB)" }, "properties": [ { "id": "unit", "value": "mib" }, { "id": "custom.axisPlacement", "value": "right" } ] }
+            ]
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["gpu", "nvidia", "dreamcast", "dcgm"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "GPU Health (nv-01 RTX 5090)",
+      "uid": "gpu-health-dreamcast",
+      "version": 1
+    }

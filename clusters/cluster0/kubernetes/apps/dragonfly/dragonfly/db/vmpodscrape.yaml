@@ -1,0 +1,29 @@
+---
+# Scrape Dragonfly's Prometheus metrics into VictoriaMetrics. Dragonfly serves
+# /metrics on its ADMIN port (9999), NOT the redis port: the CR sets
+# --primary_port_http_enabled=false (HTTP disabled on :6379) and --admin_port=9999
+# (admin UI + /metrics). The operator's dragonfly-db Service only exposes redis
+# :6379, so we pod-scrape the admin port directly. Confirmed live: 259
+# dragonfly_* series on :9999/metrics (memory, connections, ops, replication
+# lag, pipeline stats). Pairs with the operator chart's shipped
+# grafanaDashboard (dragonfly HelmRelease grafanaDashboard.enabled=true), which
+# until now had no data. vmagent selectAllByDefault=true -> auto-discovered.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: dragonfly-db
+  namespace: dragonfly
+spec:
+  selector:
+    matchLabels:
+      app: dragonfly-db
+  namespaceSelector:
+    matchNames:
+      - dragonfly
+  podTargetLabels:
+    - app
+    - role
+  endpoints:
+    - port: admin
+      path: /metrics
+      interval: 30s

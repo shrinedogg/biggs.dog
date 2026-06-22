@@ -1,0 +1,188 @@
+---
+# Rook-Ceph cluster health dashboard. Fed by VMServiceScrape rook-ceph-mgr
+# (the mgr Prometheus module on :9283), which this repo added because Rook's
+# monitoring.enabled only emits ServiceMonitor CRs and the Prometheus Operator
+# CRDs are absent here. Picked up by the Grafana sidecar.
+#
+# Uses the standard ceph_* metrics exported by the Ceph mgr Prometheus module.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ceph-health-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Storage"
+data:
+  ceph-health.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Rook-Ceph cluster health via the mgr Prometheus module -- overall health, capacity, OSD/mon quorum state, and placement-group status.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Cluster Health",
+          "description": "0 = HEALTH_OK, 1 = HEALTH_WARN, 2 = HEALTH_ERR. Driven by ceph_health_status.",
+          "gridPos": { "h": 5, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "max(ceph_health_status)", "legendFormat": "health", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "mappings": [
+                { "options": { "0": { "text": "OK", "color": "green" }, "1": { "text": "WARN", "color": "yellow" }, "2": { "text": "ERR", "color": "red" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 2 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "OSDs Up / In",
+          "description": "OSDs up (running) vs in (participating). A drop in 'up' = crashed OSD; a drop in 'in' = OSD marked out (rebalancing). They should be equal and stable.",
+          "gridPos": { "h": 5, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(ceph_osd_up)", "legendFormat": "Up", "refId": "A" },
+            { "expr": "sum(ceph_osd_in)", "legendFormat": "In", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Up" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "In" }, "properties": [{ "id": "color", "value": { "fixedColor": "blue", "mode": "fixed" } }] }
+            ]
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value", "orientation": "vertical" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Monitors in Quorum",
+          "description": "Count of mons in quorum. Must be a majority (floor(N/2)+1); with 3 mons, losing 2 = loss of quorum = cluster stalls.",
+          "gridPos": { "h": 5, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(ceph_mon_quorum_status == 1)", "legendFormat": "Quorum", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 2 } ] }, "color": { "mode": "thresholds" } },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "PGs Active+Clean",
+          "description": "Placement groups in the healthy active+clean state, vs total. Should be 100%; degraded = recovery in progress or stuck PGs.",
+          "gridPos": { "h": 5, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(ceph_pg_active_clean)", "legendFormat": "active+clean", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Cluster Capacity (Used vs Available)",
+          "description": "Total bytes used vs available across the cluster. The default ceph-block pool is replicated size 3 across 4 worker OSDs (/dev/nvme0n1 each). Watch the available line trending toward zero.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(ceph_cluster_total_used_bytes)", "legendFormat": "Used", "refId": "A" },
+            { "expr": "sum(ceph_cluster_total_avail_bytes)", "legendFormat": "Available", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "bytes",
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 15, "stacking": { "mode": "normal", "group": "A" }, "showPoints": "never" }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Available" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] }
+            ]
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Per-OSD Utilisation (%)",
+          "description": "Each OSD's filled percentage. Imbalance (one OSD much fuller than others) triggers the balancer/pg_autoscaler mgr module. Slow-growers or a sudden jump indicate a near-full disk.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * ceph_osd_stat_bytes_used / clamp_min(ceph_osd_stat_bytes, 1)", "legendFormat": "{{ceph_daemon}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 75 }, { "color": "red", "value": 85 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Client IOPS (Read / Write)",
+          "description": "Cluster-wide client read/write ops per second, aggregated across all OSDs.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 13 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(rate(ceph_osd_op_r[5m]))", "legendFormat": "Reads/s", "refId": "A" },
+            { "expr": "sum(rate(ceph_osd_op_w[5m]))", "legendFormat": "Writes/s", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["ceph", "rook", "storage", "health"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Ceph Health (rook-ceph)",
+      "uid": "ceph-health-rook",
+      "version": 1
+    }

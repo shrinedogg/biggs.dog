@@ -1,0 +1,30 @@
+---
+# Scrape the active Rook-Ceph mgr's Prometheus module into VictoriaMetrics.
+#
+# Both rook charts set monitoring.enabled: true, but that makes Rook emit
+# ServiceMonitor (monitoring.coreos.com/v1) CRs -- and the Prometheus Operator
+# CRDs are NOT installed in this cluster (kubectl get servicemonitor errors:
+# "the server doesn't have a resource type"). So Rook's ServiceMonitors never
+# take effect and NO ceph_* metrics were being ingested. This VMServiceScrape
+# bridges that gap: vmagent (observability/stack) runs selectAllByDefault=true,
+# so this is auto-discovered with no vmagent config change.
+#
+# The mgr Prometheus module (ceph mgr module enable prometheus, done by Rook
+# when monitoring.enabled=true) exposes /metrics on :9283 with the full ceph_*
+# series: ceph_health_status, ceph_cluster_total_used_bytes, ceph_pool_bytes_used,
+# ceph_osd_up, ceph_mon_quorum, ceph_pg_*, etc. The service selector targets
+# only the ACTIVE mgr (mgr_role=active), so failover doesn't double-scrape.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: rook-ceph-mgr
+  namespace: rook-ceph
+spec:
+  selector:
+    matchLabels:
+      app: rook-ceph-mgr
+      rook_cluster: rook-ceph
+  endpoints:
+    - port: http-metrics
+      path: /metrics
+      interval: 30s

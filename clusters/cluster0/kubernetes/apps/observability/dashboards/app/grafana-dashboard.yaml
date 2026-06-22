@@ -1,0 +1,253 @@
+---
+# Reusable, namespace-scoped "component health" dashboard. Works for ANY
+# namespace because it relies only on the cluster-wide kube-state-metrics +
+# cadvisor + kubelet metric streams (no app-native exporter required).
+# Templated on $namespace. Picked up automatically by the Grafana sidecar
+# (searchNamespace: ALL, label: grafana-dashboard). No Grafana Operator CRD
+# needed. Same delivery pattern as ai-system/vllm/app/grafana-dashboard.yaml.
+#
+# Use this as the baseline "is the namespace healthy?" view for every app
+# namespace. Namespaces WITH app-native scrapes (ai-system/vllm, dreamcast GPU)
+# get dedicated Tier-2 dashboards on top of this one.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: namespace-health-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Kubernetes Health"
+data:
+  namespace-health.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Reusable per-namespace Kubernetes health view -- pod phases, readiness, restarts (CrashLoop), CPU/memory vs requests/limits, replica availability, and PVC usage. Works in any namespace via the $namespace variable; uses only kube-state-metrics + cadvisor + kubelet baseline metrics.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Pods Not Ready",
+          "description": "Count of pods whose Ready condition is false. Zero is healthy.",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\"})", "legendFormat": "Ready", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Unhealthy Pods",
+          "description": "Pods that are Failed OR not Ready. Zero is healthy.",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count((kube_pod_status_phase{namespace=\"$namespace\", phase=~\"Failed|Pending\"} == 1) or (kube_pod_status_ready{namespace=\"$namespace\", condition=\"true\"} == 0))", "legendFormat": "Unhealthy", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 3 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Total Restarts (5m)",
+          "description": "Sum of container restarts in the namespace over the last 5 minutes. Spikes indicate CrashLoopBackOff.",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[5m]))", "legendFormat": "Restarts", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "piechart",
+          "title": "Pod Phase Distribution",
+          "description": "Pods grouped by phase (Running / Pending / Failed / Succeeded).",
+          "gridPos": { "h": 8, "w": 8, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (phase) (kube_pod_status_phase{namespace=\"$namespace\"})", "legendFormat": "{{phase}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Running" }, "properties": [{ "id": "color", "value": { "fixedColor": "green", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "Pending" }, "properties": [{ "id": "color", "value": { "fixedColor": "yellow", "mode": "fixed" } }] },
+              { "matcher": { "id": "byName", "options": "Failed" }, "properties": [{ "id": "color", "value": { "fixedColor": "red", "mode": "fixed" } }] }
+            ]
+          },
+          "options": { "legend": { "displayMode": "list", "placement": "right", "showLegend": true, "values": ["value"] }, "pieType": "donut", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "tooltip": { "mode": "single", "sort": "none" } }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Replicas: Available vs Desired",
+          "description": "Deployment/StatefulSet/ReplicaSet available (ready) vs desired replica counts. Any sustained gap signals a rollout failure or pod instability.",
+          "gridPos": { "h": 8, "w": 16, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(kube_deployment_status_replicas_available{namespace=\"$namespace\"})", "legendFormat": "Deployments available", "refId": "A" },
+            { "expr": "sum(kube_deployment_spec_replicas{namespace=\"$namespace\"})", "legendFormat": "Deployments desired", "refId": "B" },
+            { "expr": "sum(kube_statefulset_status_replicas_ready{namespace=\"$namespace\"})", "legendFormat": "StatefulSets ready", "refId": "C" },
+            { "expr": "sum(kube_statefulset_spec_replicas{namespace=\"$namespace\"})", "legendFormat": "StatefulSets desired", "refId": "D" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 5, "showPoints": "never" } },
+            "overrides": [
+              { "matcher": { "id": "byRegexp", "options": ".*desired" }, "properties": [{ "id": "custom.lineStyle", "value": { "fill": "dash", "dash": [10, 10] } }] }
+            ]
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "none" } }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Container Restart Rate (CrashLoop)",
+          "description": "Per-pod container restart rate. Any non-zero line is a pod that restarted in the window; sustained spikes = CrashLoopBackOff.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(kube_pod_container_status_restarts_total{namespace=\"$namespace\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never", "stacking": { "mode": "normal", "group": "A" } } },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "CPU Usage vs Request (%)",
+          "description": "Per-pod CPU usage as a percentage of its CPU request. Sustained > 100% risks throttling and signals an under-requested workload.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"$namespace\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 100 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Memory Usage vs Limit (%)",
+          "description": "Per-pod memory working set as a percentage of its memory limit. Approaching 100% = imminent OOMKill. (vs request shown for capacity planning.)",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"$namespace\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}} vs limit", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "PVC Usage (%)",
+          "description": "Persistent volume claim utilisation. > 80% yellow, > 90% red -- prevents storage exhaustion and failed PVC-bound pods.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 32 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"$namespace\"}) / clamp_min(sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace=\"$namespace\"}), 1)", "legendFormat": "{{persistentvolumeclaim}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10, "showPoints": "never" },
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 90 } ] },
+              "color": { "mode": "thresholds" }
+            },
+            "overrides": []
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true }, "tooltip": { "mode": "multi", "sort": "desc" } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["kubernetes", "namespace", "health"],
+      "templating": {
+        "list": [
+          {
+            "current": {},
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "definition": "label_values(kube_pod_info, namespace)",
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "namespace",
+            "query": { "query": "label_values(kube_pod_info, namespace)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+            "refresh": 1,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          },
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Namespace Health",
+      "uid": "namespace-health",
+      "version": 1
+    }

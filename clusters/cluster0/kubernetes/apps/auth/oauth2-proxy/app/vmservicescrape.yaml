@@ -1,0 +1,20 @@
+---
+# Scrape oauth2-proxy's Prometheus endpoint into VictoriaMetrics. oauth2-proxy
+# natively exposes /metrics on its dedicated metrics port (arg
+# --metrics-address=0.0.0.0:44180; Service port name "metrics"). The chart does
+# not emit a VM-native scrape, and no pod annotation exists, so without this
+# the auth-forward-proxy request/error/latency metrics were uncollected.
+# vmagent (observability/stack) runs selectAllByDefault=true -> auto-discovered.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s

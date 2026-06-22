@@ -1,0 +1,38 @@
+---
+# Scrape the CloudNativePG postgres_exporter metrics sidecar into VictoriaMetrics.
+#
+# CNPG always runs a postgres_exporter in the postgres container on :9187
+# (port name "metrics"), but the Clusters ship with spec.monitoring.
+# enablePodMonitor=false -- and even if set to true, CNPG would emit a
+# monitoring.coreos.com/v1 PodMonitor, whose CRDs are NOT installed here
+# (so it would be silently ignored, same as the Rook ServiceMonitors). Result:
+# the exporter was running but UN-SCRAPED, and the already-imported official
+# cloudnative-pg Grafana dashboard (observability/grafana-operator HelmRelease
+# dashboards.default.cloudnative-pg) had no data. This VMPodScrape fixes that;
+# vmagent (observability/stack) runs selectAllByDefault=true, so it's
+# auto-discovered with no vmagent config change.
+#
+# Covers ALL CNPG clusters in cnpg-system (cnpg-affine, cnpg-bookboss,
+# cnpg-kagent, cnpg-pocket-id, cnpg-renovate) in one scrape: the pods share the
+# cnpg.io/podRole=instance label, and the per-cluster cnpg.io/cluster label is
+# carried through by pod discovery for dashboard grouping.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMPodScrape
+metadata:
+  name: cnpg-postgres
+  namespace: cnpg-system
+spec:
+  jobLabel: cnpg.io/cluster
+  selector:
+    matchLabels:
+      cnpg.io/podRole: instance
+  namespaceSelector:
+    matchNames:
+      - cnpg-system
+  podTargetLabels:
+    - cnpg.io/cluster
+    - cnpg.io/podRole
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
