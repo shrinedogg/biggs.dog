@@ -115,6 +115,27 @@ spec:
             - port: "9090"
               protocol: TCP
 ---
+# flux-operator-mcp reply path. The flux-operator-mcp Service is a ClusterIP;
+# like cnpg above, its SYN,ACK arrives reverse-NAT'd from the service VIP and
+# misses the egress conntrack entry, so Cilium treats it as new ingress to
+# ai-system and drops it ("Policy denied"). Allowing the return path fixes the
+# flux-agent -> flux-operator-mcp:9090 connection. Without this, kagent's
+# RemoteMCPServer reconcile for flux-operator-mcp fails with
+# "context deadline exceeded", stalling tool registration and (observed)
+# blocking all agent invocations via the context server.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-flux
+  namespace: ai-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: flux-system
+            app.kubernetes.io/name: flux-operator-mcp
+---
 # vm-mcp queries VictoriaMetrics in observability
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

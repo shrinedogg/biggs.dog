@@ -119,28 +119,6 @@ spec:
             - port: "9090"
               protocol: TCP
 ---
-# flux-operator-mcp -> ai-system: allow the reply (SYN-ACK) back to the
-# kagent controller, which initiates the ai-system -> flux-operator-mcp:9090
-# MCP connection. flux-system is egress-default-deny, so without this the
-# reply depends solely on Cilium's stateful conntrack -- which stopped
-# permitting it once kagent-controller and flux-operator-mcp were co-located
-# on nv-01 (node-pinning). The explicit allow removes that dependency.
-# Symmetric to allow-ingress-from-ai-system above. No toPorts: the reply's
-# destination port is the controller's ephemeral source port.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-egress-to-ai-system
-  namespace: flux-system
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: flux-operator-mcp
-  egress:
-    - toEndpoints:
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: ai-system
----
 # flux-operator exposes the Flux Status web UI on :9080 and metrics on :8080;
 # the chart previously allowed any namespace in. Keep it reachable from inside
 # the cluster for operators/dashboards.
