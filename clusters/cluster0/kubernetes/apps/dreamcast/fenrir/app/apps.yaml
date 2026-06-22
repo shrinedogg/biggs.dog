@@ -75,7 +75,7 @@ spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 3
   isHDRSupported: true
-  title: Test Ball  
+  title: Test Ball
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:
     runtimeVariables:
@@ -84,13 +84,12 @@ spec:
     startAudioServer: false
     startVirtualCompositor: false
     audio:
-      source: 'audiotestsrc wave=ticks is-live=true'
+      source: "audiotestsrc wave=ticks is-live=true"
     video:
       source: |
         videotestsrc pattern=ball flip=true is-live=true !
         video/x-raw, framerate={fps}/1
 ---
-# yaml-language-server: $schema=https://github.com/games-on-whaless/fenrir/raw/refs/heads/main/schemas/direwolf.games-on-whales.github.io/app_v1alpha1.json
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: App
 metadata:
@@ -123,257 +122,265 @@ spec:
       # the matching NVIDIA driver .run (cached on the nvngx-cache PVC so the
       # download happens at most once) and stages them for the app container.
       initContainers:
-      - name: nvngx-bridge
-        image: ghcr.io/games-on-whales/steam:fedora-43
-        securityContext:
-          # Write to the fresh cache PVC / scratch emptyDir (root-owned).
-          runAsUser: 0
-        command:
-        - /bin/bash
-        - -c
-        - |
-          set -euo pipefail
-          # Must match the host NVIDIA driver shipped by the Talos extension.
-          # Bump this when the node's nvidia driver/extension is upgraded.
-          VER=595.71.05
-          DEST=/cache
-          mkdir -p "$DEST"
-          if [ -f "$DEST/_nvngx.dll" ] && [ -f "$DEST/nvngx.dll" ] \
-             && [ "$(cat "$DEST/.driver-version" 2>/dev/null || true)" = "$VER" ]; then
-            echo "nvngx cache hit for driver $VER"
-            exit 0
-          fi
-          echo "nvngx cache miss; downloading NVIDIA $VER to extract wine NGX DLLs"
-          cd /work
-          url="https://us.download.nvidia.com/XFree86/Linux-x86_64/$VER/NVIDIA-Linux-x86_64-$VER.run"
-          if command -v curl >/dev/null 2>&1; then
-            curl -fsSL -o nv.run "$url"
-          else
-            wget -qO nv.run "$url"
-          fi
-          sh nv.run -x
-          main="$(find . -name nvngx.dll -type f | head -n1)"
-          bridge="$(find . -name _nvngx.dll -type f | head -n1)"
-          if [ -z "$main" ] || [ -z "$bridge" ]; then
-            echo "ERROR: nvngx.dll/_nvngx.dll not found in extracted driver" >&2
-            exit 1
-          fi
-          install -m 0644 "$main" "$DEST/nvngx.dll"
-          install -m 0644 "$bridge" "$DEST/_nvngx.dll"
-          echo "$VER" > "$DEST/.driver-version"
-          echo "staged nvngx bridge DLLs:"
-          ls -l "$DEST"
-        volumeMounts:
-        - name: nvngx-cache
-          mountPath: /cache
-        - name: nvngx-work
-          mountPath: /work
+        - name: nvngx-bridge
+          image: ghcr.io/games-on-whales/steam:fedora-43
+          securityContext:
+            # Write to the fresh cache PVC / scratch emptyDir (root-owned).
+            runAsUser: 0
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              # Must match the host NVIDIA driver shipped by the Talos extension.
+              # Bump this when the node's nvidia driver/extension is upgraded.
+              VER=595.71.05
+              DEST=/cache
+              mkdir -p "$DEST"
+              if [ -f "$DEST/_nvngx.dll" ] && [ -f "$DEST/nvngx.dll" ] \
+                 && [ "$(cat "$DEST/.driver-version" 2>/dev/null || true)" = "$VER" ]; then
+                echo "nvngx cache hit for driver $VER"
+                exit 0
+              fi
+              echo "nvngx cache miss; downloading NVIDIA $VER to extract wine NGX DLLs"
+              cd /work
+              url="https://us.download.nvidia.com/XFree86/Linux-x86_64/$VER/NVIDIA-Linux-x86_64-$VER.run"
+              if command -v curl >/dev/null 2>&1; then
+                curl -fsSL -o nv.run "$url"
+              else
+                wget -qO nv.run "$url"
+              fi
+              sh nv.run -x
+              main="$(find . -name nvngx.dll -type f | head -n1)"
+              bridge="$(find . -name _nvngx.dll -type f | head -n1)"
+              if [ -z "$main" ] || [ -z "$bridge" ]; then
+                echo "ERROR: nvngx.dll/_nvngx.dll not found in extracted driver" >&2
+                exit 1
+              fi
+              install -m 0644 "$main" "$DEST/nvngx.dll"
+              install -m 0644 "$bridge" "$DEST/_nvngx.dll"
+              echo "$VER" > "$DEST/.driver-version"
+              echo "staged nvngx bridge DLLs:"
+              ls -l "$DEST"
+          volumeMounts:
+            - name: nvngx-cache
+              mountPath: /cache
+            - name: nvngx-work
+              mountPath: /work
       containers:
-      - name: app
-        image: ghcr.io/games-on-whales/steam:fedora-43
-        # Without a GPU allocation the container gets no /dev/dri node and no
-        # driver libs (CDI injection is per-allocated-container), so Sway and
-        # Steam render nothing onto the Wayland display -> black video.
-        # nv-01 exposes 4 time-sliced nvidia.com/gpu replicas, so the wolf
-        # sidecar and the app each requesting one is fine.
-        resources:
-          limits:
-            nvidia.com/gpu: "1"
-          requests:
-            nvidia.com/gpu: "1"
-        securityContext:
-          # Privileged is required for controller input: wolf hotplugs
-          # uinput devices mid-session and the container's device cgroup
-          # denies open() on /dev/input/event* ("Operation not permitted").
-          # Kubernetes has no equivalent of Docker's device_cgroup_rules
-          # (c 13:* rmw), so privileged is the only way to admit devices
-          # that do not exist at container start.
-          privileged: true
-          capabilities:
-            add: ["SYS_ADMIN", "SYS_NICE", "SYS_PTRACE", "NET_RAW", "MKNOD", "NET_ADMIN"]
-          seccompProfile:
-            type: Unconfined
-          appArmorProfile:
-            type: Unconfined
-          allowPrivilegeEscalation: true
-          runAsUser: 0
-          runAsGroup: 0
-        env:
-        # Sway (wlroots 0.19) used to abort on wolf's compositor: it
-        # advertised both the legacy wl_drm global and dmabuf v4 feedback,
-        # and wlroots asserted on the duplicate device announcement
-        # (backend/wayland/backend.c:311). Fixed in the patched wolf image
-        # (docker.io/shrinedogg/wolf, see helmrelease.yaml WOLF_IMAGE):
-        # the compositor now skips wl_drm when dmabuf v4 feedback is active
-        # (opt back in with GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1).
-        - name: RUN_SWAY
-          value: "true"
-        # - name: RUN_GAMESCOPE
-        #   value: "true"
-        - name: PROTON_LOG
-          value: "1"
-        # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
-        # NVIDIA GBM backend in /usr/local/lib/gbm but Mesa's libgbm only
-        # searches /usr/lib/x86_64-linux-gnu/gbm. Without it Sway falls back
-        # to dumb buffers (rejected by NVIDIA render nodes), no output gets
-        # created, and Steam never launches -> black stream.
-        - name: GBM_BACKENDS_PATH
-          value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
-        # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
-        # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
-        # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
-        # DLSS option stays greyed out regardless of the RTX GPU. These are
-        # Proton-side toggles consumed by the entrypoint, so they take effect
-        # even though the GPU is injected via CDI.
-        - name: PROTON_ENABLE_NVAPI
-          value: "1"
-        - name: DXVK_ENABLE_NVAPI
-          value: "1"
-        # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
-        # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
-        # (session.go), and a duplicate env key makes the server-side-apply
-        # patch invalid -> the Deployment is never created and the session
-        # reaper kills the session after 60s.
-        command:
-        - /bin/bash
-        - -c
-        - |
-          cleanup() {
-            echo "Cleaning up..." >&2
-            exit 0
-          }
-          trap cleanup SIGINT SIGTERM
+        - name: app
+          image: ghcr.io/games-on-whales/steam:fedora-43
+          # Without a GPU allocation the container gets no /dev/dri node and no
+          # driver libs (CDI injection is per-allocated-container), so Sway and
+          # Steam render nothing onto the Wayland display -> black video.
+          # nv-01 exposes 4 time-sliced nvidia.com/gpu replicas, so the wolf
+          # sidecar and the app each requesting one is fine.
+          resources:
+            limits:
+              nvidia.com/gpu: "1"
+            requests:
+              nvidia.com/gpu: "1"
+          securityContext:
+            # Privileged is required for controller input: wolf hotplugs
+            # uinput devices mid-session and the container's device cgroup
+            # denies open() on /dev/input/event* ("Operation not permitted").
+            # Kubernetes has no equivalent of Docker's device_cgroup_rules
+            # (c 13:* rmw), so privileged is the only way to admit devices
+            # that do not exist at container start.
+            privileged: true
+            capabilities:
+              add:
+                [
+                  "SYS_ADMIN",
+                  "SYS_NICE",
+                  "SYS_PTRACE",
+                  "NET_RAW",
+                  "MKNOD",
+                  "NET_ADMIN",
+                ]
+            seccompProfile:
+              type: Unconfined
+            appArmorProfile:
+              type: Unconfined
+            allowPrivilegeEscalation: true
+            runAsUser: 0
+            runAsGroup: 0
+          env:
+            # Sway (wlroots 0.19) used to abort on wolf's compositor: it
+            # advertised both the legacy wl_drm global and dmabuf v4 feedback,
+            # and wlroots asserted on the duplicate device announcement
+            # (backend/wayland/backend.c:311). Fixed in the patched wolf image
+            # (docker.io/shrinedogg/wolf, see helmrelease.yaml WOLF_IMAGE):
+            # the compositor now skips wl_drm when dmabuf v4 feedback is active
+            # (opt back in with GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1).
+            - name: RUN_SWAY
+              value: "true"
+            # - name: RUN_GAMESCOPE
+            #   value: "true"
+            - name: PROTON_LOG
+              value: "1"
+            # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
+            # NVIDIA GBM backend in /usr/local/lib/gbm but Mesa's libgbm only
+            # searches /usr/lib/x86_64-linux-gnu/gbm. Without it Sway falls back
+            # to dumb buffers (rejected by NVIDIA render nodes), no output gets
+            # created, and Steam never launches -> black stream.
+            - name: GBM_BACKENDS_PATH
+              value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+            # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
+            # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
+            # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
+            # DLSS option stays greyed out regardless of the RTX GPU. These are
+            # Proton-side toggles consumed by the entrypoint, so they take effect
+            # even though the GPU is injected via CDI.
+            - name: PROTON_ENABLE_NVAPI
+              value: "1"
+            - name: DXVK_ENABLE_NVAPI
+              value: "1"
+          # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
+          # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
+          # (session.go), and a duplicate env key makes the server-side-apply
+          # patch invalid -> the Deployment is never created and the session
+          # reaper kills the session after 60s.
+          command:
+            - /bin/bash
+            - -c
+            - |
+              cleanup() {
+                echo "Cleaning up..." >&2
+                exit 0
+              }
+              trap cleanup SIGINT SIGTERM
 
-          # Wait for wayland display to be available
-          while [ ! -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]; do
-            echo "Waiting for wayland display..." >&2
-            sleep 1
-          done
+              # Wait for wayland display to be available
+              while [ ! -S $XDG_RUNTIME_DIR/$WAYLAND_DISPLAY ]; do
+                echo "Waiting for wayland display..." >&2
+                sleep 1
+              done
 
-          while [ ! -S $XDG_RUNTIME_DIR/pulse-socket ]; do
-            echo "Waiting for pulse socket..." >&2
-            sleep 1
-          done
+              while [ ! -S $XDG_RUNTIME_DIR/pulse-socket ]; do
+                echo "Waiting for pulse socket..." >&2
+                sleep 1
+              done
 
-          # Do NOT export PULSE_SINK/PULSE_SOURCE here: this image has no
-          # pactl, so the old lookup exported PULSE_SINK="" and
-          # PULSE_SOURCE=".monitor". libpulse treats a set-but-bogus device
-          # name as an explicit request and fails the stream instead of
-          # falling back, leaving Steam silent. The wolf pulseaudio server
-          # already makes the session's virtual sink the default sink.
+              # Do NOT export PULSE_SINK/PULSE_SOURCE here: this image has no
+              # pactl, so the old lookup exported PULSE_SINK="" and
+              # PULSE_SOURCE=".monitor". libpulse treats a set-but-bogus device
+              # name as an explicit request and fails the stream instead of
+              # falling back, leaving Steam silent. The wolf pulseaudio server
+              # already makes the session's virtual sink the default sink.
 
-          # Run a real udevd inside the container (privileged; the kernel
-          # broadcasts uevents into the pod's netns). This is what lets
-          # games detect the virtual pad Steam Input creates mid-game:
-          # Steam itself receives the Moonlight controller (via the
-          # wolf-agent's fake-udev events), but it then emulates a new
-          # uinput pad for the game, and without udevd nobody writes the
-          # udev db entry or libudev event for it -> SDL/Proton in-game
-          # see no controller at all.
-          /usr/lib/systemd/systemd-udevd --daemon
-          udevadm trigger --subsystem-match=input --action=add 2>/dev/null || true
-          udevadm settle --timeout=5 2>/dev/null || true
+              # Run a real udevd inside the container (privileged; the kernel
+              # broadcasts uevents into the pod's netns). This is what lets
+              # games detect the virtual pad Steam Input creates mid-game:
+              # Steam itself receives the Moonlight controller (via the
+              # wolf-agent's fake-udev events), but it then emulates a new
+              # uinput pad for the game, and without udevd nobody writes the
+              # udev db entry or libudev event for it -> SDL/Proton in-game
+              # see no controller at all.
+              /usr/lib/systemd/systemd-udevd --daemon
+              udevadm trigger --subsystem-match=input --action=add 2>/dev/null || true
+              udevadm settle --timeout=5 2>/dev/null || true
 
-          # Focus guard (sway only): Steam's steamwebhelper maps an invisible,
-          # unnamed, class-less notification popup (role "popup",
-          # _NET_WM_WINDOW_TYPE_NOTIFICATION) that grabs X input focus away
-          # from the running game. Gamescope pins focus to the game so it is
-          # immune; sway honors the client-side XSetInputFocus and keyboard +
-          # Steam Input controller routing both break (input lands in the
-          # popup, Steam thinks BPM is foreground). The guard polls X focus
-          # and, while a viewable steam_app_* window exists, returns focus to
-          # it whenever an unnamed/class-less window holds it. Legitimate
-          # focus changes (BPM has WM_CLASS steamwebhelper) are untouched.
-          cat > /tmp/focus-guard.py <<'PYEOF'
-          import time
-          from Xlib import display, X
+              # Focus guard (sway only): Steam's steamwebhelper maps an invisible,
+              # unnamed, class-less notification popup (role "popup",
+              # _NET_WM_WINDOW_TYPE_NOTIFICATION) that grabs X input focus away
+              # from the running game. Gamescope pins focus to the game so it is
+              # immune; sway honors the client-side XSetInputFocus and keyboard +
+              # Steam Input controller routing both break (input lands in the
+              # popup, Steam thinks BPM is foreground). The guard polls X focus
+              # and, while a viewable steam_app_* window exists, returns focus to
+              # it whenever an unnamed/class-less window holds it. Legitimate
+              # focus changes (BPM has WM_CLASS steamwebhelper) are untouched.
+              cat > /tmp/focus-guard.py <<'PYEOF'
+              import time
+              from Xlib import display, X
 
-          def viewable_game(d):
-              for w in d.screen().root.query_tree().children:
+              def viewable_game(d):
+                  for w in d.screen().root.query_tree().children:
+                      try:
+                          cls = w.get_wm_class()
+                          if cls and cls[0].startswith("steam_app_") \
+                                  and w.get_attributes().map_state == X.IsViewable:
+                              return w
+                      except Exception:
+                          pass
+                  return None
+
+              while True:
                   try:
-                      cls = w.get_wm_class()
-                      if cls and cls[0].startswith("steam_app_") \
-                              and w.get_attributes().map_state == X.IsViewable:
-                          return w
+                      d = display.Display()
+                      while True:
+                          game = viewable_game(d)
+                          if game is not None:
+                              f = d.get_input_focus().focus
+                              if getattr(f, "id", None) not in (None, game.id):
+                                  try:
+                                      cls = f.get_wm_class()
+                                      name = f.get_wm_name()
+                                  except Exception:
+                                      cls = name = None
+                                  if not cls and not name:
+                                      d.set_input_focus(game, X.RevertToParent,
+                                                        X.CurrentTime)
+                                      d.sync()
+                          time.sleep(1)
                   except Exception:
-                      pass
-              return None
+                      time.sleep(5)
+              PYEOF
+              if [ "$RUN_SWAY" = "true" ]; then
+                (
+                  while [ ! -S /tmp/.X11-unix/X0 ]; do sleep 2; done
+                  exec runuser -u ${UNAME:-retro} -- env DISPLAY=:0 python3 /tmp/focus-guard.py
+                ) &
+              fi
 
-          while True:
-              try:
-                  d = display.Display()
-                  while True:
-                      game = viewable_game(d)
-                      if game is not None:
-                          f = d.get_input_focus().focus
-                          if getattr(f, "id", None) not in (None, game.id):
-                              try:
-                                  cls = f.get_wm_class()
-                                  name = f.get_wm_name()
-                              except Exception:
-                                  cls = name = None
-                              if not cls and not name:
-                                  d.set_input_focus(game, X.RevertToParent,
-                                                    X.CurrentTime)
-                                  d.sync()
-                      time.sleep(1)
-              except Exception:
-                  time.sleep(5)
-          PYEOF
-          if [ "$RUN_SWAY" = "true" ]; then
-            (
-              while [ ! -S /tmp/.X11-unix/X0 ]; do sleep 2; done
-              exec runuser -u ${UNAME:-retro} -- env DISPLAY=:0 python3 /tmp/focus-guard.py
-            ) &
-          fi
-
-          chown -R $PUID:$PGID /home/retro
-          chmod -R 777 /home/retro
-          exec /entrypoint.sh
-        volumeMounts:
-        - name: uinput
-          mountPath: /dev/uinput
-        - name: input-events
-          mountPath: /dev/input
-        # Steam's CEF UI (steamwebhelper) allocates its GPU command buffers
-        # in /dev/shm; the container-runtime default of 64Mi fills instantly
-        # and Big Picture renders nothing (black screen with cursor).
-        - name: dshm
-          mountPath: /dev/shm
-        # udev database written by the wolf-agent (fake-udev) so SDL/Steam
-        # detect the virtual controllers wolf hotplugs. The volume is
-        # defined in the User spec (user.yaml) and shared across the pod.
-        - name: udev-data
-          mountPath: /run/udev
-        # DLSS: the nvngx-bridge initContainer stages the NVIDIA wine NGX
-        # bridge DLLs here. Proton derives this exact path from
-        # realpath(libGLX_nvidia.so)/../nvidia/wine (CDI roots driver libs in
-        # /usr/local/lib) and copies them into each prefix's system32.
-        - name: nvngx-cache
-          mountPath: /usr/local/lib/nvidia/wine
-          readOnly: true
+              chown -R $PUID:$PGID /home/retro
+              chmod -R 777 /home/retro
+              exec /entrypoint.sh
+          volumeMounts:
+            - name: uinput
+              mountPath: /dev/uinput
+            - name: input-events
+              mountPath: /dev/input
+            # Steam's CEF UI (steamwebhelper) allocates its GPU command buffers
+            # in /dev/shm; the container-runtime default of 64Mi fills instantly
+            # and Big Picture renders nothing (black screen with cursor).
+            - name: dshm
+              mountPath: /dev/shm
+            # udev database written by the wolf-agent (fake-udev) so SDL/Steam
+            # detect the virtual controllers wolf hotplugs. The volume is
+            # defined in the User spec (user.yaml) and shared across the pod.
+            - name: udev-data
+              mountPath: /run/udev
+            # DLSS: the nvngx-bridge initContainer stages the NVIDIA wine NGX
+            # bridge DLLs here. Proton derives this exact path from
+            # realpath(libGLX_nvidia.so)/../nvidia/wine (CDI roots driver libs in
+            # /usr/local/lib) and copies them into each prefix's system32.
+            - name: nvngx-cache
+              mountPath: /usr/local/lib/nvidia/wine
+              readOnly: true
       volumes:
-      - name: uinput
-        hostPath:
-          path: /dev/uinput
-          type: CharDevice
-      - name: input-events
-        hostPath:
-          path: /dev/input
-          type: Directory
-      - name: dshm
-        emptyDir:
-          medium: Memory
-          sizeLimit: 4Gi
-      # Persistent cache (host-path on nv-01) holding the extracted wine NGX
-      # bridge DLLs so the NVIDIA driver .run is downloaded at most once.
-      - name: nvngx-cache
-        persistentVolumeClaim:
-          claimName: nvngx-cache
-      # Scratch space for the initContainer to download + extract the .run.
-      - name: nvngx-work
-        emptyDir:
-          sizeLimit: 4Gi
+        - name: uinput
+          hostPath:
+            path: /dev/uinput
+            type: CharDevice
+        - name: input-events
+          hostPath:
+            path: /dev/input
+            type: Directory
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 4Gi
+        # Persistent cache (host-path on nv-01) holding the extracted wine NGX
+        # bridge DLLs so the NVIDIA driver .run is downloaded at most once.
+        - name: nvngx-cache
+          persistentVolumeClaim:
+            claimName: nvngx-cache
+        # Scratch space for the initContainer to download + extract the .run.
+        - name: nvngx-work
+          emptyDir:
+            sizeLimit: 4Gi
   wolfConfig:
     runtimeVariables:
       # See the firefox app above: the dGPU's DRM node is renderD129.
