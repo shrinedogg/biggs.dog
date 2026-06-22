@@ -37,6 +37,17 @@ spec:
     # agent-sandbox. Useful for post-processing tool results, computing
     # statistics, and generating structured reports from Flux data.
     executeCodeBlocks: true
+    context:
+      # Bound session growth so diagnostic tool results (full k8s resource
+      # YAMLs from get_kubernetes_resources) can't accumulate past the model's
+      # 131K context window. When a call's prompt tokens hit tokenThreshold,
+      # ADK summarizes older events (via the local model) and drops the
+      # originals, keeping the session bounded. Without this, a multi-turn Flux
+      # diagnosis overflows the window (observed: input_tokens=131073).
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
     deployment:
       resources:
         requests:
