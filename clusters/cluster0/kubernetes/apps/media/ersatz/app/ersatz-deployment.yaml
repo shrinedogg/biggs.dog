@@ -33,7 +33,7 @@ spec:
         # digest (see pinDigests rule in renovate.json) so updates land in-place
         # without rolling back to an older stable vXX.Y.Z build, which could downgrade
         # the database schema.
-        - image: ersatztv/legacy:develop@sha256:c50f62b4a2cb84e4162cfb7a3df9768e61ca6bb6dd18df2b8b334f1341e3ee87
+        - image: ersatztv/legacy:develop@sha256:6a60bba98387544929d09fdce85a9dfe249ef64ea378504b5b659486ece57df9
           imagePullPolicy: Always
           name: ersatz
           securityContext:
