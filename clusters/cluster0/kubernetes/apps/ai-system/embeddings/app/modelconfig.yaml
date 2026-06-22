@@ -4,8 +4,8 @@
 # memory -- the embeddings provider that kagent uses to vectorize/store/recall
 # memory entries in the pgvector-backed kagent DB.
 #
-# Provider is OpenAI (Infinity is OpenAI /v1/embeddings-aligned), so the ADK
-# OpenAI client calls {baseUrl}/embeddings -> http://embeddings.ai-system:7997/v1/embeddings.
+# Provider is OpenAI (Infinity is OpenAI /embeddings-aligned), so the ADK
+# OpenAI client calls {baseUrl}/embeddings -> http://embeddings.ai-system:7997/embeddings.
 # The model id must match Infinity's --model-id. The api key reuses the shared
 # kagent-vllm secret (also set as INFINITY_API_KEY on the server) -- purely for
 # client compliance; Infinity enforces it server-side too.
@@ -23,4 +23,7 @@ spec:
   apiKeySecret: kagent-vllm
   apiKeySecretKey: OPENAI_API_KEY
   openAI:
-    baseUrl: "http://embeddings.ai-system.svc.cluster.local:7997/v1"
+    # No /v1 suffix: Infinity serves its OpenAI-compatible endpoint at
+    # /embeddings (not /v1/embeddings). The /v1/* paths return 404, which
+    # silently broke every memory embedding call (memory table stayed empty).
+    baseUrl: "http://embeddings.ai-system.svc.cluster.local:7997"
