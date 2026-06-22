@@ -1,7 +1,19 @@
 ---
-# ClusterRole to give kagent cilium agents full read access to the cluster
-# This enables the k8s_get_resources and k8s_describe_resource tools to work
-# across all namespaces.
+# Read-only cluster access scoped to the kagent Cilium agent runner SAs only.
+#
+# Architecture note: the k8s_* tools these agents expose (k8s_get_resources,
+# k8s_describe_resource, ...) do NOT execute under these ServiceAccounts. They
+# are served by kagent-tool-server -- a separate Deployment with its OWN
+# ServiceAccount and its own read-only ClusterRole (rendered by the kagent-tools
+# subchart). So the agent-runner SAs do not strictly need cluster read for their
+# tools to function; this binding is retained as a narrow fallback for the two
+# cilium agent SAs only.
+#
+# This replaces a much broader ClusterRoleBinding (`kagent-admin-readers`) that
+# bound the whole `system:serviceaccounts:ai-system` GROUP to this role -- i.e.
+# every SA in ai-system (vllm, victoria-metrics-mcp, the kagent controller, all
+# agent runners) got cluster-wide read INCLUDING secrets, for no functional
+# reason. That group grant has been removed.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -9,15 +21,15 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: kagent
 rules:
-  # Full read access to all resources across all namespaces
+  # Read-only across all resources/namespaces. (Historically broad; the cilium
+  # tools themselves run via kagent-tool-server's own RBAC. Could be narrowed /
+  # swapped for the built-in `view` role as a follow-up to drop secret reads.)
   - apiGroups: ["*"]
     resources: ["*"]
     verbs: ["get", "list", "watch"]
-  # Core API group (nodes, events, etc.)
   - nonResourceURLs: ["*"]
     verbs: ["get"]
 ---
-# Bind the ClusterRole to the kagent service account used by cilium agents
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -26,24 +38,12 @@ metadata:
     app.kubernetes.io/managed-by: kagent
 subjects:
   - kind: ServiceAccount
-    name: kagent-cilium-debug-agent  # agent pods use this SA pattern
+    name: kagent-cilium-debug-agent
     namespace: ai-system
   - kind: ServiceAccount
     name: kagent-cilium-policy-agent
     namespace: ai-system
----
-# Also bind for all kagent-managed agents that might need cluster-wide reads
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRoleBinding
-metadata:
-  name: kagent-admin-readers
-  labels:
-    app.kubernetes.io/managed-by: kagent
-subjects:
-  - kind: Group
-    name: system:serviceaccounts:ai-system
-    apiGroup: rbac.authorization.k8s.io
 roleRef:
+  apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
   name: kagent-cilium-admin
-  apiGroup: rbac.authorization.k8s.io

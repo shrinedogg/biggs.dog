@@ -37,7 +37,11 @@ spec:
     networkPolicy:
       create: false
     rbac:
-      # cluster-admin is the chart default and is required: the MCP server
-      # reads Flux CRs (GitRepository, Kustomization, HelmRelease, etc.) across
-      # all namespaces. Kept explicit for clarity.
-      create: true
+      # Disable the chart's cluster-admin ClusterRoleBinding. The flux-operator-mcp
+      # server is a read-only diagnostic agent (readonly: true above); cluster-admin
+      # grants create/update/delete/patch/escalate cluster-wide, far beyond what a
+      # read-only, prompt-injectable LLM-driven service needs. The SA is still
+      # created (serviceAccount.create defaults to true, independent of rbac), and
+      # rbac-readonly.yaml binds it to the built-in `view` ClusterRole (read-only,
+      # no secrets/exec) plus a narrow role for Flux CRs, pods/log, and metrics.
+      create: false

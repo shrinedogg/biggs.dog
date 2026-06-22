@@ -1,0 +1,83 @@
+---
+# Read-only RBAC for the flux-operator-mcp server, which backs the read-only
+# flux-agent. Replaces the chart's default `cluster-admin` binding (disabled via
+# rbac.create=false in helmrelease.yaml), which was over-privileged for a
+# read-only, prompt-injectable LLM-driven service: cluster-admin grants create/
+# update/delete/patch/escalate across the whole cluster, far beyond the read-only
+# Flux inspection this server does.
+#
+# Two-part strategy:
+#   1) Bind the SA to the built-in `view` ClusterRole -> read-only across core,
+#      apps, and CRDs that aggregate to view (most do). Crucially `view` EXCLUDES
+#      `secrets` and `pods/exec`, so neither secret values nor exec is reachable.
+#   2) A narrow explicit role for the Flux API groups (which may not aggregate),
+#      pods/log (for get_kubernetes_logs), and metrics.k8s.io (get_kubernetes_metrics).
+#
+# The ServiceAccount `flux-operator-mcp` is still created by the chart
+# (serviceAccount.create defaults to true and is independent of rbac.create).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-operator-mcp-view
+  labels:
+    app.kubernetes.io/name: flux-operator-mcp
+    app.kubernetes.io/managed-by: flux-mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: view
+subjects:
+  - kind: ServiceAccount
+    name: flux-operator-mcp
+    namespace: flux-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: flux-operator-mcp-readonly
+  labels:
+    app.kubernetes.io/name: flux-operator-mcp
+    app.kubernetes.io/managed-by: flux-mcp
+rules:
+  # Flux CD GitOps CRs (the agent's primary domain).
+  - apiGroups:
+      - source.toolkit.fluxcd.io
+      - kustomize.toolkit.fluxcd.io
+      - helm.toolkit.fluxcd.io
+      - notification.toolkit.fluxcd.io
+      - image.toolkit.fluxcd.io
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Flux Operator CRs (FluxInstance, FluxConfig).
+  - apiGroups:
+      - fluxcd.controlplane.io
+    resources: ["*"]
+    verbs: ["get", "list", "watch"]
+  # Pod logs (get_kubernetes_logs) -- NOT granted by the built-in view role.
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  # Metrics (get_kubernetes_metrics).
+  - apiGroups: ["metrics.k8s.io"]
+    resources: ["pods", "nodes"]
+    verbs: ["get", "list"]
+  # API discovery (get_kubernetes_api_versions). system:discovery (auto-bound to
+  # system:authenticated) already covers this; repeated explicitly for robustness.
+  - nonResourceURLs: ["/api", "/api/*", "/apis", "/apis/*", "/version", "/healthz", "/readyz", "/livez"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: flux-operator-mcp-readonly
+  labels:
+    app.kubernetes.io/name: flux-operator-mcp
+    app.kubernetes.io/managed-by: flux-mcp
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: flux-operator-mcp-readonly
+subjects:
+  - kind: ServiceAccount
+    name: flux-operator-mcp
+    namespace: flux-system
