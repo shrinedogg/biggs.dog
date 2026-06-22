@@ -12,3 +12,4 @@ resources:
   - ./kagent/cilium-agents/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
   - ./flux-mcp/ks.yaml
+  - ./embeddings/ks.yaml

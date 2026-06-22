@@ -1,0 +1,132 @@
+---
+# Minimal dedicated identity for the embedding server. No cluster RBAC: it
+# only serves HTTP /v1/embeddings; it does not touch the Kubernetes API.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: embeddings
+  namespace: ai-system
+---
+# Infinity embedding server (CPU). Serves an OpenAI-compatible /v1/embeddings
+# endpoint for BAAI/bge-m3, which kagent's OpenAI ModelConfig
+# (`embedding-model`) targets for long-term (vector) memory.
+#
+# Why Infinity: OpenAI API-aligned (so the kagent OpenAI provider's
+# {base_url}/embeddings calls work as-is), ships a dedicated `latest-cpu`
+# image, and explicitly lists bge-m3 as a tested model.
+# https://github.com/michaelfeil/infinity
+#
+# torch engine (not optimum/ONNX): bge-m3 works with the torch backend without
+# needing a separate ONNX export; optimum would be faster but requires one.
+#
+# Reuses the shared kagent-vllm API key as INFINITY_API_KEY so auth matches the
+# ModelConfig's apiKeySecretRef (kagent-vllm) -- defense in depth, and the same
+# key already secures the chat vLLM.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: embeddings
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: embeddings
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: embeddings
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: embeddings
+    spec:
+      serviceAccountName: embeddings
+      terminationGracePeriodSeconds: 10
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - name: infinity
+          image: michaelf34/infinity:latest-cpu
+          imagePullPolicy: IfNotPresent
+          args:
+            - v2
+            - --model-id=BAAI/bge-m3
+            - --engine=torch
+            - --port=7997
+          env:
+            # Persist downloaded weights across restarts (re-download is slow).
+            - name: HF_HOME
+              value: /data
+            # Enforce auth; matches the ModelConfig apiKeySecretRef below.
+            - name: INFINITY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kagent-vllm
+                  key: VLLM_API_KEY
+            # Quieter logs.
+            - name: INFINITY_LOG_LEVEL
+              value: warning
+          ports:
+            - name: http
+              containerPort: 7997
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            # First boot downloads ~2.4GB weights + loads the model.
+            periodSeconds: 15
+            failureThreshold: 60
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              # bge-m3 (~568M) on CPU via torch; embeddings are infrequent.
+              cpu: 500m
+              memory: 2Gi
+            limits:
+              # No CPU limit (repo policy: no CFS throttling). Memory bounded
+              # to protect the node: model + torch runtime headroom.
+              memory: 4Gi
+          # Harden within the privileged namespace. runAsNonRoot /
+          # readOnlyRootFilesystem are intentionally NOT set: the Infinity image's
+          # runtime user and write paths aren't documented. Capabilities are
+          # dropped and privilege escalation disabled regardless.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: data
+          emptyDir:
+            sizeLimit: 5Gi
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi

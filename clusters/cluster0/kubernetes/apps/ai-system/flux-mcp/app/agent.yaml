@@ -48,6 +48,14 @@ spec:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
+    memory:
+      # Long-term (cross-session) vector memory. Backed by the in-cluster
+      # Infinity embedding server (ModelConfig `embedding-model`) + the
+      # pgvector kagent DB. Entries prune after ttlDays. Compaction above
+      # bounds the *session*; memory retrieval is top-K (bounded per call), so
+      # the two compose without re-introducing overflow.
+      modelConfig: embedding-model
+      ttlDays: 30
     deployment:
       resources:
         requests:

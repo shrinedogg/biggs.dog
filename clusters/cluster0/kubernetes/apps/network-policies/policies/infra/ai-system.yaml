@@ -171,6 +171,28 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# Infinity embedding server needs internet access to download model weights
+# (~2.4GB bge-m3) from Hugging Face on first boot. HF serves weights from
+# rotating Xet/LFS CDN hosts (*.xethub.hf.co, CloudFront, etc.) with no
+# stable FQDN, so this is a broad :443 egress scoped to the single embeddings
+# pod. DNS is already allowed by allow-egress-dns.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-embeddings-huggingface
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: embeddings
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # kagent MCP server exposed via the kagent-mcp.biggs.dog HTTPRoute
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

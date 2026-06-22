@@ -41,6 +41,13 @@ spec:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
+    memory:
+      # Long-term (cross-session) vector memory via the in-cluster Infinity
+      # embedding server (ModelConfig `embedding-model`) + pgvector. See
+      # flux-mcp/app/agent.yaml for rationale on how this composes with
+      # compaction without re-introducing context overflow.
+      modelConfig: embedding-model
+      ttlDays: 30
     deployment:
       resources:
         requests:

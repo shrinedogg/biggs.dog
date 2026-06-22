@@ -1,0 +1,26 @@
+---
+# ModelConfig targeting the in-cluster Infinity embedding server. Referenced by
+# agents via spec.declarative.memory.modelConfig to enable long-term (vector)
+# memory -- the embeddings provider that kagent uses to vectorize/store/recall
+# memory entries in the pgvector-backed kagent DB.
+#
+# Provider is OpenAI (Infinity is OpenAI /v1/embeddings-aligned), so the ADK
+# OpenAI client calls {baseUrl}/embeddings -> http://embeddings.ai-system:7997/v1/embeddings.
+# The model id must match Infinity's --model-id. The api key reuses the shared
+# kagent-vllm secret (also set as INFINITY_API_KEY on the server) -- purely for
+# client compliance; Infinity enforces it server-side too.
+apiVersion: kagent.dev/v1alpha2
+kind: ModelConfig
+metadata:
+  name: embedding-model
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: embeddings
+    app.kubernetes.io/managed-by: embeddings
+spec:
+  provider: "OpenAI"
+  model: "BAAI/bge-m3"
+  apiKeySecret: kagent-vllm
+  apiKeySecretKey: OPENAI_API_KEY
+  openAI:
+    baseUrl: "http://embeddings.ai-system.svc.cluster.local:7997/v1"

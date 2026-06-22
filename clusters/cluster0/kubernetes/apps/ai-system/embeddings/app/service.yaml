@@ -1,0 +1,19 @@
+---
+# Headless-free ClusterIP for the Infinity embedding server. kagent's
+# `embedding-model` ModelConfig targets http://embeddings.ai-system:7997/v1.
+apiVersion: v1
+kind: Service
+metadata:
+  name: embeddings
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: embeddings
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: embeddings
+  ports:
+    - name: http
+      port: 7997
+      targetPort: http
+      protocol: TCP
