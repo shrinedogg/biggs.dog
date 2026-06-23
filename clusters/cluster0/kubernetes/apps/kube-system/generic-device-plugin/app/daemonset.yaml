@@ -24,7 +24,7 @@ spec:
       priorityClassName: system-node-critical
       containers:
         - name: generic-device-plugin
-          image: ghcr.io/squat/generic-device-plugin:latest@sha256:4051cdc395da395ec42bfa473b25c69a686f75b7ebd10542afc5c0f44602e0dd
+          image: ghcr.io/squat/generic-device-plugin:latest@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576
           args:
             # The :latest image changed the default domain to devic.es;
             # fenrir's User CR requests squat.ai/uinput.
