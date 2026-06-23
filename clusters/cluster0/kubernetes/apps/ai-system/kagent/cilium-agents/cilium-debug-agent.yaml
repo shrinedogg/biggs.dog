@@ -29,7 +29,7 @@ spec:
       # summarizes older events (via the local model) and drops the originals.
       # See flux-mcp/app/agent.yaml for full rationale.
       compaction:
-        tokenThreshold: 80000
+        tokenThreshold: 60000
         summarizer:
           modelConfig: default-model-config
     deployment:
