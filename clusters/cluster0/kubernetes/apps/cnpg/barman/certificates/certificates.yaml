@@ -20,6 +20,7 @@ apiVersion: cert-manager.io/v1
 kind: Issuer
 metadata:
   name: barman-cloud-selfsigned
+  namespace: cnpg-system
 spec:
   selfSigned: {}
 ---
@@ -27,6 +28,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: barman-cloud-server
+  namespace: cnpg-system
 spec:
   isCA: true
   commonName: barman-cloud
@@ -52,6 +54,7 @@ apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
   name: barman-cloud-client
+  namespace: cnpg-system
 spec:
   isCA: true
   commonName: barman-cloud-client

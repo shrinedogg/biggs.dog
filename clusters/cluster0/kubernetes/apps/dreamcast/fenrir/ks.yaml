@@ -22,7 +22,6 @@ metadata:
   name: &app fenrir
   namespace: flux-system
 spec:
-  targetNamespace: dreamcast
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

@@ -5,7 +5,6 @@ metadata:
   name: &app nvidia-gpu-tuning
   namespace: flux-system
 spec:
-  targetNamespace: dreamcast
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

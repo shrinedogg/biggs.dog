@@ -10,7 +10,6 @@ spec:
     - name: secretstore
     # CNPG Postgres (cnpg-pocket-id) + the pocket-id-user-password secret must be ready.
     - name: cnpg-databases
-  targetNamespace: auth
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

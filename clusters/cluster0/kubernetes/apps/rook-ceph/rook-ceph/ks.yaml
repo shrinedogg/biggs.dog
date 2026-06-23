@@ -5,7 +5,6 @@ metadata:
   name: &app rook-ceph-operator
   namespace: flux-system
 spec:
-  targetNamespace: rook-ceph
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
@@ -25,7 +24,6 @@ metadata:
   name: &app rook-ceph-csi-rbac
   namespace: flux-system
 spec:
-  targetNamespace: rook-ceph
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
@@ -47,7 +45,6 @@ metadata:
   name: &app rook-ceph-cluster
   namespace: flux-system
 spec:
-  targetNamespace: rook-ceph
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

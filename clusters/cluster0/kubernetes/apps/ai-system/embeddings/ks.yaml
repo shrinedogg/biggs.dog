@@ -17,7 +17,6 @@ spec:
   dependsOn:
     # kagent provides the ModelConfig CRD that app/modelconfig.yaml creates.
     - name: kagent
-  targetNamespace: ai-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

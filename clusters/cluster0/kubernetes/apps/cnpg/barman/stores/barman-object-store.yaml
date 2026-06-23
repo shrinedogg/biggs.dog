@@ -2,6 +2,7 @@ apiVersion: barmancloud.cnpg.io/v1
 kind: ObjectStore
 metadata:
   name: barman-object-store
+  namespace: cnpg-system
 spec:
   instanceSidecarConfiguration:
     env:

@@ -11,7 +11,6 @@ spec:
     # The OIDC provider (Pocket ID) must be serving before oauth2-proxy can
     # discover the issuer at https://id.biggs.dog.
     - name: pocket-id
-  targetNamespace: auth
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

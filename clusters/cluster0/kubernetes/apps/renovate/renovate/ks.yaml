@@ -7,7 +7,6 @@ metadata:
 spec:
   dependsOn:
     - name: cnpg-databases
-  targetNamespace: renovate
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

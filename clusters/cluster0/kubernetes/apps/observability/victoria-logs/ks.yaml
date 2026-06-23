@@ -5,7 +5,6 @@ metadata:
   name: victoria-logs-collector
   namespace: flux-system
 spec:
-  targetNamespace: observability
   commonMetadata:
     labels:
       app.kubernetes.io/name: victoria-logs-collector
@@ -25,7 +24,6 @@ metadata:
   name: victoria-logs-single
   namespace: flux-system
 spec:
-  targetNamespace: observability
   commonMetadata:
     labels:
       app.kubernetes.io/name: victoria-logs-single

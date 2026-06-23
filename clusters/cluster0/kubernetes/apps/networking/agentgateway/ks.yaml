@@ -43,7 +43,6 @@ metadata:
   name: &app agentgateway
   namespace: flux-system
 spec:
-  targetNamespace: networking
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

@@ -5,7 +5,6 @@ metadata:
   name: &app victoria-metrics
   namespace: flux-system
 spec:
-  targetNamespace: observability
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

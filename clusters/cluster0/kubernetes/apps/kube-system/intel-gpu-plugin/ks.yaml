@@ -5,7 +5,6 @@ metadata:
   name: &app intel-gpu-plugin
   namespace: flux-system
 spec:
-  targetNamespace: kube-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

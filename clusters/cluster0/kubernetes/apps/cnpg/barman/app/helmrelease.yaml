@@ -4,6 +4,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: &app plugin-barman-cloud
+  namespace: cnpg-system
 spec:
   interval: 3m
   chartRef:

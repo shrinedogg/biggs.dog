@@ -10,7 +10,6 @@ spec:
     - name: nv-gpu-operator
     # ClusterSecretStore (onepassword-connect) must exist for the ExternalSecret.
     - name: secretstore
-  targetNamespace: ai-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

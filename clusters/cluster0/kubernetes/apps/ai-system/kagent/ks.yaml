@@ -12,7 +12,6 @@ spec:
     - name: agent-sandbox
     # The local model endpoint + shared API key secret must be ready.
     - name: vllm
-  targetNamespace: ai-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

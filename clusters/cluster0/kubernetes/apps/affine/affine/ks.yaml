@@ -8,7 +8,6 @@ spec:
   dependsOn:
     - name: cnpg-databases
     - name: manticore
-  targetNamespace: affine
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
