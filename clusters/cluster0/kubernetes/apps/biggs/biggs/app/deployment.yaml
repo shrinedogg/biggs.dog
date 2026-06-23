@@ -20,7 +20,7 @@ spec:
           type: RuntimeDefault
       automountServiceAccountToken: false
       containers:
-        - image: szkud/biggslanding:latest
+        - image: szkud/biggslanding:latest@sha256:e066618fe25a9b655749ea56f26ba2da0ce82f866d22954546e0883d76c2163d
           imagePullPolicy: Always
           name: biggs
           securityContext:

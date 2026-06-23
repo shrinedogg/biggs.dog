@@ -1,9 +1,13 @@
 # biggs.dog — agent routing rules
 
 This is a Flux GitOps repo for a Kubernetes homelab (`clusters/cluster0`).
-The kagent MCP server (`https://kagent-mcp.biggs.dog/mcp`) exposes specialized
+The kagent MCP server (`http://192.168.2.13:8083/mcp`) exposes specialized
 agents. When a task matches one of the domains below, prefer invoking that
-kagent agent over answering from memory or using generic tools.
+kagent agent over answering from memory or using generic tools. (The MCP
+endpoint is a LAN-only Cilium LoadBalancer `kagent-mcp-lan`, pinned to
+`192.168.2.13` via `io.cilium/lb-ipam-ips`. It bypasses the gateway -- the
+agentgateway mangled the `/mcp` Streamable-HTTP path -- so it's plain HTTP,
+no auth, reachable only on the LAN/VPN.)
 
 All agents share a single in-cluster vLLM backend (currently
 `nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params, served at a
@@ -13,8 +17,10 @@ single-stream, ~65 ms TTFT; ~3,070 tok/s aggregate at 64-way) with ample
 context, so
 full multi-step agent tasks work fine -- including heavy ones like flux-agent
 (whose `flux-operator-mcp` tool schemas alone are ~64K tokens). No need to keep
-tasks minimal anymore; the `kagent-mcp` HTTPRoute allows 300s, so even long
-agentic loops complete. (Still prefer terse output over needless verbosity.)
+tasks minimal anymore; long agentic loops complete because inference is fast
+(~250 tok/s single-stream), not because of a server-side route timeout -- the
+MCP LoadBalancer is a plain TCP passthrough with no request timeout. (Still
+prefer terse output over needless verbosity.)
 
 Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 131K
 window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%

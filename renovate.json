@@ -127,6 +127,7 @@
                 "ghcr.io/squat/generic-device-plugin",
                 "quay.io/aminvakil/alpine-nfs-server",
                 "szkud/biggslanding",
+                "michaelf34/infinity",
                 "shrinedogg/nsyncd",
                 "ersatztv/legacy"
             ],
