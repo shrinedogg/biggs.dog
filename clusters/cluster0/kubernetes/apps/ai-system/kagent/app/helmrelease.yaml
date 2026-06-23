@@ -207,6 +207,23 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          # ----------------------------------------------------------------
+          # Tag the kagent-controller MCP Service (port 8083) with the
+          # agentgateway MCP appProtocol. agentgateway is protocol-aware:
+          # without appProtocol=agentgateway.dev/mcp it treats the backend as
+          # plain HTTP, mishandling the MCP /mcp Streamable-HTTP path/session
+          # (observed: MCP clients got a 404 on /mcp via the kagent-mcp route).
+          # The kagent chart doesn't expose this on the Service, so patch it.
+          # (mcp-path defaults to /mcp for Streamable HTTP -- no annotation
+          # needed.) See agentgateway MCP servers doc.
+          # ----------------------------------------------------------------
+          - target:
+              kind: Service
+              name: kagent-controller
+            patch: |-
+              - op: add
+                path: /spec/ports/0/appProtocol
+                value: agentgateway.dev/mcp
   install:
     remediation:
       retries: 3
