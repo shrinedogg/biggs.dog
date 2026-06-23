@@ -4,6 +4,4 @@ kind: Kustomization
 resources:
   - ./namespace.yaml
   # Flux-Kustomizations
-  - ./rook-ceph/operator/ks.yaml
-  - ./rook-ceph/csi-rbac/ks.yaml
-  - ./rook-ceph/cluster/ks.yaml
+  - ./rook-ceph/ks.yaml

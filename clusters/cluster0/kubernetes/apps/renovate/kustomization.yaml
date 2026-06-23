@@ -6,4 +6,3 @@ resources:
   - ./namespace.yaml
   # Flux-Kustomizations
   - ./renovate/ks.yaml
-  
