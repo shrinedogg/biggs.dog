@@ -34,7 +34,7 @@ spec:
           operator: Exists
           effect: NoSchedule
       containers:
-        - image: quay.io/aminvakil/alpine-nfs-server:latest@sha256:dc192e164c69b03f156765793a1be62ca437709ae477b27ca7d8f3dcf5021576
+        - image: quay.io/aminvakil/alpine-nfs-server:latest@sha256:4051cdc395da395ec42bfa473b25c69a686f75b7ebd10542afc5c0f44602e0dd
           imagePullPolicy: Always
           name: nfs-server
           env:
