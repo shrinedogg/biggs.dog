@@ -5,5 +5,9 @@ resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
   # Flux-Kustomizations
-  - ./cnpg/ks.yaml
-  - ./barman/ks.yaml
+  - ./cnpg/app/ks.yaml
+  - ./cnpg/secrets/ks.yaml
+  - ./cnpg/databases/ks.yaml
+  - ./barman/certificates/ks.yaml
+  - ./barman/barman/ks.yaml
+  - ./barman/object-store/ks.yaml

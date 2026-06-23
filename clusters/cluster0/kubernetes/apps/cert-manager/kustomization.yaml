@@ -5,5 +5,7 @@ resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
   # Flux-Kustomizations
-  - ./cert-manager/ks.yaml
-  
+  - ./cert-manager/app/ks.yaml
+  - ./cert-manager/issuers/ks.yaml
+  - ./cert-manager/ca-certificates/ks.yaml
+  - ./cert-manager/certificates/ks.yaml
