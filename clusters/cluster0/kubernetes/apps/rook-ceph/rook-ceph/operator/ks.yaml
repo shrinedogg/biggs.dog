@@ -4,7 +4,6 @@ metadata:
   name: &app rook-ceph-operator
   namespace: flux-system
 spec:
-  targetNamespace: rook-ceph
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

@@ -5,7 +5,6 @@ metadata:
   name: cnpg
   namespace: flux-system
 spec:
-  targetNamespace: cnpg-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg
@@ -30,7 +29,6 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg-secrets
-  targetNamespace: cnpg-system
   path: ./clusters/cluster0/kubernetes/apps/cnpg/cnpg/secrets
   prune: true
   sourceRef:
@@ -53,7 +51,6 @@ spec:
     # Clusters use the barman-cloud plugin; the plugin + ObjectStore must exist
     # (and its TLS be valid) before the Clusters can become healthy.
     - name: cnpg-barman-object-store
-  targetNamespace: cnpg-system
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg-databases

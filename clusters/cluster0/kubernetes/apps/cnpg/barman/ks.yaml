@@ -9,7 +9,6 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg-barman-certs
-  targetNamespace: cnpg-system
   path: ./clusters/cluster0/kubernetes/apps/cnpg/barman/certificates/
   prune: true
   sourceRef:
@@ -34,7 +33,6 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: cnpg-barman
-  targetNamespace: cnpg-system
   path: ./clusters/cluster0/kubernetes/apps/cnpg/barman/app/
   prune: true
   sourceRef:
