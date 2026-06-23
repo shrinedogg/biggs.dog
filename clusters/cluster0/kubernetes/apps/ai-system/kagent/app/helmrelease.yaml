@@ -338,9 +338,13 @@ spec:
     # runtime from a mounted secret file, so no credentials live in git.
     #
     # vectorEnabled=true: long-term (cross-session) vector memory via pgvector.
-    # The model is now nvidia/Qwen3.6-35B-A3B-NVFP4 with a 262K context window,
-    # so flux-agent's ~64K tool schemas + memory + tasks fit with room to spare
-    # -- no context-overflow on the heavy agents.
+    # NOTE: the model's NATIVE window is 262K, but vLLM SERVES at a 131K cap
+    # (vllm/app/deployment.yaml --max-model-len=131072) for KV-concurrency
+    # headroom. 131K is tight for flux-agent's ~64K tool schemas + memory +
+    # tasks, and accumulated vector memory DID overflow it (input_tokens=131073
+    # on flux-agent); memory is now disabled per-agent on flux-agent
+    # (flux-mcp/app/agent.yaml). The other agents have no per-agent memory block
+    # and remain well under the cap.
     database:
       postgres:
         bundled:

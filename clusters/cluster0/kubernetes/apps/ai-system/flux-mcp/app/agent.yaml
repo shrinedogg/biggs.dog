@@ -48,14 +48,28 @@ spec:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
-    memory:
-      # Long-term (cross-session) vector memory. Backed by the in-cluster
-      # Infinity embedding server (ModelConfig `embedding-model`) + the
-      # pgvector kagent DB. Entries prune after ttlDays. Compaction above
-      # bounds the *session*; memory retrieval is top-K (bounded per call), so
-      # the two compose without re-introducing overflow.
-      modelConfig: embedding-model
-      ttlDays: 30
+    # NOTE: per-agent vector memory is DISABLED for flux-agent. It was the root
+    # cause of the agent's context-overflow failures (input_tokens=131073,
+    # HTTP 400 before the first tool call). The flux-operator-mcp tool schemas
+    # alone are ~64K tokens; against the 131K vLLM serve cap
+    # (vllm/app/deployment.yaml --max-model-len=131072) that leaves only ~67K
+    # for the system message, builtin prompt includes, memory retrieval, and the
+    # session. As cross-session vector memory accumulated, top-K retrieval grew
+    # until even a trivial task tipped the assembled prompt over the ceiling
+    # ("hi" still fit, any real Flux query 400'd). The session compaction above
+    # only bounds intra-session events -- it cannot shrink tool schemas or
+    # memory injection -- so memory must stay off. To re-enable, prune the
+    # kagent pgvector store (or raise --max-model-len toward the 262K native
+    # window, dropping --max-num-seqs per the vLLM deployment notes), THEN
+    # uncomment the block below.
+    # memory:
+    #   # Long-term (cross-session) vector memory. Backed by the in-cluster
+    #   # Infinity embedding server (ModelConfig `embedding-model`) + the
+    #   # pgvector kagent DB. Entries prune after ttlDays. Compaction above
+    #   # bounds the *session*; memory retrieval is top-K (bounded per call), so
+    #   # the two compose without re-introducing overflow.
+    #   modelConfig: embedding-model
+    #   ttlDays: 30
     deployment:
       nodeSelector:
         nvidia.com/gpu.present: "true"
