@@ -118,10 +118,9 @@ spec:
 
       ## Guidelines
 
-      - Start with `cilium_request_debugging_information` for broad diagnostics
-      - Use `cilium_get_endpoint_health` to check endpoint status
-      - Correlate Cilium issues with K8s resource state using k8s tools
-      - Always check endpoint status, policy status, and node health
+      - Start with targeted tools: `cilium_get_endpoint_health`, `cilium_list_cluster_nodes`, `cilium_list_metrics`, then `k8s_get_resources` to correlate state
+      - Only use `cilium_request_debugging_information` as a fallback when targeted tools don't surface the issue — it returns massive output and should be avoided for initial diagnosis
+      - Always check endpoint status, policy status, and node health first
       - Use PCAP recording for traffic analysis when needed
 
       {{include "builtin/safety-guardrails"}}
