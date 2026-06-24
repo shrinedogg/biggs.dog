@@ -4,7 +4,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: gpu-arbiter-controller-manager
-  namespace: gpu-arbiter-system
+  namespace: dreamcast
   labels:
     app.kubernetes.io/name: gpu-arbiter-operator
     app.kubernetes.io/part-of: gpu-arbiter
@@ -88,14 +88,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: gpu-arbiter-controller-manager
-    namespace: gpu-arbiter-system
+    namespace: dreamcast
 ---
-# Leader Election Role — namespace-scoped for leader election in gpu-arbiter-system
+# Leader Election Role — namespace-scoped for leader election in dreamcast
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: gpu-arbiter-leader-election-role
-  namespace: gpu-arbiter-system
+  namespace: dreamcast
   labels:
     app.kubernetes.io/name: gpu-arbiter-operator
     app.kubernetes.io/part-of: gpu-arbiter
@@ -138,7 +138,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: gpu-arbiter-leader-election-rolebinding
-  namespace: gpu-arbiter-system
+  namespace: dreamcast
   labels:
     app.kubernetes.io/name: gpu-arbiter-operator
     app.kubernetes.io/part-of: gpu-arbiter
@@ -150,14 +150,14 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: gpu-arbiter-controller-manager
-    namespace: gpu-arbiter-system
+    namespace: dreamcast
 ---
 # Controller Manager Deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gpu-arbiter-controller-manager
-  namespace: gpu-arbiter-system
+  namespace: dreamcast
   labels:
     app.kubernetes.io/name: gpu-arbiter-operator
     app.kubernetes.io/part-of: gpu-arbiter
