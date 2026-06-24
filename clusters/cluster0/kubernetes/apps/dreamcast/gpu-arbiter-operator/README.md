@@ -71,18 +71,17 @@ act across two namespaces:
 
 ## Image
 
-`shrinedogg/gpu-arbiter-operator:v0.1.0` (`linux/amd64`). The tag is pinned via
-the `images:` block in `app`'s Flux Kustomization and uses
-`imagePullPolicy: Always` because the `v0.1.0` dev tag is overwritten in place
-on each rebuild.
+`shrinedogg/gpu-arbiter-operator:v0.1.1` (`linux/amd64`). The tag is pinned via
+the `images:` block in `app`'s Flux Kustomization. Tags are **immutable**
+semver, so `imagePullPolicy` is the default `IfNotPresent` — a new release means
+a new tag, never an in-place overwrite.
 
-Rebuild + push:
+Cut a new release (bump the version in both `app/operator.yaml` and `ks.yaml`):
 
 ```bash
 docker buildx build --platform linux/amd64 \
-  -t shrinedogg/gpu-arbiter-operator:v0.1.0 --push .
-# then roll the manager so the node re-pulls the overwritten tag:
-kubectl rollout restart deployment gpu-arbiter-controller-manager -n dreamcast
+  -t shrinedogg/gpu-arbiter-operator:v0.1.1 --push .
+git tag -a v0.1.1 -m "v0.1.1" && git push origin v0.1.1   # in the operator repo
 ```
 
 ## vLLM coupling

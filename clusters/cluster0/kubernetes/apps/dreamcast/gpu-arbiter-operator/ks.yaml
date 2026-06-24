@@ -65,4 +65,4 @@ spec:
     - name: gpu-arbiter-ai-system-rbac
   images:
     - name: shrinedogg/gpu-arbiter-operator
-      newTag: "v0.1.0"
+      newTag: "v0.1.1"

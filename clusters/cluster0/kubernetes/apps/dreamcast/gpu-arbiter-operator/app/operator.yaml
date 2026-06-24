@@ -180,10 +180,11 @@ spec:
           type: RuntimeDefault
       containers:
         - name: manager
-          image: shrinedogg/gpu-arbiter-operator:v0.1.0
-          # Always pull: the v0.1.0 dev tag is overwritten in-place on each
-          # rebuild, so IfNotPresent would pin nodes to a stale cached image.
-          imagePullPolicy: Always
+          image: shrinedogg/gpu-arbiter-operator:v0.1.1
+          # Immutable semver tag, so the default IfNotPresent is safe: a new
+          # release means a new tag (bump it here + in ks.yaml) rather than
+          # overwriting an existing one.
+          imagePullPolicy: IfNotPresent
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
