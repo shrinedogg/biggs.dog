@@ -136,28 +136,41 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### vLLM Deployment
 
-- **Model**: `nvidia/Qwen3.6-35B-A3B-NVFP4` (35B MoE, ~3B active parameters, **262K context** with Mamba-hybrid attention).
+- **Model**: `nvidia/Qwen3.6-35B-A3B-NVFP4` (35B MoE, ~3B active parameters, **131K context** served, native max 262K) with Mamba-hybrid attention.
+- **Version**: v0.23.0 (CUDA 12.9 for Blackwell GPU support on RTX 5090).
 - **Quant**: NVIDIA **NVFP4** (native Blackwell FP4 tensor core support, ~19B on disk).
 - **GPU**: One of the RTX 5090's 4 time-slices (~8 GB per slice, vLLM pins ~31 GB, one per session games at ~1–2 GB).
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
+- **Context cap rationale**: The model's native max is 262K, but at 262K the KV pool on the 32 GB card only covers ~3.2 concurrent full-context requests. Capping at 131K doubles that to ~6.4 concurrent requests while staying well above flux-agent's ~64K tool-schema need.
+
+### Embeddings Service
+
+- **Model**: `BAAI/bge-m3` (Infinity embedding server, CPU-only).
+- **Deployment**: `michaelf34/infinity:latest-cpu` with PyTorch backend (not ONNX).
+- **Port**: 7997 (internal service).
+- **API**: OpenAI-compatible `/v1/embeddings` endpoint.
+- **Usage**: Backing kagent's long-term vector memory via the `embedding-model` ModelConfig.
+- **CPU-only by design**: The single GPU (nv-01) is fully committed to vLLM and scaled to 0 during gaming; a second GPU consumer would contend. Embedding traffic is infrequent and low-throughput, so CPU is sufficient.
 
 ### kagent Agents
 
-**Available agents** (`kubectl get agents -n ai-system`):
+**Chart-managed agents** (enabled):
 - `k8s-agent` — general Kubernetes inspection/troubleshooting.
 - `observability-agent` — metrics, dashboards, alerting.
 - `promql-agent` — PromQL query generation.
 - `helm-agent` — Helm release management.
-- `flux-agent` — Flux GitOps inspection (custom, read-only, defined in `apps/ai-system/flux-mcp/`).
-- `vm-agent` — VictoriaMetrics query + TSDB analysis (custom, defined in `apps/ai-system/victoria-metrics-mcp/`).
 - `cilium-manager-agent` — Cilium install/config/upgrade.
-- `cilium-debug-agent` — Cilium diagnosis.
-- `cilium-policy-agent` — Cilium policy authoring.
 
-Disabled agents (chart toggles): `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
+**Custom (non-chart) agents** (static manifests):
+- `flux-agent` (read-only) — Flux GitOps inspection (defined in `apps/ai-system/flux-mcp/`).
+- `vm-agent` — VictoriaMetrics query + TSDB analysis (defined in `apps/ai-system/victoria-metrics-mcp/`).
+- `cilium-debug-agent` — Cilium diagnosis (defined in `apps/ai-system/kagent/cilium-agents/`).
+- `cilium-policy-agent` — Cilium policy authoring (defined in `apps/ai-system/kagent/cilium-agents/`).
 
-Agent selection is documented in [`.rules`](.rules); each agent has a specific domain and preferred MCP server.
+**Disabled agents** (chart toggles): `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
+
+All chart-managed agents have `executeCodeBlocks` enabled via postRenderer patches in the Helm release values. Agent selection is documented in [`.rules`](.rules); each agent has a specific domain and preferred MCP server.
 
 ### Agent Sandbox
 
@@ -165,7 +178,7 @@ The cluster runs **SIG-Apps `Sandbox`** CRD + controller (`agents.x-k8s.io`, pin
 
 ### Long-Term Memory
 
-kagent is configured with vectorized memory (long-term, cross-session) backed by CNPG Postgres + pgvector. The 131K context window easily absorbs tool schemas + memory + conversation (~20% KV cache peak under load).
+kagent is configured with vectorized memory (long-term, cross-session) backed by CNPG Postgres + pgvector, using the `embeddings` service for embedding generation. Per-agent memory is disabled on `flux-agent` (custom) because its ~64K tool schemas already bring the 131K context window to saturation; other agents have memory enabled and remain well under the cap (~20% KV cache peak under load).
 
 ### MCP Servers
 

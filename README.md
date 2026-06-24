@@ -224,26 +224,35 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 
 | Component | Description |
 | --------- | ----------- |
-| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices. Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the [GPU Arbiter](#gpu-arbiter) (the 32 GB card can't fit vLLM and a session at once) and back to 1 when idle. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **262K context** with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
-| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only Cilium LoadBalancer (`kagent-mcp-lan` at `http://192.168.2.13:8083/mcp`, pinned via `io.cilium/lb-ipam-ips` -- the gateway path was abandoned after it mangled the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) memory. |
-| flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. |
+| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices (v0.23.0). Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the [GPU Arbiter](#gpu-arbiter) (the 32 GB card can't fit vLLM and a session at once) and back to 1 when idle. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **131K context** (native max 262K) with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
+| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only Cilium LoadBalancer (`kagent-mcp-lan` at `http://192.168.2.13:8083/mcp`, pinned via `io.cilium/lb-ipam-ips` -- the gateway path was abandoned after it mangled the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
+| flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. Per-agent memory disabled to avoid exceeding the 131K context window with large tool schemas. |
 | victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
-| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.4.6`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). Provides the isolated, stateful single-pod runtimes kagent spins up for agents that opt into `executeCodeBlocks` — where the LLM writes and runs code. Enabled on all agents (see the engineering notes below). Defined in `apps/ai-system/agent-sandbox/`. |
+| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.4.6`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution). Enabled on all built-in agents. Defined in `apps/ai-system/agent-sandbox/`. |
+| embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` model for kagent's long-term vector memory. Intentionally CPU-only to avoid contending with the GPU-constrained vLLM during gaming. Defined in `apps/ai-system/embeddings/`. |
 
-**Available agents** (`kubectl get agents -n ai-system`): `k8s-agent`, `observability-agent`, `promql-agent`, `helm-agent`, `flux-agent`, `vm-agent`, and three Cilium agents (`cilium-manager-agent`, `cilium-debug-agent`, `cilium-policy-agent`). The chart's `argo-rollouts`, `istio`, and `kgateway` agents are disabled. See [`.rules`](.rules) for which agent to use for what.
+**Available agents** (`kubectl get agents -n ai-system`):
+- **Chart-managed**: `k8s-agent`, `observability-agent`, `promql-agent`, `helm-agent`, `cilium-manager-agent`.
+- **Custom (non-chart)**: `flux-agent`, `vm-agent`, `cilium-debug-agent`, `cilium-policy-agent`.
+- **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
+
+See [`.rules`](.rules) for agent selection by task domain.
 
 ## 🌐 Networking Configuration
 
 ### BGP Peering
 
-The cluster uses Cilium BGP to peer with the network router (UDM) for LoadBalancer IP advertisement:
+The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.2.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
 
 ## 🔐 Secret Management
 
-Secrets are managed using:
+Secrets follow a three-tier model:
 
-1. **SOPS with age encryption** - For secrets stored in Git
-2. **External Secrets + 1Password** - For runtime secret injection from 1Password vaults
+1. **SOPS with age encryption** — Git-committed secrets (Cilium policies, app defaults).
+2. **External Secrets + 1Password** — Runtime secrets from 1Password vaults (API keys, credentials).
+3. **cert-manager** — Automatic certificate issuance + renewal (ACME Let's Encrypt, CA issuer).
+
+See [NOTES.md](NOTES.md#secret-model) for details.
 
 ## 🚀 Getting Started
 
