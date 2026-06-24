@@ -259,7 +259,6 @@ spec:
   variables:
     - name: gateName
       expression: '"gpu.biggs.dog/await-vram"'
-  failurePolicy: Ignore
 ---
 # MutatingAdmissionPolicyBinding — scope the policy to dreamcast namespace
 apiVersion: admissionregistration.k8s.io/v1
