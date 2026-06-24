@@ -236,20 +236,22 @@ spec:
         operations: ["CREATE"]
         resources: ["pods"]
   matchConditions:
-    - name: in-dreamcast
-      expression: "object.metadata.namespace == 'dreamcast'"
-    - name: is-direwolf-worker
-      expression: "object.metadata.labels['app'] == 'direwolf-worker'"
-  reinvocationPolicy: IfNeeded
+    - name: gate-absent
+      expression: >-
+        !has(object.spec.schedulingGates) ||
+        !object.spec.schedulingGates.exists(g, g.name == "gpu.biggs.dog/await-vram")
+  reinvocationPolicy: Never
   mutations:
-    - patchType: ApplyConfiguration
-      applyConfiguration:
+    - patchType: JSONPatch
+      jsonPatch:
         expression: >-
-          Object{
-            spec: Object.spec{
-              schedulingGates: [{reason: "gpu.biggs.dog/await-vram"}]
+          [
+            JSONPatch{
+              op: "add",
+              path: "/spec/schedulingGates",
+              value: [{"name": "gpu.biggs.dog/await-vram"}]
             }
-          }
+          ]
 ---
 # MutatingAdmissionPolicyBinding — scope the policy to dreamcast namespace
 apiVersion: admissionregistration.k8s.io/v1
@@ -262,4 +264,10 @@ metadata:
     app.kubernetes.io/component: operator
 spec:
   policyName: gpu-await-vram-gate
-  matchResources: {}
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: dreamcast
+    objectSelector:
+      matchLabels:
+        app: direwolf-worker
