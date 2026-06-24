@@ -2,6 +2,8 @@
 
 This document contains detailed architectural decisions, engineering notes, and historical context that is less critical for operators but helpful for maintainers and contributors.
 
+> **Note**: Cluster node specs (Talos Linux version, Kubernetes version, OS versions) in `README.md` are managed externally via Omni and reflect state at time of documentation. For live cluster versions, use `kubectl version` and check the Omni console. This Git repo drives desired state for workloads (manifests in `clusters/cluster0/`), not node OS versions.
+
 ## Dreamcast Engineering Notes
 
 ### Forked Images
