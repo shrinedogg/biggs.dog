@@ -20,7 +20,28 @@ spec:
   timeout: 2m
   force: true
 ---
-# Phase 1: Operator deployment — waits for CRDs
+# Phase 0.5: Cross-namespace RBAC for operator in ai-system — must exist before operator
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gpu-arbiter-ai-system-rbac
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: gpu-arbiter-ai-system-rbac
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-operator/ai-system-rbac
+  prune: true
+  wait: false
+  timeout: 2m
+  force: true
+---
+# Phase 1: Operator deployment — waits for CRDs and cross-namespace RBAC
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
