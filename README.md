@@ -230,7 +230,6 @@ The single 32 GB RTX 5090 can't host vLLM and a gaming session at once, so the [
 
 **Deployment** lives under `apps/dreamcast/gpu-arbiter-operator` (operator) and `apps/dreamcast/gpu-arbiter-instance` (the CR): three ordered Flux Kustomizations — the `GPUArbiter` CRD, a cross-namespace Role/RoleBinding in `ai-system` (so the `dreamcast` service account can scale `vllm`), then the manager Deployment + cluster-scoped RBAC. Image `shrinedogg/gpu-arbiter-operator:v0.1.1` (`linux/amd64`, immutable semver tags). `ai-system/vllm` intentionally omits `spec.replicas` so Flux doesn't fight the arbiter over the count. Full detail in the [directory README](clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-operator/README.md).
 
-**Engineering notes:** two bugs surfaced porting the bash loop to Go — (1) scaling now uses the `deployments/scale` subresource; a backwards `client.MergeFrom` previously emitted `{"spec":{"replicas":null}}`, deleting the field so it defaulted back to `1` and vLLM never actually scaled down; and (2) status is written with a full `Status().Update()` rather than a JSON merge patch, so zero-valued `omitempty` fields like `gamePods` clear instead of going stale.
 
 ### Defined Apps (`fenrir/app/apps.yaml`)
 
