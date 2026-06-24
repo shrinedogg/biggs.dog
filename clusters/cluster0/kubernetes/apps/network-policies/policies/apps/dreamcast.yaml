@@ -3,7 +3,7 @@
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: allow-egress-to-observability
+  name: gpu-arbiter-operator
   namespace: dreamcast
   labels:
     app.kubernetes.io/name: gpu-arbiter-operator
