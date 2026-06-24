@@ -137,7 +137,12 @@ spec:
     matchLabels:
       app.kubernetes.io/name: vmsingle
   ingress:
+    # gpu-arbiter-operator in dreamcast queries DCGM metrics from vmsingle
     - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: dreamcast
+            app.kubernetes.io/name: gpu-arbiter-operator
+        # kagent MCP server (PromQL/MetricsQL proxy to vmsingle)
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: ai-system
             app.kubernetes.io/name: victoria-metrics-mcp
