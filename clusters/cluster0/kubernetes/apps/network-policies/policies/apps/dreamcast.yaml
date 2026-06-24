@@ -1,5 +1,9 @@
 ---
-# Allow gpu-arbiter-operator to scrape DCGM metrics from VictoriaMetrics
+# Allow gpu-arbiter-operator to:
+# 1. Reach VictoriaMetrics in observability (DCGM metrics)
+# 2. Reach kube-apiserver (leader election, K8s API)
+# 3. Reach kube-dns (service discovery)
+# 4. Reach ai-system to scale vLLM deployments
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -13,10 +17,44 @@ spec:
     matchLabels:
       app.kubernetes.io/name: gpu-arbiter-operator
   egress:
+    # 1. DNS resolution
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    # 2. Kubernetes API server (leader election, scale operations)
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+    # 3. VictoriaMetrics (DCGM metrics)
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
       toPorts:
         - ports:
             - port: "8428"
+              protocol: TCP
+    # 4. ai-system (scale vLLM deployment)
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+        - ports:
+            - port: "80"
               protocol: TCP
