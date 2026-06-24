@@ -8,4 +8,5 @@ resources:
   - ./nv-gpu-operator/ks.yaml
   - ./nvidia-gpu-tuning/ks.yaml
   - ./fenrir/ks.yaml
+  - ./gpu-arbiter-operator/ks.yaml
   - ./gpu-arbiter-instance/ks.yaml
