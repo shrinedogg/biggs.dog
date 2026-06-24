@@ -169,39 +169,17 @@ OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cooki
 
 ## 📺 Applications
 
-### Authentication
+| Category | Applications | Notes |
+| -------- | ------------ | ----- |
+| **Authentication** | Pocket ID, OAuth2 Proxy | Passkey-first OIDC SSO for all apps |
+| **Media** | Emby, Bookboss, Ersatz, Nsyncd | Content & book management |
+| **Communication** | Jitsi Meet, Continuwuity (Matrix) | Video conferencing & messaging |
+| **Productivity** | AFFiNE, Manticore Search | Collaborative workspace + full-text search |
+| **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast](#-dreamcast-game-streaming-stack)) |
+| **Game Servers** | Windrose Online | Persistent MMO on Wine backend |
+| **Other** | biggs | Tribute |
 
-- **Pocket ID** - Passkey-first OIDC identity provider (`id.biggs.dog`)
-- **OAuth2 Proxy** - Forward-auth / SSO gateway for browser apps (`auth.biggs.dog`)
-
-### Media Stack
-
-- **Emby** - Media server
-- **Bookboss** - Book management
-- **Ersatz** - Custom media service
-- **Nsyncd** - Synchronization service
-
-### Communication
-
-- **Jitsi Meet** - Self-hosted video conferencing
-- **Continuwuity** - Matrix homeserver (Conduwuit fork)
-
-### Productivity
-
-- **AFFiNE** - Collaborative knowledge base and workspace
-- **Manticore Search** - Full-text search engine (used by AFFiNE)
-
-### Game Streaming
-
-- **Fenrir / Wolf** - GPU-accelerated game streaming to [Moonlight](https://moonlight-stream.org/) clients (Firefox, Steam Big Picture, a test pattern). See [Dreamcast Game Streaming Stack](#-dreamcast-game-streaming-stack) below.
-
-### Game Servers
-
-- **Windrose** - Dedicated server for Windrose Online (persistent-world MMO) in the `games` namespace; a Wine-backed server instance exposed via a Cilium LoadBalancer.
-
-### Other
-
-- **biggs** - Biggs the dog.
+Detailed app deployment configs are in `clusters/cluster0/kubernetes/apps/<namespace>/`.
 
 ## 🎮 Dreamcast Game Streaming Stack
 
@@ -221,36 +199,21 @@ The `dreamcast` namespace is the newest addition to the cluster: an on-demand, G
 
 ### GPU Arbiter
 
-The single 32 GB RTX 5090 can't host vLLM and a gaming session at once, so the [`gpu-arbiter-operator`](https://github.com/shrinedogg/gpu-arbiter-operator) (a Go / controller-runtime port of the original bash loop) arbitrates the card. It reconciles a cluster-scoped `GPUArbiter` CR (`cluster0`) and, on every poll (`spec.intervalSeconds`, default 2s):
+The single 32 GB RTX 5090 can't host vLLM and a gaming session at once. The [`gpu-arbiter-operator`](https://github.com/shrinedogg/gpu-arbiter-operator) reconciles a cluster-scoped `GPUArbiter` CR (`cluster0`) and:
 
-1. **Scales vLLM.** Lists gaming pods by label selector (`app In [alex-steam, direwolf-worker]`) in `dreamcast`. While ≥1 active gaming pod exists it scales `ai-system/vllm` to `0` (releasing VRAM); when idle, back to `1`.
-2. **Removes the scheduling gate.** Gaming pods start gated with `gpu.biggs.dog/await-vram`. The operator lifts the gate once vLLM is down (`status.replicas == 0`), or free VRAM (`DCGM_FI_DEV_FB_FREE` via VictoriaMetrics) ≥ `spec.freeMiB`, or a safety `spec.timeoutSeconds` elapses — so a stuck metric degrades gracefully instead of hanging the session.
+1. **Scales vLLM** to 0 when gaming pods appear, back to 1 when idle.
+2. **Lifts the scheduling gate** (`gpu.biggs.dog/await-vram`) once VRAM is freed.
 
-`kubectl get gpuarbiter cluster0` surfaces the live decision (`GAMEPODS`, `VLLMREPLICAS`, `FREEVRAM`, and a `message`).
-
-**Deployment** lives under `apps/dreamcast/gpu-arbiter-operator` (operator) and `apps/dreamcast/gpu-arbiter-instance` (the CR): three ordered Flux Kustomizations — the `GPUArbiter` CRD, a cross-namespace Role/RoleBinding in `ai-system` (so the `dreamcast` service account can scale `vllm`), then the manager Deployment + cluster-scoped RBAC. Image `shrinedogg/gpu-arbiter-operator:v0.1.1` (`linux/amd64`, immutable semver tags). `ai-system/vllm` intentionally omits `spec.replicas` so Flux doesn't fight the arbiter over the count. Full detail in the [directory README](clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-operator/README.md).
+**Deployment:** `apps/dreamcast/gpu-arbiter-{operator,instance}`. Image: `shrinedogg/gpu-arbiter-operator:v0.1.1`. See the [directory README](clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-operator/README.md) for full spec and testing details. Query status with `kubectl get gpuarbiter cluster0`.
 
 
-### Defined Apps (`fenrir/app/apps.yaml`)
+### Defined Apps
 
-- **Firefox** — reference app, validates the GPU/video path.
-- **Test Ball** — synthetic `videotestsrc` pattern with no app container; isolates the Wolf/NVENC encode path from app rendering.
-- **Steam** — Big Picture via Sway, with a 250Gi `host-path` PVC persisting `/home/retro` (login, library, installed games) across sessions. Includes DLSS support under Proton (see DLSS notes below) and a `nvngx-cache` (4Gi `host-path`) PVC for the restored NVIDIA wine NGX bridge DLLs.
+Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference), **Test Ball** (synthetic videotestsrc), **Steam** (Big Picture + persistent `/home/retro` PVC + DLSS). See [NOTES.md](NOTES.md#dreamcast-engineering-notes) for details.
 
-### Patched Fork & Engineering Notes
+### Forked Images
 
-Getting this working end-to-end required a fork of the operator (`[shrinedogg/fenrir](https://github.com/shrinedogg/fenrir)`) plus several cluster-specific config decisions. Images are built locally and published to Docker Hub with semver tags.
-
-**Forked images:**
-
-
-| Image | Tag | Why |
-| ----- | --- | --- |
-| `docker.io/shrinedogg/direwolf-operator` | `v0.1.0` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent isn't up on the first try) and prunes stale `trackedSessions` entries that spam logs. |
-| `docker.io/shrinedogg/moonlight-proxy` | `v0.1.1` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session. |
-| `docker.io/shrinedogg/wolf-agent` | `v0.1.0` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers. |
-| `docker.io/shrinedogg/wolf` | `v0.1.0` | Overlay on `wolf:stable` with a patched `gst-wayland-display` ([shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display), branch `fix/optional-wl-drm`): skips the legacy `wl_drm` global when dmabuf v4 feedback is active, fixing the wlroots/Sway nested-compositor abort. |
-| `docker.io/shrinedogg/gpu-arbiter-operator` | `v0.1.1` | Go/controller-runtime port of the original bash `gpu-arbiter`; scales `vllm` to 0 during sessions and lifts the VRAM scheduling gate. v0.1.x fixed scaling to use the `deployments/scale` subresource (a backwards merge patch had emitted `replicas:null`, defaulting back to 1) and switched status writes to a full `Status().Update()` so zero-valued fields clear. |
+See [NOTES.md](NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream.
 
 
 ## 🤖 AI & Agents
