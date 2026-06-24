@@ -45,8 +45,10 @@ rules:
       - deployments/scale
     verbs:
       - get
+      - list
       - patch
       - update
+      - watch
   - apiGroups:
       - gpu.biggs.dog
     resources:

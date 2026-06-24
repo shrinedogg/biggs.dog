@@ -41,6 +41,7 @@ spec:
   timeout: 2m
   dependsOn:
     - name: gpu-arbiter-operator-crds
+    - name: gpu-arbiter-ai-system-rbac
   images:
     - name: shrinedogg/gpu-arbiter-operator
       newTag: "v0.1.0"

@@ -1345,4 +1345,38 @@ spec:
                 caFile: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
 
     # -- Add extra objects dynamically to this chart
-    extraObjects: []
+    extraObjects:
+      # Cluster-wide RBAC for vmagent to discover VMServiceScrapes across all namespaces
+      # (DCGM exporter VMServiceScrape lives in dreamcast, not observability)
+      - |-
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRole
+        metadata:
+          name: vmagent-scrapes-clusterrole
+          labels:
+            app.kubernetes.io/managed-by: victoria-metrics
+        rules:
+          - apiGroups:
+              - operator.victoriametrics.com
+            resources:
+              - vmservicescrapecs
+              - vmservicescrapecategories
+            verbs:
+              - get
+              - list
+              - watch
+      - |-
+        apiVersion: rbac.authorization.k8s.io/v1
+        kind: ClusterRoleBinding
+        metadata:
+          name: vmagent-scrapes-clusterrolebinding
+          labels:
+            app.kubernetes.io/managed-by: victoria-metrics
+        roleRef:
+          apiGroup: rbac.authorization.k8s.io
+          kind: ClusterRole
+          name: vmagent-scrapes-clusterrole
+        subjects:
+          - kind: ServiceAccount
+            name: vmagent-stack-observability
+            namespace: observability

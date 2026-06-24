@@ -1,0 +1,47 @@
+---
+# Role for the gpu-arbiter SA in ai-system — allows scaling the vLLM Deployment
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gpu-arbiter-vllm-scaler-role
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+rules:
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments/scale
+    verbs:
+      - get
+      - patch
+      - update
+---
+# RoleBinding — bind ai-system Role to the gpu-arbiter SA from dreamcast
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gpu-arbiter-vllm-scaler-binding
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gpu-arbiter-vllm-scaler-role
+subjects:
+  - kind: ServiceAccount
+    name: gpu-arbiter-controller-manager
+    namespace: dreamcast
