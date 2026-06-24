@@ -229,36 +229,27 @@ metadata:
     app.kubernetes.io/component: operator
 spec:
   failurePolicy: Ignore
-  matchPolicy: Equivalent
-  rules:
-    - apiGroups:
-        - ""
-      apiVersions:
-        - v1
-      operations:
-        - CREATE
-      resources:
-        - pods
-      scope: Namespaced
-  conditions:
-    - operator: In
-      expression: >-
-        object.metadata.labels["app"] == "direwolf-worker" &&
-        object.metadata.namespace == "dreamcast"
-  generation: Required
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["CREATE"]
+        resources: ["pods"]
+  matchConditions:
+    - name: in-dreamcast
+      expression: "object.metadata.namespace == 'dreamcast'"
+    - name: is-direwolf-worker
+      expression: "object.metadata.labels['app'] == 'direwolf-worker'"
   reinvocationPolicy: IfNeeded
-  sideEffects: None
-  targetResources:
-    - operator: Matches
-      kind: Pod
-      labelSelector:
-        matchLabels:
-          app: direwolf-worker
-  admissionChecks:
-    - name: node.kubernetes.io/mutating-admission-policy-gpu-await-vram-gate
-  variables:
-    - name: gateName
-      expression: '"gpu.biggs.dog/await-vram"'
+  mutations:
+    - patchType: ApplyConfiguration
+      applyConfiguration:
+        expression: >-
+          Object{
+            spec: Object.spec{
+              schedulingGates: [{reason: "gpu.biggs.dog/await-vram"}]
+            }
+          }
 ---
 # MutatingAdmissionPolicyBinding — scope the policy to dreamcast namespace
 apiVersion: admissionregistration.k8s.io/v1
@@ -271,13 +262,4 @@ metadata:
     app.kubernetes.io/component: operator
 spec:
   policyName: gpu-await-vram-gate
-  matchResources:
-    namespaceSelector:
-      matchLabels:
-        kubernetes.io/metadata.name: dreamcast
-    objectSelector:
-      matchLabels:
-        app: direwolf-worker
-  variables:
-    - name: gateName
-      expression: '"gpu.biggs.dog/await-vram"'
+  matchResources: {}
