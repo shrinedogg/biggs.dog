@@ -29,10 +29,6 @@ spec:
       # the GPU vendor and silently falls back to software x264 encoding.
       renderNode: /dev/dri/renderD129
   template:
-    metadata:
-      labels:
-        app: firefox
-        app.kubernetes.io/name: firefox
     spec:
       containers:
         - name: app
@@ -115,10 +111,6 @@ spec:
         requests:
           storage: 250Gi
   template:
-    metadata:
-      labels:
-        app: alex-steam
-        app.kubernetes.io/name: alex-steam
     spec:
       hostIPC: true
       # DLSS: restore the NVIDIA "wine" NGX bridge DLLs that the Talos

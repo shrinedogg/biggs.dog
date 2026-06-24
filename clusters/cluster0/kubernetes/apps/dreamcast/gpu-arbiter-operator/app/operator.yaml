@@ -33,22 +33,13 @@ rules:
       - apps
     resources:
       - deployments
-    verbs:
-      - get
-      - list
-      - patch
-      - update
-      - watch
-  - apiGroups:
-      - apps
-    resources:
       - deployments/scale
     verbs:
       - get
       - list
+      - watch
       - patch
       - update
-      - watch
   - apiGroups:
       - gpu.biggs.dog
     resources:
@@ -190,7 +181,9 @@ spec:
       containers:
         - name: manager
           image: shrinedogg/gpu-arbiter-operator:v0.1.0
-          imagePullPolicy: IfNotPresent
+          # Always pull: the v0.1.0 dev tag is overwritten in-place on each
+          # rebuild, so IfNotPresent would pin nodes to a stale cached image.
+          imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
