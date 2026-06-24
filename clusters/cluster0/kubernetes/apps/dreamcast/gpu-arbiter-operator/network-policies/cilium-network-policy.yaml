@@ -1,0 +1,22 @@
+---
+# Allow gpu-arbiter-operator to scrape DCGM metrics from VictoriaMetrics
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-observability
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: dreamcast
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: gpu-arbiter-operator
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
+      toPorts:
+        - ports:
+            - port: "8428"
+              protocol: TCP
