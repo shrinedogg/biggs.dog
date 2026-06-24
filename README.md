@@ -252,7 +252,7 @@ Secrets follow a three-tier model:
 2. **External Secrets + 1Password** — Runtime secrets from 1Password vaults (API keys, credentials).
 3. **cert-manager** — Automatic certificate issuance + renewal (ACME Let's Encrypt, CA issuer).
 
-See [NOTES.md](NOTES.md#secret-model) for details.
+See [NOTES.md](NOTES.md#secrets) for details.
 
 ## 🚀 Getting Started
 
