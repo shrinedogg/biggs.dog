@@ -1,4 +1,24 @@
 ---
+# Phase 0: Namespace — create before anything else
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: gpu-arbiter-namespace
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: gpu-arbiter-namespace
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-operator/namespace
+  prune: true
+  wait: false
+  timeout: 2m
+---
 # Phase 1: CRDs — deploy first, no waiting for controllers
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
@@ -16,6 +36,8 @@ spec:
   wait: false
   timeout: 2m
   force: true
+  dependsOn:
+    - name: gpu-arbiter-namespace
 ---
 # Phase 2: Operator deployment — waits for CRDs + nv-gpu-operator (DCGM → VM metrics)
 apiVersion: kustomize.toolkit.fluxcd.io/v1
@@ -38,4 +60,8 @@ spec:
   timeout: 2m
   dependsOn:
     - name: gpu-arbiter-operator-crds
+    - name: gpu-arbiter-namespace
     - name: nv-gpu-operator
+  images:
+    - name: shrinedogg/gpu-arbiter-operator
+      newTag: "v0.1.0"
