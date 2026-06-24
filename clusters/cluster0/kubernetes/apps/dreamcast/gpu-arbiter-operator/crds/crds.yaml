@@ -126,6 +126,9 @@ spec:
                         type: string
                       reason:
                         type: string
+                      firstSeen:
+                        type: string
+                        format: date-time
                   description: List of pods with the scheduling gate
                 lastReconcile:
                   type: string
@@ -149,7 +152,7 @@ spec:
           description: Free VRAM (MiB)
         - name: GatedPods
           type: integer
-          jsonPath: '.status.gatedPods | length'
+          jsonPath: ".status.gatedPods | length"
           description: Number of gated pods
         - name: Message
           type: string

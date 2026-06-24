@@ -12,8 +12,12 @@ spec:
   game:
     namespace: dreamcast
     labelSelector:
-      matchLabels:
-        app: direwolf-worker
+      matchExpressions:
+        - key: app
+          operator: In
+          values:
+            - alex-steam
+            - direwolf-worker
   gateName: gpu.biggs.dog/await-vram
   metrics:
     url: http://vmsingle-stack.observability.svc:8428
