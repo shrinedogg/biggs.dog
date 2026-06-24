@@ -52,7 +52,7 @@ clusters/
 
 ## 🖥️ Cluster Nodes
 
-Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all running **Talos Linux v1.13.4** (kernel `6.18.34-talos`, `amd64`) with Kubernetes **v1.36.2**.
+Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all running **Talos Linux v1.13.5** with Kubernetes **v1.36.2**.
 
 | Hostname     | Role          | CPU                                          | RAM    | GPU                                                                          |
 | ------------ | ------------- | -------------------------------------------- | ------ | ---------------------------------------------------------------------------- |
