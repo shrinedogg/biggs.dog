@@ -4,8 +4,8 @@
 # ModelConfig in app/modelconfig.yaml.
 #
 # CPU-only on purpose: the single GPU (nv-01) is fully committed to the chat
-# vLLM (~0.97 util) and is scaled to 0 during gaming by the gpu-arbiter, so a
-# second GPU consumer would contend with both. Embedding traffic from kagent
+# vLLM (~0.97 util) and is scaled to 0 during gaming by the gpu-arbiter-operator,
+# so a second GPU consumer would contend with both. Embedding traffic from kagent
 # memory is infrequent and low-throughput, so CPU is plenty and keeps this
 # service entirely out of the GPU/gaming-arbiter picture.
 apiVersion: kustomize.toolkit.fluxcd.io/v1

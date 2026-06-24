@@ -1,0 +1,284 @@
+---
+# ServiceAccount for the controller manager
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: gpu-arbiter-controller-manager
+  namespace: gpu-arbiter-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+---
+# ClusterRole for the controller — manage pods, deployments, gpuarbiters
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: gpu-arbiter-manager-role
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - pods
+    verbs:
+      - get
+      - list
+      - patch
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments
+    verbs:
+      - get
+      - list
+      - watch
+  - apiGroups:
+      - apps
+    resources:
+      - deployments/scale
+    verbs:
+      - get
+      - patch
+      - update
+  - apiGroups:
+      - gpu.biggs.dog
+    resources:
+      - gpuarbiters
+    verbs:
+      - create
+      - delete
+      - get
+      - list
+      - patch
+      - update
+      - watch
+  - apiGroups:
+      - gpu.biggs.dog
+    resources:
+      - gpuarbiters/finalizers
+    verbs:
+      - update
+  - apiGroups:
+      - gpu.biggs.dog
+    resources:
+      - gpuarbiters/status
+    verbs:
+      - get
+      - patch
+      - update
+---
+# ClusterRoleBinding — bind manager-role to the controller SA
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: gpu-arbiter-manager-rolebinding
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: gpu-arbiter-manager-role
+subjects:
+  - kind: ServiceAccount
+    name: gpu-arbiter-controller-manager
+    namespace: gpu-arbiter-system
+---
+# Leader Election Role — namespace-scoped for leader election in gpu-arbiter-system
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: gpu-arbiter-leader-election-role
+  namespace: gpu-arbiter-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+rules:
+  - apiGroups:
+      - ""
+    resources:
+      - configmaps
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - coordination.k8s.io
+    resources:
+      - leases
+    verbs:
+      - get
+      - list
+      - watch
+      - create
+      - update
+      - patch
+      - delete
+  - apiGroups:
+      - ""
+    resources:
+      - events
+    verbs:
+      - create
+      - patch
+---
+# Leader Election RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: gpu-arbiter-leader-election-rolebinding
+  namespace: gpu-arbiter-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: gpu-arbiter-leader-election-role
+subjects:
+  - kind: ServiceAccount
+    name: gpu-arbiter-controller-manager
+    namespace: gpu-arbiter-system
+---
+# Controller Manager Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gpu-arbiter-controller-manager
+  namespace: gpu-arbiter-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+    app.kubernetes.io/managed-by: flux
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gpu-arbiter-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gpu-arbiter-operator
+      annotations:
+        kubectl.kubernetes.io/default-container: manager
+    spec:
+      serviceAccountName: gpu-arbiter-controller-manager
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          image: shrinedogg/gpu-arbiter-operator:v0.1.0
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            readOnlyRootFilesystem: true
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            limits:
+              cpu: 500m
+              memory: 256Mi
+            requests:
+              cpu: 25m
+              memory: 64Mi
+          ports:
+            - name: http-metrics
+              containerPort: 8080
+              protocol: TCP
+      terminationGracePeriodSeconds: 10
+---
+# MutatingAdmissionPolicy — inject scheduling gate on gaming pods
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicy
+metadata:
+  name: gpu-await-vram-gate
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+spec:
+  failurePolicy: Ignore
+  matchPolicy: Equivalent
+  rules:
+    - apiGroups:
+        - ""
+      apiVersions:
+        - v1
+      operations:
+        - CREATE
+      resources:
+        - pods
+      scope: Namespaced
+  conditions:
+    - operator: In
+      expression: >-
+        object.metadata.labels["app"] == "direwolf-worker" &&
+        object.metadata.namespace == "dreamcast"
+  generation: Required
+  reinvocationPolicy: IfNeeded
+  sideEffects: None
+  targetResources:
+    - operator: Matches
+      kind: Pod
+      labelSelector:
+        matchLabels:
+          app: direwolf-worker
+  admissionChecks:
+    - name: node.kubernetes.io/mutating-admission-policy-gpu-await-vram-gate
+  variables:
+    - name: gateName
+      expression: '"gpu.biggs.dog/await-vram"'
+  failurePolicy: Ignore
+---
+# MutatingAdmissionPolicyBinding — scope the policy to dreamcast namespace
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingAdmissionPolicyBinding
+metadata:
+  name: gpu-await-vram-gate-binding
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+spec:
+  policyName: gpu-await-vram-gate
+  matchResources:
+    namespaceSelector:
+      matchLabels:
+        kubernetes.io/metadata.name: dreamcast
+    objectSelector:
+      matchLabels:
+        app: direwolf-worker
+  variables:
+    - name: gateName
+      expression: '"gpu.biggs.dog/await-vram"'

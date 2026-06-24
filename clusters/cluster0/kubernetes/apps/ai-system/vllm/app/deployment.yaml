@@ -7,8 +7,8 @@ metadata:
   labels:
     app: vllm
 spec:
-  # replicas is intentionally OMITTED: the gpu-arbiter
-  # (clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter) owns this
+  # replicas is intentionally OMITTED: the gpu-arbiter-operator (gpu-arbiter CR
+  # at clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter-instance) owns this
   # Deployment's replica count, scaling it to 0 during Wolf gaming sessions and
   # back to 1 afterward. Declaring replicas here would make Flux fight the
   # arbiter on every reconcile. Unmanaged, a Deployment defaults to 1 replica,
@@ -32,7 +32,7 @@ spec:
       # matching the rest of the ai-system stack.
       nodeSelector:
         nvidia.com/gpu.present: "true"
-      # Short grace so vLLM RELEASES VRAM fast when the gpu-arbiter scales it to
+      # Short grace so vLLM RELEASES VRAM fast when the gpu-arbiter-operator scales it to
       # 0 for a gaming session: the gaming pod is held by a scheduling gate until
       # VRAM is free, and direwolf reaps the session after 60s, so vLLM must let
       # go well before then. vLLM is stateless (weights on the PVC), so a quick

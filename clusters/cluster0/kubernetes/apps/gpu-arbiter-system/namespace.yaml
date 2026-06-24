@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gpu-arbiter-system
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest

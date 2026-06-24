@@ -1,0 +1,10 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: gpu-arbiter-operator
+  namespace: flux-system
+spec:
+  interval: 5m
+  url: https://github.com/shrinedogg/gpu-arbiter-operator
+  ref:
+    tag: v0.1.0

@@ -4,10 +4,11 @@
 # ai-system is auto-discovered -- same mechanism as vllm's VMServiceScrape).
 #
 # NOTE: there is intentionally no "vLLM down / replicas == 0" alert. The
-# gpu-arbiter (clusters/cluster0/kubernetes/apps/dreamcast/gpu-arbiter) scales
-# this Deployment to 0 during Wolf gaming sessions and back to 1 afterward, so
-# replicas==0 is an expected, healthy state. Alert instead on restart storms
-# and CrashLoopBackOff, which indicate the pod is present but failing.
+# gpu-arbiter-operator (gpu-arbiter CR at dreamcast/gpu-arbiter-instance)
+# scales this Deployment to 0 during Wolf gaming sessions and back to 1
+# afterward, so replicas==0 is an expected, healthy state. Alert instead on
+# restart storms and CrashLoopBackOff, which indicate the pod is present but
+# failing.
 #
 # Metrics reference: see vmservicescrape.yaml in this directory.
 apiVersion: operator.victoriametrics.com/v1beta1
@@ -48,7 +49,7 @@ spec:
         # KV cache near full -> requests being preempted/swapped. Budget is
         # ~838K tokens (fp8 KV, gpu_memory-utilization=0.97, max_num_seqs=32).
         - alert: VllmKVCacheNearFull
-          expr: 'vllm:gpu_cache_usage_perc > 0.95'
+          expr: "vllm:gpu_cache_usage_perc > 0.95"
           for: 2m
           labels:
             severity: warning
@@ -58,7 +59,7 @@ spec:
         # TTFT regression: prefill latency spikes under concurrency / long
         # prompts. 5s P99 is well above the baseline (~65 ms single-stream).
         - alert: VllmHighTTFT
-          expr: 'histogram_quantile(0.99, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m]))) > 5'
+          expr: "histogram_quantile(0.99, sum by (le) (rate(vllm:time_to_first_token_seconds_bucket[5m]))) > 5"
           for: 5m
           labels:
             severity: warning
@@ -67,7 +68,7 @@ spec:
             description: "P99 TTFT has been above 5s for 5m, indicating prefill saturation. Check concurrent agent fan-out and max-num-batched-tokens."
         # Requests queued with none admitted: admission pressure / KV starvation.
         - alert: VllmRequestsWaiting
-          expr: 'vllm:num_requests_waiting > 0'
+          expr: "vllm:num_requests_waiting > 0"
           for: 3m
           labels:
             severity: warning

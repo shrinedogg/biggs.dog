@@ -1,0 +1,157 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: gpuarbiters.gpu.biggs.dog
+  labels:
+    app.kubernetes.io/name: gpu-arbiter-operator
+    app.kubernetes.io/part-of: gpu-arbiter
+    app.kubernetes.io/component: operator
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.19.0
+spec:
+  group: gpu.biggs.dog
+  names:
+    kind: GPUArbiter
+    listKind: GPUArbiterList
+    plural: gpuarbiters
+    singular: gpuarbiter
+    shortNames:
+      - gpa
+      - gpuarbiter
+  scope: Cluster
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - vllm
+                - game
+              properties:
+                vllm:
+                  type: object
+                  required:
+                    - namespace
+                    - name
+                  properties:
+                    namespace:
+                      type: string
+                      description: Namespace of the vLLM Deployment
+                    name:
+                      type: string
+                      description: Name of the vLLM Deployment
+                game:
+                  type: object
+                  required:
+                    - namespace
+                    - labelSelector
+                  properties:
+                    namespace:
+                      type: string
+                      description: Namespace of gaming-session pods
+                    labelSelector:
+                      type: object
+                      description: Selector for gaming pods
+                      x-kubernetes-preserve-unknown-fields: true
+                gateName:
+                  type: string
+                  default: gpu.biggs.dog/await-vram
+                  description: Scheduling gate to remove
+                metrics:
+                  type: object
+                  properties:
+                    url:
+                      type: string
+                      default: http://vmsingle-stack.observability.svc:8428
+                      description: VictoriaMetrics endpoint
+                    query:
+                      type: string
+                      default: max(DCGM_FI_DEV_FB_FREE)
+                      description: PromQL query for free VRAM
+                    timeoutSeconds:
+                      type: integer
+                      default: 4
+                      description: HTTP query timeout
+                freeMiB:
+                  type: integer
+                  format: int64
+                  default: 8000
+                  description: Free VRAM threshold (MiB) to ungate
+                timeoutSeconds:
+                  type: integer
+                  default: 45
+                  description: Safety fallback timeout
+                intervalSeconds:
+                  type: integer
+                  default: 2
+                  description: Poll interval (seconds)
+            status:
+              type: object
+              properties:
+                observedGeneration:
+                  type: integer
+                  format: int64
+                  description: Last observed spec generation
+                gamePods:
+                  type: integer
+                  description: Count of active gaming pods
+                currentVLLMReplicas:
+                  type: integer
+                  format: int32
+                  description: Current vLLM replica count
+                desiredVLLMReplicas:
+                  type: integer
+                  format: int32
+                  description: Target replica count the arbiter wants
+                freeVRAMMiB:
+                  type: integer
+                  format: int64
+                  description: Last DCGM reading (MiB), or -1 if unknown
+                gatedPods:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      name:
+                        type: string
+                      namespace:
+                        type: string
+                      reason:
+                        type: string
+                  description: List of pods with the scheduling gate
+                lastReconcile:
+                  type: string
+                  format: date-time
+                  description: Timestamp of last reconcile
+                message:
+                  type: string
+                  description: Human-readable summary of last decision
+      additionalPrinterColumns:
+        - name: GamePods
+          type: integer
+          jsonPath: .status.gamePods
+          description: Number of active gaming pods
+        - name: vLLMReplicas
+          type: integer
+          jsonPath: .status.currentVLLMReplicas
+          description: Current vLLM replica count
+        - name: FreeVRAM
+          type: integer
+          jsonPath: .status.freeVRAMMiB
+          description: Free VRAM (MiB)
+        - name: GatedPods
+          type: integer
+          jsonPath: '.status.gatedPods | length'
+          description: Number of gated pods
+        - name: Message
+          type: string
+          jsonPath: .status.message
+          priority: 1

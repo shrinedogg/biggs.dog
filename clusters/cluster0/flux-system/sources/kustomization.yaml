@@ -16,6 +16,7 @@ resources:
   - openebs-repo.yaml
   - nfs-driver-repo.yaml
   - gateway-api-crds-git.yaml
+  - gpu-arbiter-operator-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
   - continuwuity-oci.yaml
