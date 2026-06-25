@@ -58,8 +58,9 @@ spec:
     # here. The kernel emits NVRM:Xid to dmesg, but Talos ships that only to
     # Omni's kmsg sink, not to VictoriaLogs. Until kernel logs are routed into
     # VictoriaLogs (Talos machine.logging destination -> vlogs syslog), the
-    # freeze is covered indirectly by the KubeNodeUnreachable alert
-    # (observability/victoria-metrics) and the GPU VRAM/thermal alerts. The
+    # freeze is covered indirectly by the bundled kubernetes-mixin
+    # KubeNodeNotReady/KubeNodeUnreachable alerts (~15m) and the GPU
+    # VRAM/thermal alerts (nv-gpu-operator VMRule). The
     # XID/remapped-rows lines are kept for forward-compat with datacenter GPUs.
     # ECC stays commented (consumer RTX 5090 has no ECC).
     dcgmExporter:
