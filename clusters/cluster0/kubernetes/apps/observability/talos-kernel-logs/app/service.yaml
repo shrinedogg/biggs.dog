@@ -9,7 +9,7 @@
 # so a node routes them via the gateway -> UDM (BGP route) -> back into the
 # cluster. The lb-ipam-pool=routed label draws from the dedicated pool-routed
 # (see kube-system/cilium/bgp); the IP is pinned so the address referenced by
-# the Omni KmsgLogConfig patch (tcp://192.168.6.6:5170) stays stable.
+# the Omni KmsgLogConfig patch (tcp://192.168.6.14:5170) stays stable.
 #
 # clusterIP is also pinned and kept as an in-cluster fallback target.
 apiVersion: v1
@@ -20,7 +20,7 @@ metadata:
   labels:
     lb-ipam-pool: routed
   annotations:
-    io.cilium/lb-ipam-ips: "192.168.6.6"
+    io.cilium/lb-ipam-ips: "192.168.6.14"
 spec:
   type: LoadBalancer
   clusterIP: "10.109.199.29"
