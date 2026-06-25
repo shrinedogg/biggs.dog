@@ -1,23 +1,28 @@
 ---
-# ClusterIP (pinned) so the Talos node host can reach the relay.
+# LoadBalancer VIP on the routed pool (192.168.6.0/24) so the Talos node host
+# can reach the relay.
 #
-# IMPORTANT: this is intentionally NOT a LoadBalancer. LB IPs here are
-# advertised via BGP to the LAN router (no L2/ARP). The LB pool (192.168.2.6-254)
-# overlaps the nodes' own /24, so a node sending to an LB VIP ARPs for it on the
-# local segment and gets no answer -- nodes cannot reach LB VIPs in this setup
-# (external LAN clients can, via the router). Cilium's socket-LB DOES handle
-# ClusterIP for host-namespace traffic, so the kmsg sender on the node reaches
-# this ClusterIP fine (verified from a hostNetwork pod).
+# Background: the default LB pool (192.168.2.6-254) overlaps the nodes' own /24,
+# and LB IPs are BGP-advertised (no L2/ARP), so a node sending to such a VIP
+# ARPs locally and gets no answer -- nodes cannot reach those VIPs (external LAN
+# clients can, via the UDM router). VIPs in 192.168.6.x are off the node subnet,
+# so a node routes them via the gateway -> UDM (BGP route) -> back into the
+# cluster. The lb-ipam-pool=routed label draws from the dedicated pool-routed
+# (see kube-system/cilium/bgp); the IP is pinned so the address referenced by
+# the Omni KmsgLogConfig patch (tcp://192.168.6.6:5170) stays stable.
 #
-# clusterIP is pinned so the address referenced by the Omni KmsgLogConfig patch
-# (tcp://10.109.199.29:5170) stays stable across Service re-creation.
+# clusterIP is also pinned and kept as an in-cluster fallback target.
 apiVersion: v1
 kind: Service
 metadata:
   name: talos-kernel-log-relay
   namespace: observability
+  labels:
+    lb-ipam-pool: routed
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.6.6"
 spec:
-  type: ClusterIP
+  type: LoadBalancer
   clusterIP: "10.109.199.29"
   selector:
     app.kubernetes.io/name: talos-kernel-log-relay
