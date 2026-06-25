@@ -1,0 +1,113 @@
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: exa-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: exa-mcp
+---
+# Exa MCP Server — self-hosted Model Context Protocol server providing
+# Exa's AI-native search capabilities (web search, code search, company
+# research) via Streamable HTTP at :3000/mcp, proxying to the Exa API.
+#
+# Unlike the hosted Exa MCP endpoint, this containerised instance runs
+# inside the cluster and is reachable by kagent's RemoteMCPServer at the
+# /mcp path. The server is stateless and only makes egress calls to
+# Exa's API; no cluster RBAC is required.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exa-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: exa-mcp
+    app.kubernetes.io/version: "3.2.1"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: exa-mcp
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: exa-mcp
+        app.kubernetes.io/version: "3.2.1"
+    spec:
+      serviceAccountName: exa-mcp
+      terminationGracePeriodSeconds: 30
+      # Pin to the GPU node (nv-01), matching the rest of the ai-system stack.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: kubernetes.io/os
+                    operator: In
+                    values:
+                      - linux
+      containers:
+        - name: server
+          image: docker.io/shrinedogg/exa-mcp-server:3.2.1-http
+          imagePullPolicy: Always
+          env:
+            # Exa API key — injected from ExternalSecret or manual Secret.
+            # Required by Exa's search API for all tool calls.
+            - name: EXA_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: exa-api-key
+                  key: api-key
+            # Enable all search tools. Defaults are web_search_exa +
+            # web_fetch_exa. Adding web_search_advanced_exa enables
+            # category filtering, date ranges, domain filters, etc.
+            - name: ENABLED_TOOLS
+              value: "web_search_exa,web_fetch_exa,web_search_advanced_exa"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir:
+            sizeLimit: 100Mi

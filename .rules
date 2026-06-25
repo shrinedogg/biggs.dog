@@ -27,7 +27,7 @@ window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%
 under load), so the context-overflow that broke heavy agents on the previous
 27B/65K model is fully resolved.
 
-The live, invocable agent set (`kubectl get agents -n ai-system`) is the nine
+The live, invocable agent set (`kubectl get agents -n ai-system`) is the ten
 listed below. Most are chart-managed via per-agent `*.enabled` toggles in the
 kagent `HelmRelease`
 (`clusters/cluster0/kubernetes/apps/ai-system/kagent/app/helmrelease.yaml`);
@@ -36,6 +36,7 @@ Flux owns those `Agent` CRs, so disable them there rather than with
 their own Flux Kustomizations:
 - `flux-agent` -- `apps/ai-system/flux-mcp/` (read-only Flux inspection).
 - `vm-agent` -- `apps/ai-system/victoria-metrics-mcp/` (VictoriaMetrics MCP).
+- `exa-agent` -- `apps/ai-system/exa-mcp/` (Exa web search and research).
 - `cilium-debug-agent` and `cilium-policy-agent` --
   `apps/ai-system/kagent/cilium-agents/` (the chart versions are disabled and
   re-defined statically so they carry generic `k8s_*` tools alongside the
@@ -80,6 +81,12 @@ Pick the single most specific agent for the task:
   root-cause analysis and Flux docs lookup. Read-only. Use for "why isn't
   this reconciling / syncing from git" questions. (For Helm release internals
   specifically, prefer helm-agent.)
+
+- **exa-agent** — Web search, code discovery, and company research via Exa.
+  Use for finding code examples, researching companies/competitors,
+  discovering technical documentation, and gathering web intelligence.
+  Requires Exa API key from [exa.com](https://exa.com). Defined in
+  `apps/ai-system/exa-mcp/`.
 
 ## Cilium — choose carefully (three overlapping agents)
 

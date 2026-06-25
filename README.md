@@ -230,10 +230,11 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 | victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
 | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.4.6`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution). Enabled on all built-in agents. Defined in `apps/ai-system/agent-sandbox/`. |
 | embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` model for kagent's long-term vector memory. Intentionally CPU-only to avoid contending with the GPU-constrained vLLM during gaming. Defined in `apps/ai-system/embeddings/`. |
+| exa-mcp / `exa-agent` | A custom kagent `Agent` backed by the [Exa MCP server](https://github.com/shrinedogg/exa-mcp-server) (`3.2.1`), providing web search, code discovery, and company research. Exposes `web_search_exa`, `web_fetch_exa`, and `web_search_advanced_exa` tools with support for content categories (company, news, people, research papers, financial reports, personal sites). Defined in `apps/ai-system/exa-mcp/`. Requires Exa API key from [exa.com](https://exa.com). |
 
 **Available agents** (`kubectl get agents -n ai-system`):
 - **Chart-managed**: `k8s-agent`, `observability-agent`, `promql-agent`, `helm-agent`, `cilium-manager-agent`.
-- **Custom (non-chart)**: `flux-agent`, `vm-agent`, `cilium-debug-agent`, `cilium-policy-agent`.
+- **Custom (non-chart)**: `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`.
 - **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
 
 See [`.rules`](.rules) for agent selection by task domain.

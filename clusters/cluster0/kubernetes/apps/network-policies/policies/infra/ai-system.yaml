@@ -259,6 +259,39 @@ spec:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
 ---
+# exa-mcp egress to Exa API. The server calls Exa's web search / fetch /
+# research endpoints over HTTPS. No special FQDN is needed -- the broad
+# internet egress with TLS allows exa.com and all its CDN hosts.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-exa
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: exa-mcp
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

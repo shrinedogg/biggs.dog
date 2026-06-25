@@ -1,0 +1,20 @@
+---
+# Registers the in-cluster exa-mcp server as a kagent tool source.
+# Mirrors the pattern established by flux-operator-mcp and
+# victoria-metrics-mcp.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: exa-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Exa MCP server — AI-native web search, code discovery, and company
+    research. Exposes Exa's search capabilities: clean web results, GitHub
+    code snippets, company research with rich metadata, and advanced
+    filtering by date, domain, content type, and text.
+  protocol: STREAMABLE_HTTP
+  url: http://exa-mcp.ai-system:3000/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s
