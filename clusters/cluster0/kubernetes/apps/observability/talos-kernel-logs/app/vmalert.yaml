@@ -1,0 +1,35 @@
+---
+# Dedicated VMAlert for VictoriaLogs (LogsQL) rules. The stack's vmalert can
+# only target one datasource (metrics), so log-based alerting needs its own
+# instance pointed at VictoriaLogs. It evaluates only VMRules labelled
+# vmalert-type=vlogs; the metrics vmalert-stack is configured to exclude those.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMAlert
+metadata:
+  name: vlogs
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: vmalert-vlogs
+spec:
+  replicaCount: 1
+  # VictoriaLogs exposes the Prometheus-compatible stats API vmalert needs.
+  datasource:
+    url: http://victoria-logs-single-vls-server.observability.svc.cluster.local:9428
+  # Persist alert state + restore on restart via the metrics single-node.
+  remoteWrite:
+    url: http://vmsingle-stack.observability.svc.cluster.local:8428
+  remoteRead:
+    url: http://vmsingle-stack.observability.svc.cluster.local:8428
+  # Route notifications through the same Alertmanager as the metrics rules.
+  notifiers:
+    - url: http://vmalertmanager-stack-0.vmalertmanager-stack.observability.svc.cluster.local:9093
+  evaluationInterval: 60s
+  # No intentional ingestion delay in VictoriaLogs; keep eval delay small.
+  extraArgs:
+    rule.defaultRuleType: vlogs
+    rule.evalDelay: "5s"
+  # Only pick up VMRules explicitly marked as vlogs rules.
+  selectAllByDefault: false
+  ruleSelector:
+    matchLabels:
+      vmalert-type: vlogs

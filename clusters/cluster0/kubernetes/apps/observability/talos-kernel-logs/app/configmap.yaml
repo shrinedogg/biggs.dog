@@ -1,0 +1,52 @@
+---
+# Vector config for the Talos kernel-log relay.
+#
+# Talos ships kernel (dmesg) logs as newline-delimited JSON over raw TCP (the
+# `KmsgLogConfig` document / `talos.logging.kernel` kernel arg). VictoriaLogs
+# cannot ingest that stream directly (it speaks HTTP /insert/jsonline or
+# syslog), so this Vector instance receives the raw json_lines on :5170 and
+# forwards them to VictoriaLogs. nv-01 is wired to send here via Omni
+# ConfigPatch 530-cm-8aa40879-...-kmsg-vlogs (added as a SECOND kmsg
+# destination; Omni's own destination is preserved).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: talos-kernel-log-relay-config
+  namespace: observability
+data:
+  vector.yaml: |
+    data_dir: /vector-data-dir
+    api:
+      enabled: false
+    sources:
+      talos_kmsg:
+        type: socket
+        mode: tcp
+        address: 0.0.0.0:5170
+        decoding:
+          codec: json
+        framing:
+          method: newline_delimited
+    transforms:
+      enrich:
+        type: remap
+        inputs: ["talos_kmsg"]
+        source: |
+          .log_source = "talos-kernel"
+          # Only nv-01 ships kmsg to this relay today. Hardcoded because the
+          # LoadBalancer may SNAT the sender IP; revisit (map source IP -> node)
+          # if more nodes are wired to this relay.
+          .node = "nv-01"
+    sinks:
+      vlogs:
+        type: http
+        inputs: ["enrich"]
+        uri: "http://victoria-logs-single-vls-server.observability.svc.cluster.local:9428/insert/jsonline?_stream_fields=node,log_source,priority,facility&_msg_field=msg&_time_field=talos-time"
+        method: post
+        encoding:
+          codec: json
+        framing:
+          method: newline_delimited
+        request:
+          headers:
+            Content-Type: application/stream+json

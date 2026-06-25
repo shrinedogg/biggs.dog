@@ -1,0 +1,60 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: talos-kernel-log-relay
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: talos-kernel-log-relay
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: talos-kernel-log-relay
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: talos-kernel-log-relay
+      annotations:
+        # Restart the pod when the Vector config changes (Flux sets this via the
+        # configMapGenerator hash only when using kustomize generators; here we
+        # rely on `flux reconcile` + manual rollout if the config changes).
+        kubernetes.io/description: "Receives Talos kmsg json_lines on :5170, forwards to VictoriaLogs"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vector
+          image: timberio/vector:0.56.0-distroless-libc
+          args: ["--config", "/etc/vector/vector.yaml"]
+          ports:
+            - name: kmsg
+              containerPort: 5170
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/vector
+              readOnly: true
+            - name: data
+              mountPath: /vector-data-dir
+      volumes:
+        - name: config
+          configMap:
+            name: talos-kernel-log-relay-config
+        - name: data
+          emptyDir: {}

@@ -1,0 +1,21 @@
+---
+# LAN LoadBalancer so the Talos host network (nv-01) can reach the relay at a
+# stable IP. Cilium LB-IPAM pins 192.168.2.14 (next free after .13); pinned via
+# io.cilium/lb-ipam-ips so it survives restarts (same pattern as kagent-mcp-lan).
+# This IP:port is referenced by the Omni KmsgLogConfig patch on nv-01.
+apiVersion: v1
+kind: Service
+metadata:
+  name: talos-kernel-log-relay
+  namespace: observability
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.2.14"
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: talos-kernel-log-relay
+  ports:
+    - name: kmsg
+      port: 5170
+      targetPort: 5170
+      protocol: TCP

@@ -739,6 +739,15 @@ spec:
         port: "8080"
         selectAllByDefault: true
         evaluationInterval: 20s
+        # Exclude VictoriaLogs (LogsQL) rules: they are evaluated by the
+        # dedicated `vlogs` VMAlert (apps/observability/talos-kernel-logs).
+        # NotIn matches all rules WITHOUT this label too, so existing metrics
+        # rules keep being selected.
+        ruleSelector:
+          matchExpressions:
+            - key: vmalert-type
+              operator: NotIn
+              values: ["vlogs"]
         extraArgs:
           http.pathPrefix: "/"
 
