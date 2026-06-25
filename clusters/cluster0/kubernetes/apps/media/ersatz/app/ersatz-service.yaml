@@ -18,4 +18,3 @@ spec:
       port: 8409
       protocol: TCP
       targetPort: 8409
-      nodePort: 30409
