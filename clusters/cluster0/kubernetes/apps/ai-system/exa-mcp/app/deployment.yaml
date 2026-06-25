@@ -54,7 +54,7 @@ spec:
                       - linux
       containers:
         - name: server
-          image: docker.io/shrinedogg/exa-mcp-server:3.2.1-http11
+          image: docker.io/shrinedogg/exa-mcp-server:3.2.1-http12
           imagePullPolicy: Always
           env:
             # Exa API key — injected from ExternalSecret or manual Secret.
@@ -73,20 +73,17 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
-            - name: http-health
-              containerPort: 3001
-              protocol: TCP
           livenessProbe:
             httpGet:
               path: /health
-              port: http-health
+              port: http
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /health
-              port: http-health
+              port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
