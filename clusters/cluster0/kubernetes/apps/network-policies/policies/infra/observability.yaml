@@ -150,3 +150,27 @@ spec:
         - ports:
             - port: "8428"
               protocol: TCP
+---
+# Talos nodes ship kernel (dmesg) logs to talos-kernel-log-relay on :5170
+# (Vector -> VictoriaLogs; see apps/observability/talos-kernel-logs). nv-01
+# sends via the LAN LoadBalancer 192.168.2.14, originating from the node host
+# network, so the source identity is host/remote-node. Without this, the
+# implicit default-deny silently drops the kmsg TCP stream and no kernel logs
+# (incl. the GpuXidError signal) ever reach VictoriaLogs.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-kmsg-relay-from-nodes
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: talos-kernel-log-relay
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "5170"
+              protocol: TCP
