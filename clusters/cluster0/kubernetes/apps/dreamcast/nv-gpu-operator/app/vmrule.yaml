@@ -1,0 +1,73 @@
+---
+# GPU health/contention alerts evaluated by vmalert (observability/stack runs
+# selectAllByDefault=true, so this VMRule is auto-discovered -- same mechanism
+# as the DCGM VMServiceScrape in this directory).
+#
+# Context: on 2026-06-25 nv-01 hard-froze and dropped off the network. The node
+# was running at ~98% VRAM (vLLM gpu-memory-utilization was 0.97, leaving ~1GB
+# free) with the GPU time-sliced/shared, producing a storm of NVRM
+# NV_ERR_NO_MEMORY before the lockup. These rules surface the two precursors
+# that were invisible at the time: VRAM exhaustion and thermal stress.
+#
+# Metric availability (verified against VictoriaMetrics): the gpu-operator's
+# DCGM exporter currently emits FB_FREE/USED/RESERVED, GPU_TEMP, POWER_USAGE,
+# SM_CLOCK. It does NOT emit DCGM_FI_DEV_XID_ERRORS, so the suspected Xid 109
+# CTX_SWITCH_TIMEOUT freeze still cannot be alerted on -- enable XID collection
+# in the dcgm-exporter csv/config to add an XID alert (highest-value follow-up).
+#
+# Labels available on every series: Hostname, gpu, UUID, modelName, pci_bus_id.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: nvidia-gpu
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/name: nv-gpu-operator
+spec:
+  groups:
+    - name: nvidia-gpu-vram
+      rules:
+        # VRAM headroom nearly gone. With vLLM at gpu-memory-utilization=0.90
+        # the GPU normally idles ~3GB free; sustained <750MiB means a
+        # co-scheduled consumer (embeddings, GPU-operator validators, DRA
+        # workloads, or a Wolf game session) has consumed almost the entire
+        # reserve -- the immediate precondition for the NV_ERR_NO_MEMORY
+        # cascade that preceded the nv-01 freeze.
+        - alert: GpuVramFreeLow
+          expr: 'min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 750'
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "GPU VRAM headroom low on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
+            description: "Only {{ $value | humanize }}MiB free on {{ $labels.Hostname }} gpu {{ $labels.gpu }} for 10m (threshold 750MiB). Co-scheduled GPU consumers are starving the reserve; expect NVRM NV_ERR_NO_MEMORY. Check what landed on the node and consider lowering vLLM gpu-memory-utilization or reducing GPU time-slice replicas."
+        # Near-zero free VRAM: allocations are actively failing now.
+        - alert: GpuVramFreeCritical
+          expr: 'min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 500'
+          for: 5m
+          labels:
+            severity: critical
+          annotations:
+            summary: "GPU VRAM nearly exhausted on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
+            description: "Only {{ $value | humanize }}MiB free on {{ $labels.Hostname }} gpu {{ $labels.gpu }} for 5m. GPU allocations are likely failing (NV_ERR_NO_MEMORY). This is the state that preceded the 2026-06-25 nv-01 lockup -- intervene before the node hangs."
+    - name: nvidia-gpu-thermal
+      rules:
+        # RTX 5090 throttles around 88-90C. Sustained high temp under the
+        # mitigations=off / pcie_aspm=off profile is a plausible contributor to
+        # a hard lockup, so surface it early.
+        - alert: GpuTempHigh
+          expr: 'max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 84'
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "GPU temperature high on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
+            description: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} has been above 84C for 5m ({{ $value }}C). Approaching the thermal-throttle threshold; check airflow and sustained load."
+        - alert: GpuTempCritical
+          expr: 'max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 90'
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "GPU temperature critical on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
+            description: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} has been above 90C for 2m ({{ $value }}C). Thermal-throttle/instability risk -- reduce load or check cooling."
