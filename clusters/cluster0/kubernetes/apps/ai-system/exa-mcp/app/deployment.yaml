@@ -73,17 +73,20 @@ spec:
             - name: http
               containerPort: 3000
               protocol: TCP
+            - name: http-health
+              containerPort: 3001
+              protocol: TCP
           livenessProbe:
             httpGet:
               path: /health
-              port: http
+              port: http-health
             initialDelaySeconds: 10
             periodSeconds: 15
             timeoutSeconds: 5
           readinessProbe:
             httpGet:
               path: /health
-              port: http
+              port: http-health
             initialDelaySeconds: 5
             periodSeconds: 10
             timeoutSeconds: 3
