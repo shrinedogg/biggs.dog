@@ -5,9 +5,11 @@
 # `KmsgLogConfig` document / `talos.logging.kernel` kernel arg). VictoriaLogs
 # cannot ingest that stream directly (it speaks HTTP /insert/jsonline or
 # syslog), so this Vector instance receives the raw json_lines on :5170 and
-# forwards them to VictoriaLogs. nv-01 is wired to send here via Omni
-# ConfigPatch 530-cm-8aa40879-...-kmsg-vlogs (added as a SECOND kmsg
-# destination; Omni's own destination is preserved).
+# forwards them to VictoriaLogs. nv-01 sends here via Omni ConfigPatch
+# 530-cm-8aa40879-...-kmsg-vlogs (a SECOND kmsg destination; Omni's own
+# destination is preserved). The target is this Service's pinned ClusterIP
+# (10.109.199.29:5170) -- nodes can't reach BGP LB VIPs in their own subnet,
+# but Cilium socket-LB handles ClusterIP for host-namespace traffic.
 apiVersion: v1
 kind: ConfigMap
 metadata:

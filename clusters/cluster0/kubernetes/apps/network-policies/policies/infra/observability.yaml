@@ -153,8 +153,8 @@ spec:
 ---
 # Talos nodes ship kernel (dmesg) logs to talos-kernel-log-relay on :5170
 # (Vector -> VictoriaLogs; see apps/observability/talos-kernel-logs). nv-01
-# sends via the LAN LoadBalancer 192.168.2.14, originating from the node host
-# network, so the source identity is host/remote-node. Without this, the
+# sends to the relay's ClusterIP from the node host network, so the source
+# identity is host/remote-node. Without this, the
 # implicit default-deny silently drops the kmsg TCP stream and no kernel logs
 # (incl. the GpuXidError signal) ever reach VictoriaLogs.
 apiVersion: cilium.io/v2
