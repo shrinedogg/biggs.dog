@@ -57,6 +57,8 @@ spec:
       moonlight_proxy:
         containers:
           proxy:
+            # NOTE: also see the service.app pin below — it stabilizes the
+            # shared direwolf LB VIP.
             image:
               # Patched fork: /launch waits up to 120s (upstream 25s) for the
               # session pod to come up. A cold start (image pull + wolf boot +
@@ -65,3 +67,12 @@ spec:
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.1).
               repository: docker.io/shrinedogg/moonlight-proxy
               tag: v0.1.1
+    # Pin the shared moonlight-proxy LoadBalancer VIP. The chart's service.app
+    # already carries lbipam.cilium.io/sharing-key: direwolf (and the per-session
+    # RTP Services share this IP via that key); Helm merges this annotation in,
+    # so the whole direwolf group stays on a stable address instead of drifting
+    # across the pool on recreation. .6.12 is its current assignment.
+    service:
+      app:
+        annotations:
+          io.cilium/lb-ipam-ips: "192.168.6.12"
