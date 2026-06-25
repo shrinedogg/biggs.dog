@@ -3,6 +3,8 @@ kind: Service
 metadata:
   name: ersatz-service
   namespace: media
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.6.12"
   # annotations:
   #   metallb.universe.tf/address-pool: "worker-02-ip"
   #   external-dns.alpha.kubernetes.io/hostname: biggs.dog
