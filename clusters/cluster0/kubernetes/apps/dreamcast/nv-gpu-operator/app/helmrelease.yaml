@@ -43,16 +43,25 @@ spec:
                 resources:
                   - name: nvidia.com/gpu
                     replicas: 4
-    # Custom DCGM-exporter metric profile. The image-builtin
-    # dcp-metrics-included.csv (4.5.3-4.8.2-distroless) curates a subset that
-    # OMITS DCGM_FI_DEV_XID_ERRORS -- the single most important signal for the
-    # recurring nv-01 hard-freeze (suspected Xid 109 / CTX_SWITCH_TIMEOUT under
-    # load; see nvidia-gpu-tuning). Without XID in the scrape, the freeze could
-    # never be root-caused from metrics. We ship the canonical dcgm-exporter
-    # profile (etc/dcp-metrics-included.csv) which restores XID_ERRORS and adds
-    # remapped-rows / NVLink counters. ECC stays commented (consumer RTX 5090
-    # has no ECC). The chart creates a ConfigMap (key dcgm-metrics.csv) and the
-    # gpu-operator mounts it, pointing DCGM_EXPORTER_COLLECTORS at it.
+    # Custom DCGM-exporter metric profile. Expands the image-builtin
+    # dcp-metrics-included.csv (4.5.3-4.8.2-distroless) with clocks, temps,
+    # utilization, PCIe and PROF metrics. The chart creates a ConfigMap (key
+    # dcgm-metrics.csv) and the gpu-operator mounts it, pointing
+    # DCGM_EXPORTER_COLLECTORS at it.
+    #
+    # IMPORTANT (verified 2026-06-25): DCGM_FI_DEV_XID_ERRORS and the
+    # remapped-rows fields are listed below but DO NOT emit on this hardware --
+    # DCGM reports them NOT_SUPPORTED on the consumer GeForce RTX 5090 (the
+    # exporter logs "init ... result=11" at startup and the metrics never
+    # appear). So XID errors -- the key signal for the nv-01 hard-freeze
+    # (suspected Xid 109 / CTX_SWITCH_TIMEOUT) -- CANNOT be alerted on via DCGM
+    # here. The kernel emits NVRM:Xid to dmesg, but Talos ships that only to
+    # Omni's kmsg sink, not to VictoriaLogs. Until kernel logs are routed into
+    # VictoriaLogs (Talos machine.logging destination -> vlogs syslog), the
+    # freeze is covered indirectly by the KubeNodeUnreachable alert
+    # (observability/victoria-metrics) and the GPU VRAM/thermal alerts. The
+    # XID/remapped-rows lines are kept for forward-compat with datacenter GPUs.
+    # ECC stays commented (consumer RTX 5090 has no ECC).
     dcgmExporter:
       config:
         create: true

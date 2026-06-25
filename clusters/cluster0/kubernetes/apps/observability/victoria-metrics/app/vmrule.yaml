@@ -1,0 +1,46 @@
+---
+# Cluster node-health alerts evaluated by vmalert (observability/stack runs
+# selectAllByDefault=true, so this VMRule is auto-discovered).
+#
+# Why this exists: on 2026-06-25 the GPU worker nv-01 hard-froze (suspected
+# Xid 109 / CTX_SWITCH_TIMEOUT) and dropped off the network -- kubelet stopped
+# posting, so its Ready condition went to "unknown". There was NO alert for
+# that, so the freeze was only noticed manually. An XID-specific alert is not
+# possible here (DCGM reports XID NOT_SUPPORTED on the consumer GeForce RTX
+# 5090, and Talos ships kernel NVRM:Xid logs only to Omni, not VictoriaLogs),
+# so we alert on the freeze's *observable signature* -- the node becoming
+# unreachable -- which catches it regardless of root cause.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: node-health
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: victoria-metrics
+spec:
+  groups:
+    - name: node-health
+      rules:
+        # Kubelet stopped posting status -> Ready=unknown. This is the exact
+        # signature of the nv-01 hard-freeze: the node fell off the network and
+        # the node controller flipped its conditions to Unknown. Treated as
+        # critical because the node is effectively gone (workloads get the
+        # unreachable taint and are evicted after the toleration window).
+        - alert: KubeNodeUnreachable
+          expr: 'kube_node_status_condition{condition="Ready",status="unknown"} == 1'
+          for: 3m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Node {{ $labels.node }} is unreachable"
+            description: "Node {{ $labels.node }} has had Ready=unknown for 3m -- kubelet stopped posting status (node likely hung, lost power, or fell off the network). This is the signature of the 2026-06-25 nv-01 freeze. Check the node console/BMC and Omni machine status."
+        # Kubelet is reporting but the node is unhealthy (NotReady). Distinct
+        # from the unreachable case above (kubelet still posting here).
+        - alert: KubeNodeNotReady
+          expr: 'kube_node_status_condition{condition="Ready",status="false"} == 1'
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Node {{ $labels.node }} is NotReady"
+            description: "Node {{ $labels.node }} has reported Ready=false for 5m. The kubelet is still posting, so inspect node conditions (disk/memory/PID pressure, CNI, container runtime) via kubectl describe node and talosctl."
