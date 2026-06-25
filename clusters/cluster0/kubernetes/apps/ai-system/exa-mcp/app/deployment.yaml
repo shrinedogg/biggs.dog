@@ -54,7 +54,7 @@ spec:
                       - linux
       containers:
         - name: server
-          image: docker.io/shrinedogg/exa-mcp-server:3.2.1-http9
+          image: docker.io/shrinedogg/exa-mcp-server:3.2.1-http10
           imagePullPolicy: Always
           env:
             # Exa API key — injected from ExternalSecret or manual Secret.
