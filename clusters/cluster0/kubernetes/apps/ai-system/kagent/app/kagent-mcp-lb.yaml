@@ -8,25 +8,25 @@
 # tools/list -> tools/call(invoke_agent) -> agent runs, all over /mcp.
 #
 # Reachability: Cilium LBIPAM (pool "pool") assigns a private LAN IP from
-# 192.168.2.6-254. That's RFC1918 -> NOT internet-routable, so this is reachable
+# 192.168.6.6-254. That's RFC1918 -> NOT internet-routable, so this is reachable
 # only from the LAN (and any VPN into it). HTTP only (no TLS) by design, for LAN
 # MCP clients (e.g. an editor). In-cluster clients keep using the ClusterIP
 # kagent-controller Service; this adds an external-on-the-LAN entry point.
 #
-# Editor config: http://192.168.2.13:8083/mcp
+# Editor config: http://192.168.6.13:8083/mcp
 #
 # The IP is pinned via io.cilium/lb-ipam-ips so it survives node restarts.
 # Without it, LBIPAM assigns dynamically from the pool and the editor MCP
 # client breaks whenever the assignment changes (as happened after the
-# 2026-06-23 nv-01 reboot). Matches the pattern used by jvb (192.168.2.9)
-# and coturn (192.168.2.10).
+# 2026-06-23 nv-01 reboot). Matches the pattern used by jvb (192.168.6.9)
+# and coturn (192.168.6.10).
 apiVersion: v1
 kind: Service
 metadata:
   name: kagent-mcp-lan
   namespace: ai-system
   annotations:
-    io.cilium/lb-ipam-ips: "192.168.2.13"
+    io.cilium/lb-ipam-ips: "192.168.6.13"
 spec:
   type: LoadBalancer
   # Same selector as the chart's kagent-controller ClusterIP Service.

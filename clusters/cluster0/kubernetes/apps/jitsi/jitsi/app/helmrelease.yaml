@@ -155,13 +155,13 @@ spec:
         type: LoadBalancer
         externalTrafficPolicy: Cluster
         annotations:
-          io.cilium/lb-ipam-ips: "192.168.2.9"
+          io.cilium/lb-ipam-ips: "192.168.6.9"
       useInternalStun: true
       publicIPs:
-        # WAN IP — external clients connect directly; requires UDM SE port forward UDP 10000 → 192.168.2.9:10000
+        # WAN IP — external clients connect directly; requires UDM SE port forward UDP 10000 → 192.168.6.9:10000
         - 87.92.48.51
         # LAN service IP — used by Coturn as TURN relay peer to avoid hairpin NAT
-        - 192.168.2.9
+        - 192.168.6.9
     coturn:
       enabled: true
       replicaCount: 1
@@ -210,7 +210,7 @@ spec:
             denied-peer-ip=203.0.113.0-203.0.113.255
             denied-peer-ip=240.0.0.0-255.255.255.255
             allowed-peer-ip=10.244.0.0-10.244.255.255
-            allowed-peer-ip=192.168.2.0-192.168.2.255
+            allowed-peer-ip=192.168.6.0-192.168.6.255
       turns:
         enabled: true
         certificate:
@@ -222,12 +222,12 @@ spec:
       service:
         type: LoadBalancer
         annotations:
-          io.cilium/lb-ipam-ips: "192.168.2.10"
-          # Registers turn.biggs.dog → 192.168.2.10 in k8s-gateway for internal DNS resolution
+          io.cilium/lb-ipam-ips: "192.168.6.10"
+          # Registers turn.biggs.dog → 192.168.6.10 in k8s-gateway for internal DNS resolution
           external-dns.alpha.kubernetes.io/hostname: "turn.biggs.dog"
       allowedPeerIPs:
         - "10.244.0.0-10.244.255.255" # pod CIDR
-        - "192.168.2.0-192.168.2.255" # service/LAN range — allows relay to JVB LB IP 192.168.2.9
+        - "192.168.6.0-192.168.6.255" # service/LAN range — allows relay to JVB LB IP 192.168.6.9
       extraVolumes:
         - name: run
           emptyDir:

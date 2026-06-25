@@ -58,7 +58,7 @@ If any condition holds, the gate lifts and the pod can schedule. This degrades g
 
 The cluster uses:
 - **Cilium** as the CNI (replaces kube-proxy), with BGP for LoadBalancer IP advertisement.
-- **k8s-gateway** for split-horizon DNS: `*.biggs.dog` resolves to the internal gateway LB (`192.168.2.7`) in-cluster and to the external gateway LB (`192.168.2.6`) for LAN clients.
+- **k8s-gateway** for split-horizon DNS: `*.biggs.dog` resolves to the internal gateway LB (`192.168.6.7`) in-cluster and to the external gateway LB (`192.168.6.6`) for LAN clients.
 - **CoreDNS** patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` queries to k8s-gateway instead of Cloudflare, keeping pod traffic in-cluster.
 - **Gateway API** with **AgentGateway** (OCI HelmRelease) as the ingress controller.
 

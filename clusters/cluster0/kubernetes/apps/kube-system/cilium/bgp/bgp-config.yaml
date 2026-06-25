@@ -1,5 +1,15 @@
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumloadbalancerippool_v2alpha1.json
+# Single LoadBalancer pool on a NON-node subnet (192.168.6.0/24). The nodes
+# live on 192.168.2.0/24, and LB IPs are BGP-advertised (no L2/ARP), so a VIP
+# inside the nodes' own /24 is unreachable FROM the nodes (a node ARPs locally
+# and gets no answer). Keeping the whole pool off-subnet means every VIP routes
+# via the gateway -> UDM (which holds the BGP route) -> back into the cluster,
+# so VIPs are reachable from both LAN clients and the nodes themselves. This is
+# why the formerly separate "pool-routed" (192.168.6.x, label lb-ipam-pool=routed)
+# was folded in here -- with the whole pool off-subnet it served no extra purpose.
+# The CiliumBGPAdvertisement below matches all services, so these VIPs are
+# advertised to the UDM automatically.
 apiVersion: cilium.io/v2alpha1
 kind: CiliumLoadBalancerIPPool
 metadata:
@@ -7,29 +17,7 @@ metadata:
 spec:
   allowFirstLastIPs: "No"
   blocks:
-    - start: 192.168.2.6
-      stop: 192.168.2.254
----
-# Dedicated pool on a NON-node subnet (192.168.6.0/24) for LoadBalancer VIPs
-# that must be reachable FROM the cluster nodes themselves. VIPs in the nodes'
-# own 192.168.2.0/24 are unreachable from nodes (they ARP locally and nothing
-# answers; LB IPs are BGP-only). A VIP in 192.168.6.x is off-subnet, so a node
-# routes it via the gateway -> UDM (which has the BGP route) -> back into the
-# cluster. Scoped via serviceSelector so only opted-in services (label
-# lb-ipam-pool=routed) draw from it; all other services keep using "pool".
-# The existing CiliumBGPAdvertisement matches all services, so these VIPs are
-# advertised to the UDM automatically.
-apiVersion: cilium.io/v2alpha1
-kind: CiliumLoadBalancerIPPool
-metadata:
-  name: pool-routed
-spec:
-  allowFirstLastIPs: "No"
-  serviceSelector:
-    matchLabels:
-      lb-ipam-pool: routed
-  blocks:
-    - start: 192.168.6.14
+    - start: 192.168.6.6
       stop: 192.168.6.254
 ---
 # yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/cilium.io/ciliumbgpadvertisement_v2alpha1.json

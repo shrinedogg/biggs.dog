@@ -73,11 +73,11 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | Component                                                | Description                                                  |
 | -------------------------------------------------------- | ------------------------------------------------------------ |
 | [Cilium](https://cilium.io/)                             | CNI (kube-proxy replacement) with BGP for LoadBalancer IPs   |
-| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.2.6`) |
+| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`) |
 | [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                         |
 | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts         |
 
-The UDM router conditionally forwards `biggs.dog` to k8s-gateway for LAN clients. In-cluster, **CoreDNS** is patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` to k8s-gateway as well, so pods resolve `*.biggs.dog` to the internal gateway LB (`192.168.2.7`) and stay in-cluster instead of hairpinning out through Cloudflare.
+The UDM router conditionally forwards `biggs.dog` to k8s-gateway for LAN clients. In-cluster, **CoreDNS** is patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` to k8s-gateway as well, so pods resolve `*.biggs.dog` to the internal gateway LB (`192.168.6.7`) and stay in-cluster instead of hairpinning out through Cloudflare.
 
 
 ### Storage
@@ -225,7 +225,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 | Component | Description |
 | --------- | ----------- |
 | [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices (v0.23.0). Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the [GPU Arbiter](#gpu-arbiter) (the 32 GB card can't fit vLLM and a session at once) and back to 1 when idle. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **131K context** (native max 262K) with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
-| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only Cilium LoadBalancer (`kagent-mcp-lan` at `http://192.168.2.13:8083/mcp`, pinned via `io.cilium/lb-ipam-ips` -- the gateway path was abandoned after it mangled the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
+| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only Cilium LoadBalancer (`kagent-mcp-lan` at `http://192.168.6.13:8083/mcp`, pinned via `io.cilium/lb-ipam-ips` -- the gateway path was abandoned after it mangled the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
 | flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. Per-agent memory disabled to avoid exceeding the 131K context window with large tool schemas. |
 | victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
 | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.4.6`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution). Enabled on all built-in agents. Defined in `apps/ai-system/agent-sandbox/`. |
@@ -243,7 +243,7 @@ See [`.rules`](.rules) for agent selection by task domain.
 
 ### BGP Peering
 
-The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.2.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
+The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
 
 ## 🔐 Secret Management
 

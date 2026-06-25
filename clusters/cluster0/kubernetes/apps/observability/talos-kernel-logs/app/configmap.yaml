@@ -7,11 +7,11 @@
 # syslog), so this Vector instance receives the raw json_lines on :5170 and
 # forwards them to VictoriaLogs. nv-01 sends here via Omni ConfigPatch
 # 530-cm-8aa40879-...-kmsg-vlogs (a SECOND kmsg destination; Omni's own
-# destination is preserved). The target is this Service's LB VIP on the routed
-# pool (tcp://192.168.6.14:5170) -- off the nodes' own /24, so nodes reach it via
-# the gateway/UDM rather than failing local ARP (VIPs in 192.168.2.x can't be
-# reached from nodes). clusterIP 10.109.199.29 is retained as an in-cluster
-# fallback.
+# destination is preserved). The target is this Service's LB VIP
+# (tcp://192.168.6.14:5170) -- off the nodes' own /24, so nodes reach it via
+# the gateway/UDM rather than failing local ARP (a VIP in the nodes' own
+# 192.168.2.x /24 can't be reached from nodes). clusterIP 10.109.199.29 is
+# retained as an in-cluster fallback.
 apiVersion: v1
 kind: ConfigMap
 metadata:

@@ -129,7 +129,7 @@ spec:
               protocol: UDP
     # Coturn → JVB for TURN relay on LAN
     - toCIDR:
-        - 192.168.2.9/32
+        - 192.168.6.9/32
       toPorts:
         - ports:
             - port: "10000"
