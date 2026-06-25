@@ -24,6 +24,6 @@ spec:
     app: ersatz
   ports:
     - name: ersatz-port
-      port: 8409
+      port: 80
       protocol: TCP
       targetPort: 8409

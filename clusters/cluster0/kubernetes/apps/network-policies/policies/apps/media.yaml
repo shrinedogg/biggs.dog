@@ -213,7 +213,7 @@ spec:
 # IP (no node SNAT), so this fromCIDR match sees the actual LAN client and
 # everything outside 192.168.0.0/16 is dropped by default-deny. In-cluster
 # consumers (e.g. Emby) are already covered by allow-intra-namespace.
-# NOTE: the Service maps 8409 -> 8409; Cilium enforces ingress on the TRANSLATED
+# NOTE: the Service maps 80 -> 8409; Cilium enforces ingress on the TRANSLATED
 # pod port, so the rule targets 8409 (the container port), not the Service port.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
