@@ -206,32 +206,6 @@ spec:
             - port: "443"
               protocol: TCP
 ---
-# ersatz (ErsatzTV) is exposed as a LAN-only LoadBalancer at ersatz.biggs.dog.
-# Its IPTV/HLS feed is consumed by media players that can't do an OIDC login, so
-# instead of pocket-id forward-auth we restrict reachability to the LAN at L3.
-# externalTrafficPolicy: Local on the Service preserves the real client source
-# IP (no node SNAT), so this fromCIDR match sees the actual LAN client and
-# everything outside 192.168.0.0/16 is dropped by default-deny. In-cluster
-# consumers (e.g. Emby) are already covered by allow-intra-namespace.
-# NOTE: the Service maps 80 -> 8409; Cilium enforces ingress on the TRANSLATED
-# pod port, so the rule targets 8409 (the container port), not the Service port.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-ingress-ersatz-lan
-  namespace: media
-spec:
-  endpointSelector:
-    matchLabels:
-      app: ersatz
-  ingress:
-    - fromCIDR:
-        - 192.168.0.0/16
-      toPorts:
-        - ports:
-            - port: "8409"
-              protocol: TCP
----
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

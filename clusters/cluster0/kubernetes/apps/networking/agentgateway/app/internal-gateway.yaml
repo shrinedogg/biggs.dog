@@ -1,0 +1,46 @@
+---
+# Internal, LAN-only ingress. Identical to wildcard-biggs-dog (same agentgateway
+# class, same *.biggs.dog wildcard cert) EXCEPT its VIP (192.168.6.15) is NOT
+# part of the UDM WAN port-forward (only the public gateway's .6.7:80/443 is
+# forwarded), so this gateway is reachable from LAN/VPN only.
+#
+# Use it for services that must have TLS at <name>.biggs.dog but must NOT be
+# exposed to the internet (e.g. ErsatzTV's admin UI / IPTV feed). Route a host
+# here by pointing its HTTPRoute parentRef at this Gateway instead of
+# wildcard-biggs-dog; k8s-gateway then answers that hostname with .6.15 for LAN
+# clients (split-horizon), while public DNS still points at Cloudflare -> the
+# public gateway, which has no such route (404), so external access is denied.
+#
+# IMPORTANT: this LAN-only guarantee assumes the UDM forwards WAN :80/:443 only
+# to 192.168.6.7. If a DMZ/range forward also covers .6.15, add source-IP
+# filtering or narrow the port-forward.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: internal-biggs-dog
+  namespace: networking
+spec:
+  addresses:
+    - type: IPAddress
+      value: 192.168.6.15
+  gatewayClassName: agentgateway
+  listeners:
+    - hostname: "*.biggs.dog"
+      name: internal-wildcard-http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - hostname: "*.biggs.dog"
+      name: internal-wildcard-https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: biggs-dog-tls

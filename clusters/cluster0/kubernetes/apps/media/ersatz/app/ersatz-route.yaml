@@ -1,0 +1,25 @@
+---
+# Routes https://ersatz.biggs.dog to ErsatzTV via the INTERNAL (LAN-only)
+# gateway, so TLS is terminated with the wildcard cert but the service is never
+# exposed on the public gateway. Intentionally NOT behind pocket-id forward-auth
+# (ErsatzTV's IPTV/HLS endpoints are consumed by media players that can't do an
+# OIDC login); LAN-only reachability is the access control instead.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: ersatz
+  namespace: media
+spec:
+  hostnames:
+    - ersatz.biggs.dog
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+  rules:
+    - backendRefs:
+        - name: ersatz-service
+          port: 80
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

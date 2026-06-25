@@ -3,23 +3,11 @@ kind: Service
 metadata:
   name: ersatz-service
   namespace: media
-  annotations:
-    # Pinned LB VIP on the LAN-only 192.168.6.0/24 range. The wildcard gateway
-    # VIP (.6.7) is the only address WAN-port-forwarded on the UDM, so this VIP
-    # is reachable from LAN/VPN only. ErsatzTV's IPTV/HLS endpoints are pulled by
-    # media players that can't perform an OIDC login, so this is intentionally
-    # NOT behind pocket-id forward-auth; the LAN-only CiliumNetworkPolicy
-    # (allow-ingress-ersatz-lan in network-policies) is the access control.
-    io.cilium/lb-ipam-ips: "192.168.6.8"
-    # k8s-gateway (watchedResources includes Service) publishes this hostname ->
-    # the LB VIP for split-horizon DNS, so ersatz.biggs.dog resolves on the LAN.
-    external-dns.alpha.kubernetes.io/hostname: ersatz.biggs.dog
 spec:
-  type: LoadBalancer
-  # Preserve the real client source IP (no node SNAT) so the LAN-only
-  # CiliumNetworkPolicy can match on it, and let Cilium BGP-advertise the VIP
-  # only from the node running the single ersatz pod.
-  externalTrafficPolicy: Local
+  # ClusterIP only: ErsatzTV is reached via the internal (LAN-only) gateway's
+  # HTTPRoute at https://ersatz.biggs.dog (TLS terminated at the gateway), and
+  # by in-cluster consumers (e.g. Emby's Live TV tuner) directly. No LB VIP.
+  type: ClusterIP
   selector:
     app: ersatz
   ports:
