@@ -77,11 +77,14 @@ spec:
             # ~64K tool-schema need. Raise back toward 262K only if you also drop
             # max-num-seqs.
             - --max-model-len=131072
-            # nv-01 is a headless Talos node with a DEDICATED GPU; usable util
-            # caps near 0.984. 0.97 gives more KV cache headroom for concurrent
-            # agent workloads. The model weights (~19GB NVFP4 on disk) are fixed,
-            # so the extra 0.02 goes purely to KV capacity, reducing preemptions.
-            - --gpu-memory-utilization=0.97
+            # nv-01's GPU is time-sliced (replicas=4) and shared with the
+            # embeddings pod, GPU-operator validators, and the DRA plugin.
+            # At 0.97 vLLM reserved ~31.6GB, leaving only ~1GB free, so
+            # co-scheduled GPU consumers hit NVRM NV_ERR_NO_MEMORY and this
+            # contributed to a full node lockup (2026-06-25). 0.90 reserves
+            # ~29.3GB (leaves ~3.2GB headroom) while keeping ample fp8-KV cache
+            # for concurrent agent workloads. The ~19GB NVFP4 weights are fixed.
+            - --gpu-memory-utilization=0.90
             # Per-step token budget for (chunked) prefill + decode. Bumped from
             # 4096 to 8192 to handle medium-length tool-context prompts more
             # efficiently, reducing the number of prefill steps. Short prompts
