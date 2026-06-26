@@ -1,0 +1,25 @@
+---
+# LAN resolver VIP. Point the UDM's per-VLAN DHCP "DNS Server" at this address.
+# Pinned on the LAN-routable 192.168.6.0/24 BGP range; externalTrafficPolicy
+# Cluster so any node can answer (the VIP is advertised from all nodes for HA).
+apiVersion: v1
+kind: Service
+metadata:
+  name: lan-dns
+  namespace: networking
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.6.16"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: lan-dns
+  ports:
+    - name: dns-udp
+      port: 53
+      targetPort: 1053
+      protocol: UDP
+    - name: dns-tcp
+      port: 53
+      targetPort: 1053
+      protocol: TCP

@@ -1,0 +1,37 @@
+---
+# CoreDNS config for the LAN resolver. Two responsibilities:
+#  1. biggs.dog -> forward to k8s-gateway (192.168.6.6), which is authoritative
+#     and returns the internal split-horizon VIPs (.6.7 gateway apps, .6.15
+#     internal gateway, etc.). k8s-gateway listens on 1053 behind the .6.6 VIP.
+#  2. Everything else -> NextDNS over DoT (encrypted upstream), so no plaintext
+#     DNS leaves the network. The NextDNS profile (5c51ae) is selected via the
+#     TLS SNI; the 45.90.28.0 / 45.90.30.0 anycast IPs are NextDNS's endpoints.
+# CoreDNS runs non-root and binds 1053; the Service maps 53 -> 1053.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lan-dns
+  namespace: networking
+data:
+  Corefile: |
+    biggs.dog:1053 {
+        errors
+        cache 30
+        forward . 192.168.6.6
+        reload
+    }
+    .:1053 {
+        errors
+        health {
+            lameduck 5s
+        }
+        ready
+        prometheus :9153
+        cache 300
+        forward . tls://45.90.28.0 tls://45.90.30.0 {
+            tls_servername 5c51ae.dns.nextdns.io
+            health_check 5s
+        }
+        loadbalance
+        reload
+    }

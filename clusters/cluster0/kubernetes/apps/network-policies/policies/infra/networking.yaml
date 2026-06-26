@@ -132,6 +132,59 @@ spec:
             - port: "53"
               protocol: TCP
 ---
+# lan-dns: cluster-hosted LAN resolver (CoreDNS). Clients (via the UDM's DHCP
+# DNS) query its LB VIP 192.168.6.16:53; it forwards biggs.dog -> k8s-gateway
+# and everything else -> NextDNS over DoT. Like k8s-gateway, it listens on the
+# TRANSLATED pod port 1053 (Service maps 53 -> 1053), so ingress allows both.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: lan-dns
+  namespace: networking
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: lan-dns
+  ingress:
+    - fromEntities:
+        - world
+        - cluster
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "1053"
+              protocol: UDP
+            - port: "1053"
+              protocol: TCP
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+  egress:
+    # biggs.dog -> k8s-gateway (LB VIP .6.6 -> pod :1053). toEntities cluster
+    # covers the LB-VIP datapath; the explicit endpoint keeps it tight.
+    - toEntities:
+        - cluster
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: k8s-gateway
+      toPorts:
+        - ports:
+            - port: "1053"
+              protocol: UDP
+            - port: "1053"
+              protocol: TCP
+    # Encrypted upstream: NextDNS DoT (anycast 45.90.28.0 / 45.90.30.0 :853).
+    - toCIDR:
+        - 45.90.28.0/24
+        - 45.90.30.0/24
+      toPorts:
+        - ports:
+            - port: "853"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
