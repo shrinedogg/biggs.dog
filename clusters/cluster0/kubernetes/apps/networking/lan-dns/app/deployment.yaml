@@ -51,6 +51,13 @@ spec:
             capabilities:
               drop:
                 - ALL
+              # The official coredns binary carries a cap_net_bind_service file
+              # capability; under no_new_privs (allowPrivilegeEscalation: false)
+              # with all caps dropped, the kernel refuses to exec it. Granting
+              # NET_BIND_SERVICE (the one cap restricted PodSecurity permits)
+              # lets it start. We still bind the unprivileged 1053.
+              add:
+                - NET_BIND_SERVICE
           ports:
             - name: dns-udp
               containerPort: 1053
