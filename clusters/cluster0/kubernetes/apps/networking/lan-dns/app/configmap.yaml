@@ -17,7 +17,11 @@ data:
     biggs.dog:1053 {
         errors
         cache 30
-        forward . 192.168.6.6
+        # Forward to k8s-gateway's ClusterIP (NOT its .6.6 LB VIP): a pod reaching
+        # a LoadBalancer VIP whose backend is on the SAME node hits a Cilium
+        # hairpin failure, so the lan-dns replica co-located with k8s-gateway got
+        # empty answers. The ClusterIP path works regardless of co-location.
+        forward . 10.105.74.41
         reload
     }
     .:1053 {
