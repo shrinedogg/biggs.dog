@@ -57,7 +57,12 @@ spec:
     ttl: 60
     service:
       type: LoadBalancer
-      clusterIP: 10.97.206.83
+      # Pinned to the live ClusterIP so it survives a Service recreate. lan-dns
+      # and the Talos-managed kube-dns both forward biggs.dog to this address
+      # (NOT the .6.6 LB VIP, which fails the same-node Cilium LB hairpin when a
+      # resolver pod is co-located with the k8s-gateway pod). Was 10.97.206.83,
+      # which never applied because ClusterIP is immutable once assigned.
+      clusterIP: 10.105.74.41
       loadBalancerIP: 192.168.6.6
       port: 53
       externalTrafficPolicy: Cluster # Allow any node to forward traffic
