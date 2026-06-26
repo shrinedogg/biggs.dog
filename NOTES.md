@@ -127,6 +127,7 @@ The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-
 - **NFD** (Node Feature Discovery) — detects hardware capabilities (GPU models, CPU flags, etc.) and labels nodes.
 - **Intel GPU Plugin** — enables Intel iGPU device plugin for media transcoding on worker nodes.
 - **NVIDIA GPU Operator** — device plugin with time-slicing (driver/toolkit provided by Talos system extensions, not by the operator).
+- **Omni / Talos machine config** — node-level config lives in Omni (Sidero) as per-machine `ConfigPatch`es, not in the Flux tree. Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). Local copies of these patches live under `omni/` (git-ignored, outside `clusters/cluster0/` so Flux never reconciles them). Each node carries a `10-<machine-id>` user patch (hostname, NIC rings, node-specific tweaks); nodes imported from existing Talos clusters got this auto-generated on import, whereas machines scaled directly from Omni do not, so their equivalent settings must be authored by hand. CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
 
 ### Automation
 

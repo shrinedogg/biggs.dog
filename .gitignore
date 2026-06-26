@@ -1,5 +1,6 @@
 .wip/
 .talos/
+omni/
 .scripts/
 .sops*
 .tmp/
