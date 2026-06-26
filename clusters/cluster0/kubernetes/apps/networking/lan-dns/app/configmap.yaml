@@ -21,7 +21,16 @@ data:
         # a LoadBalancer VIP whose backend is on the SAME node hits a Cilium
         # hairpin failure, so the lan-dns replica co-located with k8s-gateway got
         # empty answers. The ClusterIP path works regardless of co-location.
-        forward . 10.105.74.41
+        #
+        # max_fails 0: the ClusterIP is the ONLY upstream, so the default
+        # max_fails 2 ejection turns a momentary blip (a couple of dropped UDP
+        # health probes against the single k8s-gateway backend) into a LAN-wide
+        # SERVFAIL storm plus a `. IN NS` re-probe flood. Never ejecting keeps us
+        # forwarding through transient hiccups; k8s-gateway now runs 2 backends
+        # behind this ClusterIP, so Cilium load-balances away from a bad pod.
+        forward . 10.105.74.41 {
+            max_fails 0
+        }
         reload
     }
     .:1053 {

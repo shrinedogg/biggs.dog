@@ -24,6 +24,23 @@ spec:
   uninstall:
     keepHistory: false
   values:
+    # Run two replicas so the biggs.dog zone authority is not a single point of
+    # failure. lan-dns AND the in-cluster Talos CoreDNS both forward biggs.dog to
+    # this Service's ClusterIP (10.105.74.41); with one backend, any brief pod
+    # blip dropped a couple of UDP probes, tripped CoreDNS forward's max_fails
+    # ejection, and produced LAN-wide SERVFAIL storms until recovery. Two backends
+    # behind the ClusterIP keep the upstream healthy through a single-pod hiccup.
+    replicaCount: 2
+    # Spread the replicas across nodes so losing one node can't take the zone down.
+    affinity:
+      podAntiAffinity:
+        preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              topologyKey: kubernetes.io/hostname
+              labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: k8s-gateway
     # CoreDNS listens on container port 1053 (the Service maps 53 -> 1053), so it
     # can run fully non-root with no added capabilities (NET_BIND_SERVICE is not
     # required). The chart already forces runAsUser 1000 while secure: true.
