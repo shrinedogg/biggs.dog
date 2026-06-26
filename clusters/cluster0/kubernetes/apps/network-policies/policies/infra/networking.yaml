@@ -162,10 +162,20 @@ spec:
             - port: "53"
               protocol: TCP
   egress:
-    # biggs.dog -> k8s-gateway (LB VIP .6.6 -> pod :1053). toEntities cluster
-    # covers the LB-VIP datapath; the explicit endpoint keeps it tight.
     - toEntities:
         - cluster
+    # biggs.dog -> k8s-gateway. lan-dns forwards to the pinned LB VIP
+    # 192.168.6.6:53. Cilium classifies that BGP LB IP as external (NOT the
+    # cluster entity) when it isn't socket-LB translated, so it must be allowed
+    # explicitly by CIDR; the toEndpoints rule covers the translated :1053 path.
+    - toCIDR:
+        - 192.168.6.6/32
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
@@ -175,6 +185,10 @@ spec:
             - port: "1053"
               protocol: UDP
             - port: "1053"
+              protocol: TCP
+            - port: "53"
+              protocol: UDP
+            - port: "53"
               protocol: TCP
     # Encrypted upstream: NextDNS DoT (anycast 45.90.28.0 / 45.90.30.0 :853).
     - toCIDR:
