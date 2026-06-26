@@ -73,11 +73,12 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | Component                                                | Description                                                  |
 | -------------------------------------------------------- | ------------------------------------------------------------ |
 | [Cilium](https://cilium.io/)                             | CNI (kube-proxy replacement) with BGP for LoadBalancer IPs (`192.168.6.0/24`) |
-| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`) |
+| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`, ClusterIP `10.105.74.41`) |
+| lan-dns                                                  | LAN resolver (CoreDNS, LB `192.168.6.16`): forwards `biggs.dog` → k8s-gateway (split-horizon) and everything else → NextDNS over DoT (encrypted upstream). The UDM hands out `.6.16` via per-VLAN DHCP. |
 | [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                         |
 | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts         |
 
-The UDM router conditionally forwards `biggs.dog` to k8s-gateway for LAN clients. In-cluster, **CoreDNS** is patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` to k8s-gateway as well, so pods resolve `*.biggs.dog` to the internal gateway LB (`192.168.6.7`) and stay in-cluster instead of hairpinning out through Cloudflare.
+LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards to k8s-gateway for internal VIPs and to NextDNS over DoT for everything else. In-cluster, **CoreDNS** (kube-dns) is patched via Talos to forward `biggs.dog` to k8s-gateway's ClusterIP (`10.105.74.41`), so pods resolve `*.biggs.dog` internally instead of hairpinning through Cloudflare. Both forward targets use the ClusterIP (not the LB VIP) to avoid a Cilium same-node LB hairpin failure when a resolver pod is co-located with k8s-gateway.
 
 **Service-specific gateways:**
 - **ersatz** (game server): LAN-only HTTPS gateway at `ersatz.biggs.dog`
