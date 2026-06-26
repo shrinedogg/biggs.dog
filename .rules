@@ -1,13 +1,16 @@
 # biggs.dog — agent routing rules
 
 This is a Flux GitOps repo for a Kubernetes homelab (`clusters/cluster0`).
-The kagent MCP server (`http://192.168.6.13:8083/mcp`) exposes specialized
+The kagent MCP server (`https://mcp.biggs.dog/mcp`) exposes specialized
 agents. When a task matches one of the domains below, prefer invoking that
 kagent agent over answering from memory or using generic tools. (The MCP
-endpoint is a LAN-only Cilium LoadBalancer `kagent-mcp-lan`, pinned to
-`192.168.6.13` via `io.cilium/lb-ipam-ips`. It bypasses the gateway -- the
-agentgateway mangled the `/mcp` Streamable-HTTP path -- so it's plain HTTP,
-no auth, reachable only on the LAN/VPN.)
+endpoint is the `kagent-mcp` HTTPRoute on the internal LAN-only gateway
+`internal-biggs-dog` (VIP `192.168.6.15`); k8s-gateway split-horizon resolves
+`mcp.biggs.dog` to `.6.15` for LAN/VPN clients, TLS terminated with the wildcard
+cert, no auth -- WAN clients hit the public gateway, which has no such route, so
+they 404. This replaced the old `kagent-mcp-lan` plain-HTTP LoadBalancer
+(`192.168.6.13`) once the agentgateway was confirmed to no longer mangle the
+`/mcp` Streamable-HTTP path.)
 
 All agents share a single in-cluster vLLM backend (currently
 `nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params, served at a

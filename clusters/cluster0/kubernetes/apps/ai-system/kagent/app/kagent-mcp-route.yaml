@@ -9,7 +9,7 @@
 #     *.biggs.dog cert, so clients use https://mcp.biggs.dog/mcp.
 #   - WAN clients: public DNS -> Cloudflare -> public gateway (.6.7), which has
 #     no mcp.biggs.dog route -> 404. LAN-only reachability is the access control
-#     (no auth on the MCP path, same as the kagent-mcp-lan LoadBalancer).
+#     (no auth on the MCP path).
 #
 # No path rewrite and no filters: the backend serves Streamable-HTTP at /mcp and
 # the previous gateway attempt 404'd when the /mcp path was mangled, so we pass
@@ -17,8 +17,11 @@
 # Do NOT give this backend appProtocol: mcp -- that switches agentgateway into
 # its native MCP-proxy mode and re-mangles the path; we want raw HTTP passthrough.
 #
-# The direct kagent-mcp-lan LoadBalancer (http://192.168.6.13:8083/mcp) is kept
-# as the proven, no-TLS fallback for the editor MCP client.
+# This is now the sole MCP entry point. The old kagent-mcp-lan LoadBalancer
+# (http://192.168.6.13:8083/mcp) was retired once the gateway was verified to no
+# longer mangle /mcp (full initialize -> notifications/initialized -> tools/list
+# handshake confirmed over https://mcp.biggs.dog/mcp). Editor MCP clients should
+# point at https://mcp.biggs.dog/mcp.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -26,15 +29,15 @@ metadata:
   namespace: ai-system
 spec:
   hostnames:
-  - mcp.biggs.dog
+    - mcp.biggs.dog
   parentRefs:
-  - name: internal-biggs-dog
-    namespace: networking
+    - name: internal-biggs-dog
+      namespace: networking
   rules:
-  - backendRefs:
-    - name: kagent-controller
-      port: 8083
-    matches:
-    - path:
-        type: PathPrefix
-        value: /
+    - backendRefs:
+        - name: kagent-controller
+          port: 8083
+      matches:
+        - path:
+            type: PathPrefix
+            value: /

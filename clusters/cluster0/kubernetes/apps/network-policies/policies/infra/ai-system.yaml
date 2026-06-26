@@ -136,33 +136,10 @@ spec:
             k8s:io.kubernetes.pod.namespace: flux-system
             app.kubernetes.io/name: flux-operator-mcp
 ---
-# LAN access to the kagent MCP server via the kagent-mcp-lan LoadBalancer
-# (Cilium LBIPAM VIP 192.168.2.x -> kagent-controller:8083). ai-system is
-# default-deny ingress, so without this, LAN clients (e.g. an editor on the
-# LAN/VPN) hitting the LB VIP are dropped ("Policy denied", world identity ->
-# controller:8083). Allow the private LAN (192.168.0.0/16, RFC1918) to the
-# controller on 8083. That is LAN/VPN-only by construction -- the public
-# internet is not in 192.168.0.0/16, so external traffic stays blocked.
-# Scoped to the controller pod (not namespace-wide) to avoid opening every
-# ai-system pod to the LAN. HTTP only, no auth -- rely on the LAN being trusted.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-ingress-from-lan-to-mcp
-  namespace: ai-system
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/component: controller
-      app.kubernetes.io/instance: kagent
-      app.kubernetes.io/name: kagent
-  ingress:
-    - fromCIDR:
-        - 192.168.0.0/16
-      toPorts:
-        - ports:
-            - port: "8083"
-              protocol: TCP
+# (Removed) allow-ingress-from-lan-to-mcp: the kagent-mcp-lan LoadBalancer it
+# guarded was retired in favor of the kagent-mcp HTTPRoute (mcp.biggs.dog) on the
+# internal LAN-only gateway. LAN clients no longer hit the controller VIP
+# directly; the gateway path is allowed by allow-ingress-from-gateway below.
 ---
 # vm-mcp queries VictoriaMetrics in observability
 apiVersion: cilium.io/v2
