@@ -50,7 +50,7 @@ spec:
       create: false
       name: ai-system
     image:
-      tag: v0.4.6
+      tag: v0.5.0
     controller:
       # SandboxTemplate / SandboxClaim controllers (needed for kagent SandboxAgent).
       extensions: true
