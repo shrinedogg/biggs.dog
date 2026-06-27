@@ -4,11 +4,12 @@ kind: Kustomization
 resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
-  # Flux-Kustomizations
+  # Flux-Kustomizations (CRDs must come before agents that depend on them)
   - ./vllm/ks.yaml
-  - ./agent-sandbox/ks.yaml
   - ./kagent-crds/ks.yaml
+  - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
+  - ./kagent/cilium-agents/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
   - ./flux-mcp/ks.yaml
   - ./exa-mcp/ks.yaml

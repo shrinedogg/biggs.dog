@@ -1,0 +1,178 @@
+---
+# Custom kagent Agent wired to the Exa MCP server.
+# Provides web search, code discovery, and company research capabilities
+# via Exa's AI-native search API.
+#
+# Not chart-managed (like flux-agent and vm-agent): owned by this
+# Kustomization.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: exa-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Exa expert for web search, code discovery, and company research.
+    Use for finding code examples, researching companies/competitors,
+    discovering technical documentation, and gathering web intelligence.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
+        - "exa.com"
+        - "exa.ai"
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    # Allow the agent to write and execute Python code blocks in the
+    # agent-sandbox.
+    executeCodeBlocks: true
+    context:
+      # Bound session growth so large tool results (search results,
+      # research dumps) can't accumulate past the model's 131K context
+      # window.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
+    memory:
+      # Long-term (cross-session) vector memory via the in-cluster
+      # Infinity embedding server (ModelConfig `embedding-model`) + pgvector.
+      modelConfig: embedding-model
+      ttlDays: 30
+    deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
+        capabilities:
+          drop:
+            - ALL
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: web-search
+          name: Web Search
+          description: >-
+            Perform web searches using Exa's clean search results.
+            Find articles, documentation, tutorials, and current information.
+          tags:
+            - search
+            - web
+            - exa
+          examples:
+            - Search for the latest Kubernetes security best practices
+            - Find documentation on Rust async patterns
+            - Search for AI model benchmarks
+        - id: code-search
+          name: Code Search
+          description: >-
+            Search for code examples from GitHub, StackOverflow, and
+            technical documentation. Find code snippets, library usage,
+            and API syntax examples.
+          tags:
+            - code
+            - github
+            - stackoverflow
+            - search
+          examples:
+            - Find Go examples of using context cancellation
+            - Search for Kubernetes CRD validation patterns
+            - Find Python async/await examples
+        - id: company-research
+          name: Company Research
+          description: >-
+            Research companies, find competitor information, analyze
+            funding, discover team members, and gather market intelligence.
+          tags:
+            - research
+            - companies
+            - market
+            - competitors
+          examples:
+            - Research an AI infrastructure startup
+            - Find competitors to Anthropic
+            - Discover funding rounds for a company
+    systemMessage: |
+      # Exa Search Expert
+
+      You are a search and research expert with access to Exa's AI-native
+      search capabilities. You can perform web searches, discover code
+      examples from technical repositories, and conduct comprehensive
+      company and market research.
+
+      ## Available Search Capabilities
+
+      - `web_search_exa` — Fast web search with clean, relevant results
+      - `web_fetch_exa` — Fetch and analyze full content from specific URLs
+      - `web_search_advanced_exa` — Advanced search with filtering by:
+        - Date range (published or crawled)
+        - Domains (include/exclude)
+        - Content categories (company, news, people, research papers, etc.)
+        - Text matching (include/exclude specific terms)
+
+      ## Search Categories (for advanced_exa)
+
+      - **company** — Company homepages, rich metadata (headcount, location, funding, revenue)
+      - **news** — Press coverage, announcements, interviews
+      - **people** — LinkedIn profiles, public bios, professional backgrounds
+      - **research paper** — Academic papers, arXiv, OpenReview, scientific research
+      - **financial report** — SEC filings (10-K, 10-Q), earnings reports, investor presentations
+      - **personal site** — Blogs, portfolios, personal essays, independent analysis
+
+      ## Guidelines
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      - For broad searches, start with `web_search_exa` for speed and relevance
+      - Use `web_search_advanced_exa` with categories for targeted research (e.g., company research)
+      - Filter results by date when researching recent developments
+      - Use `web_fetch_exa` to extract detailed information from promising URLs
+      - Query variation: Exa returns different results for different phrasings; try 2-3 variations for comprehensive coverage
+      - Always cite the source URLs in your response
+
+      ## Filter Restrictions & Gotchas
+
+      ### Universal
+      - `includeText` and `excludeText` only support **single-item arrays**
+        - Use `["term"]` not `["term1", "term2"]`
+        - For multiple terms, add them to the query string instead
+
+      ### By Category
+      - **company category**: Cannot filter by `includeDomains`, `excludeDomains`, or date (published/crawled)
+      - **people category**: Cannot filter by `excludeDomains` (except LinkedIn), `startPublishedDate`, or text filters
+      - **financial report category**: Does not support `excludeText` (causes 400 error)
+
+      {{include "builtin/safety-guardrails"}}
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: exa-mcp
+          toolNames:
+            - web_search_exa
+            - web_fetch_exa
+            - web_search_advanced_exa

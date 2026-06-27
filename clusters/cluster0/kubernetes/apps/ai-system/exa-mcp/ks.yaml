@@ -9,7 +9,8 @@ spec:
     # kagent provides the RemoteMCPServer/Agent CRDs, the default-model-config
     # ModelConfig, and the kagent-builtin-prompts ConfigMap referenced in agent.yaml.
     - name: kagent
-    # agent-sandbox CRDs/controller must exist before SandboxAgent reconciliation.
+    # agent-sandbox CRDs/controller must exist before agents that set
+    # executeCodeBlocks (they create agents.x-k8s.io Sandbox objects).
     - name: agent-sandbox
   # All resources live in ai-system.
   commonMetadata:

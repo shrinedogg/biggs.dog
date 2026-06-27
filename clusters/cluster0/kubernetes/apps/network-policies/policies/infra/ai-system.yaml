@@ -269,6 +269,35 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# The agent-sandbox controller serves a CRD conversion webhook (v1alpha1 <->
+# v1beta1 Sandbox) on :9443. The kube-apiserver calls this webhook whenever a
+# Sandbox is read or written -- including the controller's own startup cache
+# sync and every SandboxAgent reconcile (kagent creates a v1alpha1 Sandbox that
+# the apiserver must convert). The apiserver runs host-network on a *remote*
+# control-plane node, so Cilium's allow-localhost exemption doesn't apply, and
+# the implicit default-deny ingress here drops apiserver -> webhook. The
+# conversion then hangs to its 30s timeout: the controller crash-loops on a
+# cache-sync deadlock and all SandboxAgents stay Accepted=False (which also
+# starves the kagent MCP server of ready agents). Allow the apiserver to reach
+# the webhook port. (Egress to the apiserver is already covered above by
+# allow-egress-kube-apiserver.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-apiserver-to-sandbox-webhook
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: agent-sandbox
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "9443"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

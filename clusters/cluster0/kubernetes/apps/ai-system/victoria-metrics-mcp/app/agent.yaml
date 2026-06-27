@@ -1,0 +1,211 @@
+---
+# Custom kagent Agent wired to the VictoriaMetrics MCP server.
+# Provides direct PromQL/MetricsQL query access, alerting rule inspection,
+# cardinality analysis, and embedded VictoriaMetrics documentation search.
+#
+# Not chart-managed (like flux-agent): owned by this Kustomization.
+# Built-in observability-agent remains available for Grafana/cross-K8s work.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: vm-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    A VictoriaMetrics expert that executes PromQL/MetricsQL queries, discovers
+    metrics and labels, inspects alerting and recording rules, analyzes TSDB
+    cardinality, and searches embedded VictoriaMetrics documentation. Use for
+    raw metric queries and VM-specific diagnostics. For Grafana dashboards or
+    broader Kubernetes observability correlation, prefer observability-agent.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  # Allow cluster-internal services so code can query VictoriaMetrics
+  # directly (e.g. via requests/httpx) in addition to tool calls.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    # Allow the agent to write and execute Python code blocks in the
+    # agent-sandbox. Enables complex metric analysis, statistical
+    # computations, and report generation beyond raw tool calls.
+    executeCodeBlocks: true
+    context:
+      # Bound session growth so large tool results (metric ranges, cardinality
+      # dumps) can't accumulate past the model's 131K context window. At
+      # tokenThreshold ADK summarizes older events (via the local model) and
+      # drops the originals. See flux-mcp/app/agent.yaml for full rationale.
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
+    memory:
+      # Long-term (cross-session) vector memory via the in-cluster Infinity
+      # embedding server (ModelConfig `embedding-model`) + pgvector. See
+      # flux-mcp/app/agent.yaml for rationale on how this composes with
+      # compaction without re-introducing context overflow.
+      modelConfig: embedding-model
+      ttlDays: 30
+    deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      # Harden the agent-runner pod. kagent otherwise schedules agent pods
+      # privileged (verified live: vm-agent ran privileged: true), which —
+      # combined with the agents' tool access — is a large blast radius for a
+      # prompt-injectable LLM. The agent needs network + API access, not host
+      # kernel access.
+      #
+      # runAsUser 1001 is the kagent-adk image's built-in non-root "python" user
+      # (Dockerfile: adduser -u 1001 -G pythongroup, home /.kagent). Setting the
+      # explicit numeric UID both satisfies the kubelet's runAsNonRoot check
+      # (which fails on the image's name-based USER with "image has non-numeric
+      # user (python)") and keeps /.kagent ownership correct. fsGroup 1001
+      # matches pythongroup for any mounted volumes.
+      # readOnlyRootFilesystem is intentionally NOT set: the python ADK runtime
+      # + executeCodeBlocks sandbox write to the container filesystem.
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
+        capabilities:
+          drop:
+            - ALL
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: metrics-querying
+          name: Metrics Querying
+          description: >-
+            Execute instant and range PromQL/MetricsQL queries, discover
+            available metrics, labels, and time series, and prettify or
+            explain queries against the in-cluster VictoriaMetrics instance.
+          tags:
+            - metrics
+            - promql
+            - metricsql
+            - victoriametrics
+          examples:
+            - What is the current token generation throughput of vLLM?
+            - Show memory usage for pods in ai-system over the last hour
+            - Explain this MetricsQL query and suggest improvements
+        - id: alerting-inspection
+          name: Alerting & Rules Inspection
+          description: >-
+            Inspect alerting and recording rules, check currently firing or
+            pending alerts, and diagnose rule evaluation issues.
+          tags:
+            - alerts
+            - rules
+            - alerting
+            - victoriametrics
+          examples:
+            - Are there any currently firing alerts?
+            - Show me all alerting rules and their current state
+            - Which recording rules exist for Kubernetes resource usage?
+        - id: cardinality-analysis
+          name: Cardinality & Usage Analysis
+          description: >-
+            Analyze TSDB cardinality, identify high-cardinality or unused
+            metrics, inspect active and slow queries, and get
+            VictoriaMetrics-specific tuning guidance.
+          tags:
+            - cardinality
+            - tsdb
+            - performance
+            - victoriametrics
+          examples:
+            - Which metrics have the highest cardinality?
+            - Find metrics that have never been queried
+            - Are there any currently slow or expensive queries?
+    systemMessage: |
+      # VictoriaMetrics Agent
+
+      You are VMAssist, an expert in VictoriaMetrics and MetricsQL. You have
+      direct access to this cluster's single-node VictoriaMetrics instance
+      (vmsingle) via MCP tools. You can query metrics, inspect alerting and
+      recording rules, analyze TSDB cardinality, and search embedded
+      VictoriaMetrics documentation.
+
+      ## Instance
+
+      Single-node VictoriaMetrics (vmsingle). Notable metric namespaces:
+      - `vm_*` / `vmagent_*` — VictoriaMetrics internals and scrape health
+      - `vllm:*` — In-cluster LLM (nvidia/Qwen3.6-35B-A3B-NVFP4 on vLLM; 35B MoE, ~3B active params)
+      - `node_*` — node-exporter (CPU, RAM, disk, network per node)
+      - `kube_*` — kube-state-metrics (pod/deployment/PVC/node state)
+      - `container_*` — cAdvisor (per-container resource usage)
+
+      ## Available Tools
+
+      - `query` / `query_range` — instant or range PromQL/MetricsQL queries
+      - `metrics` / `labels` / `label_values` / `series` — data discovery
+      - `metrics_metadata` — metric type, help text, and unit
+      - `rules` / `alerts` — alerting/recording rules and active alerts
+      - `metric_statistics` — query usage stats (find unused metrics)
+      - `active_queries` / `top_queries` — diagnose slow or expensive queries
+      - `tsdb_status` — cardinality analysis and series growth
+      - `documentation` — search embedded VictoriaMetrics docs
+      - `prettify_query` / `explain_query` — format and explain MetricsQL
+      - `tenants` — list available tenants
+
+      ## Guidelines
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      - Prefer MetricsQL extensions where they add value (`default()`,
+        `aggr_over_time`, label filter pushdown, `keep_last_value()`).
+      - Verify metric names with `metrics` or `series` before constructing
+        complex queries to avoid returning empty results.
+      - For cardinality investigations start with `tsdb_status`, then drill
+        into label values with `label_values` and `series`.
+      - Always cite the tool name and key results in your response.
+
+      {{include "builtin/safety-guardrails"}}
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: victoria-metrics-mcp
+          toolNames:
+            - query
+            - query_range
+            - metrics
+            - metrics_metadata
+            - labels
+            - label_values
+            - series
+            - rules
+            - alerts
+            - metric_statistics
+            - active_queries
+            - top_queries
+            - tsdb_status
+            - tenants
+            - documentation
+            - prettify_query
+            - explain_query
+            # Generic k8s tools for cluster inspection (VM agent may need to
+            # check k8s resources related to metrics targets, MCP servers, etc.)
+            - k8s_get_resources
+            - k8s_describe_resource

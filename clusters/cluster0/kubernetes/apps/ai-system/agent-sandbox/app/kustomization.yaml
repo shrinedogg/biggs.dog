@@ -1,12 +1,10 @@
+# Installs only the agent-sandbox controller (sigs.k8s.io Sandbox CRD +
+# controller). The kagent SandboxAgent CRs were removed: in kagent 0.9.10 a
+# `platform: agent-sandbox` SandboxAgent runs a sandbox pod but is never
+# registered in the controller's A2A registry, so it is not invokable via the
+# kagent MCP server (mcp.biggs.dog) or UI. The agents were reverted to classic
+# `kind: Agent` CRs (which still use executeCodeBlocks + this controller for
+# sandboxed code execution). Keep the controller installed for that and for a
+# future kagent release that wires SandboxAgent -> A2A.
 resources:
   - helmrelease.yaml
-  - cilium-debug-agent-sandbox-agent.yaml
-  - cilium-manager-agent-sandbox-agent.yaml
-  - cilium-policy-agent-sandbox-agent.yaml
-  - exa-agent-sandbox-agent.yaml
-  - flux-agent-sandbox-agent.yaml
-  - helm-agent-sandbox-agent.yaml
-  - k8s-agent-sandbox-agent.yaml
-  - observability-agent-sandbox-agent.yaml
-  - promql-agent-sandbox-agent.yaml
-  - vm-agent-sandbox-agent.yaml
