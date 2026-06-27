@@ -27,178 +27,12 @@ spec:
   postRenderers:
     - kustomize:
         patches:
-          - target:
-              kind: Agent
-              name: k8s-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: k8s-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: observability-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: observability-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: promql-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: promql-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: helm-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: helm-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: cilium-manager-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: cilium-manager-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
           # ----------------------------------------------------------------
           # Pin every chart-managed Deployment (kagent-controller, kagent-ui,
           # kagent-tools, kagent-grafana-mcp, kagent-querydoc,
           # kagent-kmcp-controller-manager) to the GPU node (nv-01) via a JSON
-          # 6902 patch. Targeting kind: Deployment leaves the Agent CRs
-          # (kind: Agent) untouched -- they carry their own nodeSelector above.
-          # op: add is safe: the chart's Deployments set no nodeSelector.
+          # 6902 patch. op: add is safe: the chart's Deployments set no
+          # nodeSelector by default.
           # ----------------------------------------------------------------
           - target:
               kind: Deployment
@@ -248,87 +82,29 @@ spec:
       enabled: false
     cilium-debug-agent:
       enabled: false
+    cilium-manager-agent:
+      enabled: false
     cilium-policy-agent:
       enabled: false
-    # ------------------------------------------------------------------
-    # Per-agent resource overrides for the chart-managed agents:
-    #   - Strip the CPU LIMIT (chart default limits.cpu=1000m -> null) to
-    #     avoid CFS throttling (repo policy: no CPU limit). Setting null
-    #     deletes that key during Helm coalescing (verified via `helm
-    #     template`), so the rendered Agent CR keeps limits.memory + requests
-    #     but has no CPU cap.
-    #   - Double the chart-default memory REQUEST and LIMIT
-    #     (requests 128Mi -> 256Mi, limits 256Mi -> 512Mi). Pinning them here
-    #     makes them durable in git rather than tracking the chart default.
-    # CPU requests are left intact (chart default 50m). k8s-agent and
-    # cilium-manager-agent aren't toggled above (they ride the chart's
-    # default enabled:true), so they're listed here just for the override.
-    # ------------------------------------------------------------------
     helm-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      # Bound session growth (see flux-mcp/app/agent.yaml for the full
-      # rationale). At tokenThreshold ADK summarizes older events via the
-      # local model and drops the originals.
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
+      enabled: false
+    k8s-agent:
+      enabled: false
+    observability-agent:
+      enabled: false
     promql-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
+      enabled: false
+    # ------------------------------------------------------------------
+    # All built-in agents disabled — replaced by SandboxAgent CRs in
+    # agent-sandbox/app/sandbox-agents/. The per-agent resource/compaction
+    # blocks below were removed since there's nothing to override.
+    # ------------------------------------------------------------------
+
     istio-agent:
       enabled: false
     kgateway-agent:
       enabled: false
-    observability-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    k8s-agent:
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    cilium-manager-agent:
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
+
     # ------------------------------------------------------------------
     # Grafana MCP subchart. The chart defaults GRAFANA_URL to
     # `grafana.kagent:3000/api`, which is broken here on two counts: no

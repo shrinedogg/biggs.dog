@@ -9,7 +9,6 @@ resources:
   - ./agent-sandbox/ks.yaml
   - ./kagent-crds/ks.yaml
   - ./kagent/ks.yaml
-  - ./kagent/cilium-agents/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
   - ./flux-mcp/ks.yaml
   - ./exa-mcp/ks.yaml
