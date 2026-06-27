@@ -1,4 +1,13 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - sandbox-agents/
+  - sandbox-agents/cilium-debug-agent-sandbox-agent.yaml
+  - sandbox-agents/cilium-manager-agent-sandbox-agent.yaml
+  - sandbox-agents/cilium-policy-agent-sandbox-agent.yaml
+  - sandbox-agents/exa-agent-sandbox-agent.yaml
+  - sandbox-agents/flux-agent-sandbox-agent.yaml
+  - sandbox-agents/helm-agent-sandbox-agent.yaml
+  - sandbox-agents/k8s-agent-sandbox-agent.yaml
+  - sandbox-agents/observability-agent-sandbox-agent.yaml
+  - sandbox-agents/promql-agent-sandbox-agent.yaml
+  - sandbox-agents/vm-agent-sandbox-agent.yaml
