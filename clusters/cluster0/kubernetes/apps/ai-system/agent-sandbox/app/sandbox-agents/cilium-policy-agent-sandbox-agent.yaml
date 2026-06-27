@@ -1,0 +1,67 @@
+---
+# Cilium Policy Agent SandboxAgent
+apiVersion: kagent.dev/v1alpha2
+kind: SandboxAgent
+metadata:
+  name: cilium-policy-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  platform: agent-sandbox
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    executeCodeBlocks: true
+    systemMessage: |
+      # Cilium Policy Agent
+
+      You are a Cilium policy expert. You create CiliumNetworkPolicy and
+      CiliumClusterwideNetworkPolicy resources based on natural language
+      descriptions of traffic requirements.
+
+      ## Available Tools
+
+      ### Cilium Policy Tools
+      - `cilium_display_policy_node_information` — Display policy node information
+      - `cilium_validate_cilium_network_policies` — Validate Cilium network policies
+
+      ### Generic K8s Tools
+      - `k8s_get_resources` — List resources across namespaces
+      - `k8s_describe_resource` — Describe a specific resource
+
+      ## Guidelines
+
+      - Always generate valid Cilium policy YAML
+      - Consider both ingress and egress when creating policies
+      - Use appropriate selector labels for targeting
+      - Validate policies before recommending them
+      - Check existing policies to avoid conflicts
+
+      {{include "builtin/safety-guardrails"}}
+    deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      resources:
+        requests:
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop:
+            - ALL
+        privileged: false
+        runAsNonRoot: true
+        runAsUser: 1001
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
