@@ -121,6 +121,8 @@ spec:
         - ports:
             - port: "3000"
               protocol: TCP
+            - port: "80"
+              protocol: TCP
 ---
 # kagent's victoria-metrics-mcp server (ai-system/victoria-metrics-mcp) proxies
 # PromQL/MetricsQL queries to vmsingle-stack on :8428. Without this, vmsingle

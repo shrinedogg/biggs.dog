@@ -333,14 +333,15 @@ spec:
     # `allow-egress-to-observability` (namespace-wide, any port).
     # ------------------------------------------------------------------
     # ------------------------------------------------------------------
-    # Grafana MCP — service account token. The Helm chart reads apiKey
-    # from values; at runtime the actual token is injected via the
-    # post-renderer env patch (below) from the ExternalSecret.
+    # Grafana MCP — the apiKey is NOT stored in git (GitHub secret
+    # scanning would block the push). Instead the runtime token is
+    # injected via the post-renderer env patch from the cluster Secret
+    # kagent-grafana-mcp-token (created manually via kubectl, synced
+    # by ExternalSecret once the 1Password item exists).
     # ------------------------------------------------------------------
     grafana-mcp:
       grafana:
         url: "http://grafana.observability:80/api"
-        apiKey: "glsa_1SSGa9j5zWUZffAWrvwSLDXPD7Z52RRt_ab16bba"
     # ------------------------------------------------------------------
     # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
     # The chart renders a ModelConfig named "default-model-config" that
