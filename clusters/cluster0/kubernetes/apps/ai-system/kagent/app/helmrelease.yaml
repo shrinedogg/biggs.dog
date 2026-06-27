@@ -207,6 +207,24 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          # ----------------------------------------------------------------
+          # Grafana MCP — mount the service account token so the mcp/grafana
+          # server can authenticate against Grafana. The ExternalSecret
+          # (grafana-mcp-token-secret.yaml) creates the secret and the env
+          # var is picked up by the container.
+          # ----------------------------------------------------------------
+          - target:
+              kind: Deployment
+              name: kagent-grafana-mcp
+            patch: |-
+              - op: add
+                path: /spec/template/spec/containers/0/env
+                value:
+                - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
+                  valueFrom:
+                    secretKeyRef:
+                      name: kagent-grafana-mcp-token
+                      key: GRAFANA_SERVICE_ACCOUNT_TOKEN
   install:
     remediation:
       retries: 3
@@ -314,9 +332,15 @@ spec:
     # ai-system to observability is already allowed by the CNP
     # `allow-egress-to-observability` (namespace-wide, any port).
     # ------------------------------------------------------------------
+    # ------------------------------------------------------------------
+    # Grafana MCP — service account token. The Helm chart reads apiKey
+    # from values; at runtime the actual token is injected via the
+    # post-renderer env patch (below) from the ExternalSecret.
+    # ------------------------------------------------------------------
     grafana-mcp:
       grafana:
         url: "http://grafana.observability:80/api"
+        apiKey: "glsa_1SSGa9j5zWUZffAWrvwSLDXPD7Z52RRt_ab16bba"
     # ------------------------------------------------------------------
     # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
     # The chart renders a ModelConfig named "default-model-config" that
