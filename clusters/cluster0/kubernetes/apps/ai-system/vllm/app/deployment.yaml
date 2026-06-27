@@ -58,7 +58,7 @@ spec:
             # tool parser, bump the image tag (or use :nightly).
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=unsloth/Qwen3.6-27B-Q5_K_M
+            - --model=hf download hf://unsloth/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q5_K_M.gguf
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (nvidia/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
