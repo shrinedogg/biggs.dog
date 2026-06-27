@@ -7,13 +7,10 @@ metadata:
     # Privileged: the vLLM inference server runs on the nv-01 GPU node and
     # relies on NVIDIA CDI device injection (nvidia.com/gpu).
     #
-    # NOTE: kagent currently schedules its agent-runner pods privileged
-    # (verified live for flux-agent/vm-agent). That is being hardened per-agent
-    # via spec.declarative.deployment.securityContext (see
-    # victoria-metrics-mcp/app/agent.yaml) and should be driven to non-root,
-    # drop-ALL across all agents. Until every workload here is hardened, this
-    # namespace stays at enforce: privileged; tighten toward baseline once the
-    # agent pods no longer require it.
+    # All kagent agent-runner pods are hardened via spec.declarative.deployment
+    # security contexts (runAsNonRoot: true, drop ALL capabilities). The
+    # enforcement level stays at privileged to accommodate the vLLM runtime
+    # which requires elevated isolation (CDI device injection).
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/warn: privileged

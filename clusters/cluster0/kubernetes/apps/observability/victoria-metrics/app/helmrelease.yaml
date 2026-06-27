@@ -1090,6 +1090,19 @@ spec:
               regex: (uid)
             - action: labeldrop
               regex: (id|name)
+            # The labelmap in relabelConfigs below copies EVERY node label onto
+            # every cadvisor/kubelet series. nv-01 (the GPU node) carries ~50
+            # extra labels the other nodes don't -- NFD CPUID features
+            # (feature_node_kubernetes_io_*), Talos system-extension versions
+            # (extensions_talos_dev_*), and NVIDIA GPU-feature-discovery labels
+            # (nvidia_com_*). That pushed nv-01 series to 169-175 labels, past
+            # vmsingle's maxLabelsPerTimeseries=150, so VictoriaMetrics SILENTLY
+            # DROPPED them -- the root cause of the "spotty" nv-01/GPU dashboards
+            # (verified in vmsingle logs: "ignoring series with 172 labels ...").
+            # These label families are useless on per-container/kubelet metrics,
+            # so strip them here (metricRelabelConfigs run after the labelmap).
+            - action: labeldrop
+              regex: (feature_node_kubernetes_io|extensions_talos_dev|nvidia_com|beta_kubernetes_io)_.+
             - action: drop
               source_labels: [__name__]
               regex: (rest_client_request_duration_seconds_bucket|rest_client_request_duration_seconds_sum|rest_client_request_duration_seconds_count)

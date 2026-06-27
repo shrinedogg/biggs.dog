@@ -17,6 +17,9 @@ spec:
     - port: gpu-metrics
       path: /metrics
       interval: 30s
-      # Preserve the exporter's own Hostname/gpu/UUID/modelName labels so the
-      # GPU and node are identifiable (e.g. Xid alerts per GPU on nv-01).
+      scrapeTimeout: 5s
+      # DCGM exporter talks to NVML via libnvidia-ml; under load or thermal stress
+      # the NVML call chain can stall, so 5s is a tight upper bound to detect
+      # unresponsiveness rather than waiting for the vmagent default (10s) and
+      # silently dropping the sample.
       honorLabels: true
