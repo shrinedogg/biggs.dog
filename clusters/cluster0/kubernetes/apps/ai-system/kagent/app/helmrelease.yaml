@@ -212,11 +212,17 @@ spec:
           # server can authenticate against Grafana. The ExternalSecret
           # (grafana-mcp-token-secret.yaml) creates the secret and the env
           # var is picked up by the container.
+          # Also add -allowed-hosts=* so the MCP server accepts requests
+          # from the kagent controller via the Service DNS (not just loopback).
           # ----------------------------------------------------------------
           - target:
               kind: Deployment
               name: kagent-grafana-mcp
             patch: |-
+              - op: add
+                path: /spec/template/spec/containers/0/args
+                value:
+                - "-allowed-hosts=*"
               - op: add
                 path: /spec/template/spec/containers/0/env
                 value:
