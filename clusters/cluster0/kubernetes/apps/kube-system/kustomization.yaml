@@ -10,3 +10,4 @@ resources:
   - ./volsync/ks.yaml
   - ./cilium/ks.yaml
   - ./generic-device-plugin/ks.yaml
+  - ./coredns/ks.yaml
