@@ -43,6 +43,8 @@ spec:
             # Lower the clock further if Xid 109 persists; raise toward 3105 for perf.
             - name: GPU_CLOCK_MAX_MHZ
               value: "2800"
+            - name: GPU_MEMORY_CLOCK_OFFSET_MHZ
+              value: "2200"
             - name: REAPPLY_INTERVAL_SECONDS
               value: "300"
           command:
@@ -51,10 +53,11 @@ spec:
             - |
               set -u
               SMI=/usr/local/bin/nvidia-smi
-              echo "[gpu-tuning] applying: persistence=on power=stock(600W) gfx_clock_max=${GPU_CLOCK_MAX_MHZ}MHz"
+              echo "[gpu-tuning] applying: persistence=on power=stock(600W) gfx_clock_max=${GPU_CLOCK_MAX_MHZ}MHz mem_clock_offset=+${GPU_MEMORY_CLOCK_OFFSET_MHZ}MHz"
               apply() {
                 "${SMI}" -pm 1 || true
                 "${SMI}" -lgc "0,${GPU_CLOCK_MAX_MHZ}" || true
+                "${SMI}" -pmc "${GPU_MEMORY_CLOCK_OFFSET_MHZ}" || true
               }
               apply
               "${SMI}" --query-gpu=persistence_mode,power.limit,clocks.max.gr --format=csv || true
