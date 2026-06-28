@@ -1,0 +1,19 @@
+---
+# Scrape JVB Prometheus metrics. JVB exposes rich metrics: conferences,
+# bitrate, packet loss, endpoints, health, RTT, MUC connections, etc.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: jvb-metrics
+  namespace: jitsi
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: jvb-metrics
+  namespaceSelector:
+    matchNames:
+      - jitsi
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s

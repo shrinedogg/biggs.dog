@@ -1,0 +1,19 @@
+---
+# Scrape Dragonfly operator controller metrics. The operator exposes standard
+# controller-runtime + certwatcher metrics on port 8080.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: dragonfly-operator
+  namespace: dragonfly
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: dragonfly-operator
+  namespaceSelector:
+    matchNames:
+      - dragonfly
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
