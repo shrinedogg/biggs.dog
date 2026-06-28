@@ -1381,8 +1381,15 @@ spec:
           - apiGroups:
               - operator.victoriametrics.com
             resources:
-              - vmservicescrapecs
-              - vmservicescrapecategories
+              - vmservicescrapes
+            verbs:
+              - get
+              - list
+              - watch
+          - apiGroups: [""]
+            resources:
+              - services
+              - endpoints
             verbs:
               - get
               - list
