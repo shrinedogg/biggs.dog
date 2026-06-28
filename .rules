@@ -13,22 +13,21 @@ they 404. This replaced the old `kagent-mcp-lan` plain-HTTP LoadBalancer
 `/mcp` Streamable-HTTP path.)
 
 All agents share a single in-cluster vLLM backend (currently
-`nvidia/Qwen3.6-35B-A3B-NVFP4` -- a 35B MoE with ~3B active params, served at a
-131K context window (262K native, capped for KV concurrency headroom) -- on
-`nv-01`'s RTX 5090); inference never leaves the cluster. It's fast (~250 tok/s
-single-stream, ~65 ms TTFT; ~3,070 tok/s aggregate at 64-way) with ample
-context, so
-full multi-step agent tasks work fine -- including heavy ones like flux-agent
-(whose `flux-operator-mcp` tool schemas alone are ~64K tokens). No need to keep
-tasks minimal anymore; long agentic loops complete because inference is fast
-(~250 tok/s single-stream), not because of a server-side route timeout -- the
-MCP LoadBalancer is a plain TCP passthrough with no request timeout. (Still
-prefer terse output over needless verbosity.)
+`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm` -- a dense 27B
+model with all params active, served at a 131K context window (262K native,
+capped for KV concurrency headroom) -- on `nv-01`'s RTX 5090); inference never
+leaves the cluster. Throughput is solid (~250–350 tok/s single-stream depending
+on context length, ~65 ms TTFT), with real 1.80x concurrency to handle agent
+fan-out, so full multi-step agent tasks work fine -- including heavy ones like
+flux-agent (whose `flux-operator-mcp` tool schemas alone are ~64K tokens). No
+need to keep tasks minimal anymore; long agentic loops complete. The MCP
+LoadBalancer is a plain TCP passthrough with no request timeout. (Still prefer
+terse output over needless verbosity.)
 
 Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 131K
 window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%
-under load), so the context-overflow that broke heavy agents on the previous
-27B/65K model is fully resolved.
+under load). VRAM utilization: ~18.6 GiB model, ~7.8 GiB fp8 KV at full
+concurrency, with headroom for stable cluster operation.
 
 The live, invocable agent set (`kubectl get agents -n ai-system`) is the ten
 listed below. Most are chart-managed via per-agent `*.enabled` toggles in the
