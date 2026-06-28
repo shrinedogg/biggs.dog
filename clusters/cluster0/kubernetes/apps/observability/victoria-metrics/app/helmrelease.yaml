@@ -324,14 +324,14 @@ spec:
         resources:
           limits:
             cpu: null
-            memory: "3500Mi"
+            memory: "4000Mi"
           requests:
             cpu: 500m
-            memory: "2000Mi"
+            memory: "30000Mi"
         port: "8428"
         # -- Data retention period. Possible units character: h(ours), d(ays), w(eeks), y(ears), if no unit character specified - month. The minimum retention period is 24h. See these [docs](https://docs.victoriametrics.com/victoriametrics/single-server-victoriametrics/#retention)
         retentionPeriod: "1"
-        replicaCount: 1
+        replicaCount: 2
         extraArgs:
           maxLabelsPerTimeseries: "150"
         storage:
@@ -840,6 +840,13 @@ spec:
         #- url: http://some-remote-write/api/v1/write
       # -- (object) Full spec for VMAgent CRD. Allowed values described [here](https://docs.victoriametrics.com/operator/api/#vmagentspec)
       spec:
+        resources:
+          limits:
+            cpu: "1000m"
+            memory: "2500Mi"
+          requests:
+            cpu: "1000m"
+            memory: "2500Mi"
         port: "8429"
         selectAllByDefault: true
         scrapeInterval: 20s
