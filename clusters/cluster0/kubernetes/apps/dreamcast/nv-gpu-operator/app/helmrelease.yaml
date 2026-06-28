@@ -64,6 +64,14 @@ spec:
     # XID/remapped-rows lines are kept for forward-compat with datacenter GPUs.
     # ECC stays commented (consumer RTX 5090 has no ECC).
     dcgmExporter:
+      env:
+        # Disable Kubernetes label enrichment. When enabled, DCGM attaches
+        # exported_pod/exported_namespace labels reflecting the GPU consumer
+        # (vLLM pod). Pod restarts create new label sets → new time series →
+        # Grafana sees gaps as old series go stale. Disabling keeps only the
+        # exporter's own namespace/pod labels, which are stable.
+        - name: DCGM_EXPORTER_KUBERNETES
+          value: "false"
       config:
         create: true
         name: dcgm-exporter-custom-metrics
