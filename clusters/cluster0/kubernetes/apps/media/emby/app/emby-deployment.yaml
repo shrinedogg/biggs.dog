@@ -64,10 +64,10 @@ spec:
           resources:
             limits:
               gpu.intel.com/i915: "1"
-              memory: 4Gi
+              memory: 4.5Gi
             requests:
               gpu.intel.com/i915: "1"
-              memory: 4Gi
+              memory: 4.5Gi
       volumes:
         - name: emby-transcode
           emptyDir:
