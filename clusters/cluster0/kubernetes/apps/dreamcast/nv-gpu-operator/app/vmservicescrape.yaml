@@ -23,15 +23,22 @@ spec:
       # to complete under contention; 10s timeout catches genuinely hung scrapes
       # without dropping samples during normal GPU load spikes.
       honorLabels: true
-      # Pre-scrape: save the discovery-level namespace so we can use it later
-      # in metricRelabelConfigs (where __meta_* labels are already stripped).
+      # Pre-scrape: save discovery-level labels so we can use them in
+      # metricRelabelConfigs (where __meta_* labels are already stripped).
       relabelConfigs:
         - action: replace
           sourceLabels: [__meta_kubernetes_namespace]
           targetLabel: scrape_namespace
-      # Post-scrape: swap the labels so `namespace` matches the scrape target's
-      # own namespace (dashboard-compatible) while the GPU consumer namespace
-      # is preserved separately.
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_name]
+          targetLabel: scrape_pod
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_container_name]
+          targetLabel: scrape_container
+      # Post-scrape: restore stable labels, preventing series churn from
+      # pod restarts. DCGM's KUBERNETES mode enriches metrics with the GPU
+      # consumer's pod/container labels (e.g., vllm-xxxxx), which change on
+      # every rollout. Overwrite them with the exporter's own stable labels.
       metricRelabelConfigs:
         - action: replace
           sourceLabels: [namespace]
@@ -39,3 +46,9 @@ spec:
         - action: replace
           sourceLabels: [scrape_namespace]
           targetLabel: namespace
+        - action: replace
+          sourceLabels: [scrape_pod]
+          targetLabel: pod
+        - action: replace
+          sourceLabels: [scrape_container]
+          targetLabel: container
