@@ -9,6 +9,8 @@ kind: VMServiceScrape
 metadata:
   name: nvidia-dcgm-exporter
   namespace: dreamcast
+  labels:
+    app.kubernetes.io/name: nvidia-dcgm-exporter
 spec:
   selector:
     matchLabels:
@@ -22,33 +24,6 @@ spec:
       # the NVML call chain can stall. 60s interval gives enough headroom for NVML
       # to complete under contention; 10s timeout catches genuinely hung scrapes
       # without dropping samples during normal GPU load spikes.
-      honorLabels: true
-      # Pre-scrape: save discovery-level labels so we can use them in
-      # metricRelabelConfigs (where __meta_* labels are already stripped).
-      relabelConfigs:
-        - action: replace
-          sourceLabels: [__meta_kubernetes_namespace]
-          targetLabel: scrape_namespace
-        - action: replace
-          sourceLabels: [__meta_kubernetes_pod_name]
-          targetLabel: scrape_pod
-        - action: replace
-          sourceLabels: [__meta_kubernetes_pod_container_name]
-          targetLabel: scrape_container
-      # Post-scrape: restore stable labels, preventing series churn from
-      # pod restarts. DCGM's KUBERNETES mode enriches metrics with the GPU
-      # consumer's pod/container labels (e.g., vllm-xxxxx), which change on
-      # every rollout. Overwrite them with the exporter's own stable labels.
-      metricRelabelConfigs:
-        - action: replace
-          sourceLabels: [namespace]
-          targetLabel: workload_namespace
-        - action: replace
-          sourceLabels: [scrape_namespace]
-          targetLabel: namespace
-        - action: replace
-          sourceLabels: [scrape_pod]
-          targetLabel: pod
-        - action: replace
-          sourceLabels: [scrape_container]
-          targetLabel: container
+      # No honorLabels — let vmagent control all labels from discovery. DCGM's
+      # custom labels (UUID, Hostname, modelName, gpu, device) survive because
+      # they aren't standard Prometheus labels that vmagent would overwrite.
