@@ -1,0 +1,203 @@
+---
+# Auth stack dashboard — Pocket ID (SST) + OAuth2 Proxy.
+# Uses kube-state-metrics, cadvisor, and oauth2-proxy process metrics.
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: auth-stack-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Auth"
+data:
+  auth-stack.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Auth stack (Pocket ID + OAuth2 Proxy) — pod health, resource usage, and OAuth2 proxy process metrics.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Auth Pods Running",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kube_pod_status_phase{namespace=\"auth\", phase=\"Running\"} == 1)", "legendFormat": "Running", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "OAuth2 Proxy Status",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "up{job=\"oauth2-proxy\"}", "legendFormat": "Up", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "mappings": [
+                { "options": { "1": { "color": "green", "text": "UP" }, "0": { "color": "red", "text": "DOWN" } }, "type": "value" }
+              ],
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+            }
+          },
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Pocket ID Status",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kube_pod_status_ready{namespace=\"auth\", pod=~\".*pocket.*\", condition=\"true\"} == 1)", "legendFormat": "Ready", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Restarts (24h)",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"auth\"}[24h]))", "legendFormat": "Restarts", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Pod Age",
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "(time() - min(kube_pod_created{namespace=\"auth\"})) / 3600", "legendFormat": "hours", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "d", "decimals": 1 }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Per-Component CPU Usage",
+          "description": "CPU per auth component. OAuth2 proxy CPU tracks authentication throughput.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"auth\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Per-Component Memory Usage",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"auth\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "CPU Usage vs Request (%)",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"auth\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"auth\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 100 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Memory Usage vs Limit (%)",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"auth\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"auth\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0, "max": 100,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Process CPU Time Rate (oauth2-proxy)",
+          "description": "OAuth2 proxy process CPU seconds/s. Tracks authentication processing load.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "rate(process_cpu_seconds_total{namespace=\"auth\"}[5m])", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["auth", "oauth2", "pocket-id", "sso", "openid-connect"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Auth Stack",
+      "uid": "auth-stack",
+      "version": 1
+    }

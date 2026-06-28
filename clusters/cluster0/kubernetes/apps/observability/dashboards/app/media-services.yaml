@@ -1,0 +1,191 @@
+---
+# Media services dashboard — Emby, BookBoss, Ersatz.
+# Uses kube-state-metrics, cadvisor, and PVC metrics. No native app metrics
+# scraped for Emby/BookBoss, so this focuses on pod health, resource usage,
+# and storage utilisation.
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: media-services-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Media"
+data:
+  media-services.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Media services (Emby, BookBoss, Ersatz) — pod health, CPU/memory usage, restart tracking, and PVC utilisation.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Pods Running",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kube_pod_status_phase{namespace=\"media\", phase=\"Running\"} == 1)", "legendFormat": "Running", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Pods Not Ready",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kube_pod_status_ready{namespace=\"media\", condition=\"true\"} == 0)", "legendFormat": "Not Ready", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Restarts (15m)",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"media\"}[15m]))", "legendFormat": "Restarts", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "PVCs",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kubelet_volume_stats_used_bytes{namespace=\"media\"})", "legendFormat": "PVCs", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short" }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "Per-Pod CPU Usage",
+          "description": "CPU cores consumed per pod. Emby transcoding pushes CPU during active streams.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"media\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Per-Pod Memory Usage",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"media\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "CPU Usage vs Request (%)",
+          "description": "CPU usage as percentage of request. Sustained > 100% = throttling risk.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"media\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"media\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 100 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Memory Usage vs Limit (%)",
+          "description": "Memory working set as percentage of limit. Approaching 100% = imminent OOMKill.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"media\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"media\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0, "max": 100,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "PVC Utilisation (%)",
+          "description": "Media storage PVC usage. Watch for slow growth toward capacity.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (persistentvolumeclaim) (kubelet_volume_stats_used_bytes{namespace=\"media\"}) / clamp_min(sum by (persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{namespace=\"media\"}), 1)", "legendFormat": "{{persistentvolumeclaim}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0, "max": 100,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 90 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 5 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["media", "emby", "bookboss", "ersatz"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Media Services",
+      "uid": "media-services",
+      "version": 1
+    }

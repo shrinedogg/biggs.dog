@@ -1,0 +1,201 @@
+---
+# Jitsi Meet dashboard — video conferencing stack health.
+# Uses kube-state-metrics, cadvisor, and PVC metrics. The Jitsi chart provides
+# stats-web (internal stats endpoint), but it is not scraped. This dashboard
+# focuses on pod health, resource usage, and component status.
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: jitsi-meet-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Jitsi"
+data:
+  jitsi-meet.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Jitsi Meet — Jicofo, JVB, Prosody, Web, and Coturn component health, resource usage, and restart tracking.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "Components Running",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(kube_pod_status_phase{namespace=\"jitsi\", phase=\"Running\"} == 1)", "legendFormat": "Running", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 3 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "Unhealthy Pods",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count((kube_pod_status_phase{namespace=\"jitsi\", phase=~\"Failed|Pending\"} == 1) or (kube_pod_status_ready{namespace=\"jitsi\", condition=\"true\"} == 0))", "legendFormat": "Unhealthy", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "background", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Restarts (1h)",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"jitsi\"}[1h]))", "legendFormat": "Restarts", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "JVB Pod Age",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "(time() - min(kube_pod_created{namespace=\"jitsi\", pod=~\"jitsi-jvb.*\"}) / 3600)", "legendFormat": "hours", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "d", "decimals": 1 }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "JVB Public IPs",
+          "description": "JVB LB is at 192.168.6.9 (LAN) + 87.92.48.51 (WAN). Coturn TURN at 192.168.6.10.",
+          "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "0", "legendFormat": "—" }
+          ],
+          "fieldConfig": {
+            "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "name" },
+          "description": "JVB: 192.168.6.9 (LAN) / 87.92.48.51 (WAN)\nTURN: 192.168.6.10"
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "Per-Component CPU Usage",
+          "description": "CPU per Jitsi component. JVB CPU spikes during active conferences (audio/video mixing).",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"jitsi\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Per-Component Memory Usage",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"jitsi\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "CPU Usage vs Request (%)",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"jitsi\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"jitsi\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 80 }, { "color": "red", "value": 100 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Memory Usage vs Limit (%)",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"jitsi\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"jitsi\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent", "min": 0, "max": 100,
+              "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 70 }, { "color": "red", "value": 90 } ] },
+              "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 }
+            }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 10,
+          "type": "timeseries",
+          "title": "Container Restart Rate",
+          "description": "Per-pod restart rate. Sustained non-zero = CrashLoopBackOff.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(kube_pod_container_status_restarts_total{namespace=\"jitsi\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "linear", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["jitsi", "meet", "video", "conferencing"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Jitsi Meet",
+      "uid": "jitsi-meet",
+      "version": 1
+    }

@@ -1,0 +1,183 @@
+---
+# Network infrastructure dashboard — CoreDNS, k8s-gateway, AgentGateway, and LAN DNS.
+# Uses CoreDNS metrics (stack-core-dns scrape), kube-state-metrics, and cadvisor.
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: networking-infrastructure-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Networking"
+data:
+  networking-infrastructure.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Network infrastructure — CoreDNS query performance, AgentGateway/k8s-gateway pod health, DNS upstream health, and networking namespace resource usage.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "DNS Request Rate",
+          "description": "CoreDNS queries per second across all replicas. Sustained high rate with latency spike = upstream overload or amplification.",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(rate(coredns_dns_requests_total[5m]))", "legendFormat": "req/s", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 2,
+          "type": "stat",
+          "title": "DNS Cache Hit Ratio",
+          "description": "Cache hits / total cache requests. Low ratio = cache too small or query pattern is unpredictable. High ratio = good cache efficiency.",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(rate(coredns_cache_hits_total[5m])) / clamp_min(sum(rate(coredns_cache_requests_total[5m])), 1)", "legendFormat": "hit ratio", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "max": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "yellow", "value": 0.5 }, { "color": "green", "value": 0.8 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "CoreDNS Replicas",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count(coredns_build_info)", "legendFormat": "replicas", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "Upstream Health Failures",
+          "description": "Forward healthcheck failures. Non-zero = upstream DNS (NextDNS/lk8s-gateway) unreachable.",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(increase(coredns_forward_healthcheck_broken_total[15m]))", "legendFormat": "failures", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 5,
+          "type": "timeseries",
+          "title": "DNS Request Latency (P50 / P99)",
+          "description": "CoreDNS query latency percentiles. P99 spike = upstream slowdown or k8s-gateway DNS programming lag.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "histogram_quantile(0.50, rate(coredns_dns_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P50", "refId": "A" },
+            { "expr": "histogram_quantile(0.99, rate(coredns_dns_request_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P99", "refId": "B" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "P99" }, "properties": [{ "id": "color", "value": { "fixedColor": "orange", "mode": "fixed" } }] }
+            ]
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true } }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "DNS Requests Per Second",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum(rate(coredns_dns_requests_total[5m]))", "legendFormat": "Total req/s", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull"], "displayMode": "list", "placement": "bottom", "showLegend": true } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "k8s DNS Programming Duration",
+          "description": "Time taken to program k8s DNS records after k8s API change. Spikes = slow k8s API or large sync.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "histogram_quantile(0.99, rate(coredns_kubernetes_dns_programming_duration_seconds_bucket[5m])) * 1000", "legendFormat": "P99 ms", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "list", "placement": "bottom", "showLegend": true } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Networking Namespace: Pod CPU Usage",
+          "description": "Per-pod CPU usage in the networking namespace (AgentGateway, k8s-gateway, lan-dns).",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"networking\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 9,
+          "type": "timeseries",
+          "title": "Networking Namespace: Memory Usage",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"networking\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "bytes", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["networking", "dns", "coredns", "k8s-gateway", "agentgateway"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "title": "Network Infrastructure",
+      "uid": "networking-infrastructure",
+      "version": 1
+    }
