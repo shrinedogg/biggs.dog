@@ -1,13 +1,13 @@
 ---
 # Scrape Hubble's Prometheus /metrics endpoint into Victoria Metrics.
 # Hubble was enabled in helmrelease.yaml (hubble.metrics.enabled), which enables
-# prometheus metrics on :9962 (the `prometheus` container port of cilium-agent).
+# Hubble-specific metrics on :9965 (the `hubble-metrics` port of cilium-agent).
+# The generic cilium-agent metrics (cilium_*) are on :9962 (the `prometheus` port).
 # The VM Operator's vmagent runs selectAllByDefault=true, so this VMServiceScrape
 # is auto-discovered with no vmagent config change.
 #
-# NOTE: Port 9965 (`hubble-metrics`) is the gRPC health/check port — it serves
-# gRPC server metrics, NOT Prometheus scrape data. Prometheus metrics are on
-# port 9962 (container port `prometheus`, targetPort `prometheus`).
+# The `k8s-app: hubble` selector targets the Helm-managed `hubble-metrics`
+# headless Service, which maps to port 9965 on all cilium-agent pods.
 #
 # Metrics exported (per hubble.metrics.enabled):
 #   - hubble_flows_processed_total
@@ -17,9 +17,8 @@
 #   - hubble_port_distribution_total
 #   - hubble_icmp_total
 #   - hubble_http_*
-#   - cilium_* (BPF counters, agent metrics)
 #
-# With the current context-free metrics config these carry coarse labels.
+# With the current context config these carry namespace labels.
 # For namespace-aware flows use source_namespace/destination_namespace labels
 # available on hubble_drop_total, hubble_tcp_flags_total, and hubble_flow_total.
 apiVersion: operator.victoriametrics.com/v1beta1
@@ -32,11 +31,11 @@ metadata:
 spec:
   selector:
     matchLabels:
-      k8s-app: cilium
+      k8s-app: hubble
   namespaceSelector:
     matchNames:
       - kube-system
   endpoints:
-    - port: prometheus
+    - port: hubble-metrics
       path: /metrics
       interval: 30s
