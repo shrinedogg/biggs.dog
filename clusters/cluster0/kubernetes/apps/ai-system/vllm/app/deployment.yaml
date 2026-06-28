@@ -44,38 +44,44 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.23.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: NVIDIA's NVFP4 quant of Alibaba's Qwen3.6-35B-A3B, served
-            # per the model card's vLLM command:
-            #   https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4
-            # A 35B MoE with only ~3B active params (fast), ~19B on disk (NVFP4
-            # ~3x smaller than BF16), Mamba-hybrid attention, and 262K native
-            # context -- most layers keep bounded KV, making long context cheap
-            # on this 32 GB card. NVFP4 needs Blackwell (nv-01's RTX 5090,
-            # sm_120). The checkpoint is multimodal (text/image/video) but we
-            # serve text-only for kagent (see --limit-mm-per-prompt below).
-            # NOTE: NVIDIA serves this with vllm/vllm-openai:nightly; we pin a
-            # release below. If v0.23.0 lacks qwen3_5_moe arch or the qwen3_xml
-            # tool parser, bump the image tag (or use :nightly).
+            # MODEL: Unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
+            # dense Qwen3.6-27B:
+            #   https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4
+            # A 27B DENSE model (all params active -> slower per-token than the
+            # old 35B-A3B MoE, but strong agentic-coding quality), with a
+            # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
+            # paged KV, so long context stays cheap) and 262K native context.
+            # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120). Weights are
+            # ~26GB on disk (incl. the vision encoder + BF16 248K-vocab
+            # embeddings), but we serve TEXT-ONLY via --language-model-only
+            # below, which skips the vision tower so resident weights are
+            # ~16-18GB -- leaving ~11-13GB for fp8 KV at 131K on this 32GB card.
+            # Quantization is compressed-tensors and AUTO-DETECTED from the
+            # checkpoint's quantization_config -- do NOT pass --quantization
+            # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
+            # here).
+            # NOTE: if v0.23.0 lacks the dense Qwen3_5ForConditionalGeneration
+            # arch or the qwen3_coder tool parser, bump the image tag (or use
+            # :nightly).
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=unsloth/Qwen3.6-27B-GGUF/Qwen3.6-27B-Q5_K_M.gguf
+            - --model=unsloth/Qwen3.6-27B-NVFP4
             # served-model-name is intentionally different from --model:
-            # the slash in the HuggingFace path (nvidia/) gets stripped by some
+            # the slash in the HuggingFace path (unsloth/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
             # clients; kagent and Zed both use this name, not the weights path.
             - --served-model-name=qwen36-local
-            # Explicit per the model card (vLLM also auto-detects modelopt's
-            # NVFP4 config, but the card serves with this flag set).
-            - --quantization=modelopt
+            # NOTE: --quantization is intentionally OMITTED. This checkpoint is
+            # compressed-tensors NVFP4 and vLLM auto-detects it from the config;
+            # forcing modelopt (the 35B's quant) would mis-load the weights.
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
             # 131K context. The model's native max is 262K, but at 262K the KV
-            # pool (~838K tokens on this 32 GB card) only covers ~3.2 concurrent
-            # full-context requests, so high concurrency KV-exhausts/preempts.
-            # 131K doubles that to ~6.4x while staying well above flux-agent's
-            # ~64K tool-schema need. Raise back toward 262K only if you also drop
-            # max-num-seqs.
+            # pool only covers a couple of concurrent full-context requests, so
+            # high concurrency KV-exhausts/preempts. 131K roughly doubles that
+            # while staying well above flux-agent's ~64K tool-schema need. Raise
+            # back toward 262K only if you also drop max-num-seqs.
             - --max-model-len=131072
             # nv-01's GPU is time-sliced (replicas=4) and shared with the
             # embeddings pod, GPU-operator validators, and the DRA plugin.
@@ -83,7 +89,8 @@ spec:
             # co-scheduled GPU consumers hit NVRM NV_ERR_NO_MEMORY and this
             # contributed to a full node lockup (2026-06-25). 0.90 reserves
             # ~29.3GB (leaves ~3.2GB headroom) while keeping ample fp8-KV cache
-            # for concurrent agent workloads. The ~19GB NVFP4 weights are fixed.
+            # for concurrent agent workloads. The ~16-18GB resident NVFP4 weights
+            # (text-only; vision tower skipped) are fixed.
             - --gpu-memory-utilization=0.90
             # Per-step token budget for (chunked) prefill + decode. Bumped from
             # 4096 to 8192 to handle medium-length tool-context prompts more
@@ -103,17 +110,20 @@ spec:
             - --max-num-seqs=32
             - --max-cudagraph-capture-size=32
             - --enable-prefix-caching
-            # Qwen3.6 hybrid-MoE may ship custom modeling code; the model card's
-            # DGX command sets trust-remote-code. NOTE: executes repo Python.
+            # Qwen3.6's hybrid (Gated-DeltaNet) arch may ship custom modeling
+            # code; the model card sets trust-remote-code. NOTE: executes repo
+            # Python.
             - --trust-remote-code
-            # Qwen3.6 tool-call + reasoning parsers, per the NVIDIA model card
-            # (tool parser is qwen3_xml, paired with the model's chat template).
+            # Qwen3.6 tool-call + reasoning parsers, per the Qwen3.6-27B model
+            # card (the dense 27B uses the qwen3_coder tool parser -- NOT the
+            # 35B's qwen3_xml; reasoning parser stays qwen3).
             - --enable-auto-tool-choice
-            - --tool-call-parser=qwen3_xml
+            - --tool-call-parser=qwen3_coder
             - --reasoning-parser=qwen3
-            # Text-only kagent traffic; forbid image/video on this multimodal
-            # model to skip the vision encoder + multimodal profiling.
-            - '--limit-mm-per-prompt={"image":0,"video":0}'
+            # Text-only kagent traffic: skip the vision encoder + multimodal
+            # profiling entirely. REQUIRED for the VRAM fit -- loading the
+            # vision tower would push resident weights to ~26GB and starve KV.
+            - --language-model-only
             # Keep port 8000 to match the Service and the kagent provider baseUrl.
             - --host=0.0.0.0
             - --port=8000
