@@ -1,0 +1,23 @@
+---
+# Scrape generic cilium-agent Prometheus metrics (cilium_*) into Victoria Metrics.
+# These are BPF counters, agent health, endpoint, policy, and process metrics
+# served on port 9962 (the `prometheus` container port of cilium-agent pods).
+# Hubble-specific metrics (hubble_*) are on a separate scrape config on port 9965.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMServiceScrape
+metadata:
+  name: cilium-agent-metrics
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: cilium-agent
+spec:
+  selector:
+    matchLabels:
+      k8s-app: cilium
+  namespaceSelector:
+    matchNames:
+      - kube-system
+  endpoints:
+    - port: prometheus
+      path: /metrics
+      interval: 30s
