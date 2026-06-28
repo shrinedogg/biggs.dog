@@ -12,25 +12,25 @@
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "rebaseWhen": "conflicted",
   "schedule": ["every weekend"],
+  "ignorePaths": ["**/apps.yaml"],
   "flux": {
-    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
+    "fileMatch": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "helm-values": {
-    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
+    "fileMatch": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "kubernetes": {
-    "managerFilePatterns": [
-      "/(^|/)clusters/.+\.ya?ml$/",
-      "/(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\.ya?ml$/",
-      "/(^|/)clusters/.+-deployment\.ya?ml$/"
-    ],
-    "skipFiles": ["**/apps.yaml"]
+    "fileMatch": [
+      "/(^|/)clusters/.+\\.ya?ml$/",
+      "/(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\\.ya?ml$/",
+      "/(^|/)clusters/.+-deployment\\.ya?$/"
+    ]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Process OCIRepository tags",
-      "managerFilePatterns": ["/(^|/)clusters/.+-oci\\.ya?ml$/"],
+      "fileMatch": ["/(^|/)clusters/.+-oci\\.ya?ml$/"],
       "matchStrings": [
         "url:\\s*oci://(?<depName>[^\\s]+)\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
       ],
@@ -40,7 +40,7 @@
     {
       "customType": "regex",
       "description": "CNPG ClusterImageCatalog extension images (reference: field, which the kubernetes manager ignores)",
-      "managerFilePatterns": ["/(^|/)clusters/.+catalog\\.ya?ml$/"],
+      "fileMatch": ["/(^|/)clusters/.+catalog\\.ya?ml$/"],
       "matchStrings": [
         "reference:\\s*(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
