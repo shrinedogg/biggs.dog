@@ -20,9 +20,12 @@
     },
     "kubernetes": {
         "managerFilePatterns": [
-            "/(^|/)clusters/.+\\.ya?ml$/",
-            "/(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\\.ya?ml$/",
-            "/(^|/)clusters/.+-deployment\\.ya?ml$/"
+            "/(^|/)clusters/.+\.ya?ml$/",
+            "/(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\.ya?ml$/",
+            "/(^|/)clusters/.+-deployment\.ya?ml$/"
+        ],
+        "skipFiles": [
+            "**/apps.yaml"  # Custom App CRDs (direwolf-operator) — Renovate fails to edit files with large base64 appAssetWebP blobs
         ]
     },
     "customManagers": [
