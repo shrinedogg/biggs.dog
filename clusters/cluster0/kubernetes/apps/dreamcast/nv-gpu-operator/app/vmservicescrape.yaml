@@ -24,15 +24,15 @@ spec:
       # without dropping samples during normal GPU load spikes.
       honorLabels: true
       # Pre-scrape: save the discovery-level namespace so we can use it later
-      # in metricRelabelings (where __meta_* labels are already stripped).
-      relabelings:
+      # in metricRelabelConfigs (where __meta_* labels are already stripped).
+      relabelConfigs:
         - action: replace
           sourceLabels: [__meta_kubernetes_namespace]
           targetLabel: scrape_namespace
       # Post-scrape: swap the labels so `namespace` matches the scrape target's
       # own namespace (dashboard-compatible) while the GPU consumer namespace
       # is preserved separately.
-      metricRelabelings:
+      metricRelabelConfigs:
         - action: replace
           sourceLabels: [namespace]
           targetLabel: workload_namespace
