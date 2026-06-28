@@ -16,10 +16,10 @@ spec:
   endpoints:
     - port: gpu-metrics
       path: /metrics
-      interval: 30s
-      scrapeTimeout: 5s
+      interval: 60s
+      scrapeTimeout: 10s
       # DCGM exporter talks to NVML via libnvidia-ml; under load or thermal stress
-      # the NVML call chain can stall, so 5s is a tight upper bound to detect
-      # unresponsiveness rather than waiting for the vmagent default (10s) and
-      # silently dropping the sample.
+      # the NVML call chain can stall. 60s interval gives enough headroom for NVML
+      # to complete under contention; 10s timeout catches genuinely hung scrapes
+      # without dropping samples during normal GPU load spikes.
       honorLabels: true
