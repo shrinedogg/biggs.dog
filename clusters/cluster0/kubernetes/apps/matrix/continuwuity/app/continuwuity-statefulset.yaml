@@ -70,11 +70,11 @@ spec:
               value: "1280000000"
             - name: CONTINUWUITY_ALLOW_REGISTRATION
               value: "true"
-            - name: CONTINUWUITY_REGISTRATION_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: continuwuity-credentials
-                  key: token
+            # - name: CONTINUWUITY_REGISTRATION_TOKEN
+            #   valueFrom:
+            #     secretKeyRef:
+            #       name: continuwuity-credentials
+            #       key: token
             # - name: CONTINUWUITY_EMERGENCY_PASSWORD
             #   valueFrom:
             #     secretKeyRef:
