@@ -52,10 +52,12 @@ spec:
             # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
             # paged KV, so long context stays cheap) and 262K native context.
             # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120). Weights are
-            # ~26GB on disk (incl. the vision encoder + BF16 248K-vocab
-            # embeddings), but we serve TEXT-ONLY via --language-model-only
-            # below, which skips the vision tower so resident weights are
-            # ~16-18GB -- leaving ~11-13GB for fp8 KV at 131K on this 32GB card.
+            # ~26GB on disk (incl. vision encoder + BF16 248K-vocab embeddings).
+            # We serve TEXT-ONLY via --language-model-only below, but the dense
+            # 27B + huge BF16 embeddings still load as ~23GiB RESIDENT on the GPU
+            # (heavier than the old 35B MoE's ~19GB). That leaves only ~3GiB for
+            # fp8 KV at util 0.95, so max-model-len is capped at 80K here -- 131K
+            # KV would need ~4.3GiB and does NOT fit (see --max-model-len).
             # Quantization is compressed-tensors and AUTO-DETECTED from the
             # checkpoint's quantization_config -- do NOT pass --quantization
             # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
@@ -77,21 +79,22 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 131K context. The model's native max is 262K, but at 262K the KV
-            # pool only covers a couple of concurrent full-context requests, so
-            # high concurrency KV-exhausts/preempts. 131K roughly doubles that
-            # while staying well above flux-agent's ~64K tool-schema need. Raise
-            # back toward 262K only if you also drop max-num-seqs.
-            - --max-model-len=131072
-            # nv-01's GPU is time-sliced (replicas=4) and shared with the
-            # embeddings pod, GPU-operator validators, and the DRA plugin.
-            # At 0.97 vLLM reserved ~31.6GB, leaving only ~1GB free, so
-            # co-scheduled GPU consumers hit NVRM NV_ERR_NO_MEMORY and this
-            # contributed to a full node lockup (2026-06-25). 0.90 reserves
-            # ~29.3GB (leaves ~3.2GB headroom) while keeping ample fp8-KV cache
-            # for concurrent agent workloads. The ~16-18GB resident NVFP4 weights
-            # (text-only; vision tower skipped) are fixed.
-            - --gpu-memory-utilization=0.90
+            # 80K context. The dense 27B-NVFP4 is ~23GiB resident, leaving only
+            # ~3GiB for fp8 KV on this 32GB card, so the full 131K (needs
+            # ~4.3GiB KV) does NOT fit -- vLLM rejects it (it estimated max ~39K
+            # at util 0.90, ~93K at 0.95). 80K stays above flux-agent's ~64K
+            # tool-schema need with headroom. To go higher you must raise
+            # --gpu-memory-utilization (riskier) or drop max-num-seqs.
+            - --max-model-len=81920
+            # nv-01's GPU is time-sliced (replicas=4) and shared with
+            # GPU-operator validators and the DRA plugin. (The embeddings server
+            # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
+            # reserved ~31.6GB, leaving ~1GB free, which contributed to a full
+            # node lockup (2026-06-25) back when embeddings was ALSO on the GPU.
+            # The dense 27B-NVFP4 is ~23GiB resident and needs more of the card
+            # for KV, so 0.95 (~30.4GB reserved, ~1.6GB free) is the compromise
+            # that yields ~3GiB fp8 KV (enough for 80K). Do NOT push past ~0.96.
+            - --gpu-memory-utilization=0.95
             # Per-step token budget for (chunked) prefill + decode. Bumped from
             # 4096 to 8192 to handle medium-length tool-context prompts more
             # efficiently, reducing the number of prefill steps. Short prompts
