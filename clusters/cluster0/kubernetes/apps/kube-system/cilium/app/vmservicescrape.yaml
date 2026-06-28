@@ -32,7 +32,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      app.kubernetes.io/name: cilium
+      k8s-app: cilium
   namespaceSelector:
     matchNames:
       - kube-system
