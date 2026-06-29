@@ -77,6 +77,3 @@ spec:
             - k8s_apply_manifest
             - k8s_get_resources
             - k8s_get_pod_logs
-      - type: BuiltIn
-        builtIn:
-          toolName: GenerateResourceTool
