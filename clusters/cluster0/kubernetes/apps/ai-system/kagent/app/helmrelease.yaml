@@ -395,7 +395,7 @@ spec:
       # Agent Substrate integration. Enables the substrate controller wiring
       # so the kagent controller can schedule SandboxAgent actors on
       # substrate workers. The substrate HelmRelease (ai-system/substrate/)
-      # deploys the actual substrate control plane (ate-system namespace).
+      # deploys the substrate control plane in the same ai-system namespace.
       # ------------------------------------------------------------------
       substrate:
         enabled: true

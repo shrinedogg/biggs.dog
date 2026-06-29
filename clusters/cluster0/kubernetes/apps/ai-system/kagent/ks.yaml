@@ -13,6 +13,8 @@ spec:
     - name: agent-sandbox
     # The local model endpoint + shared API key secret must be ready.
     - name: vllm
+    # The substrate CRDs must exist before the kagent controller starts.
+    - name: substrate-crds
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
