@@ -101,85 +101,10 @@ spec:
       enabled: false
     cilium-manager-agent:
       enabled: false
-    # ------------------------------------------------------------------
-    # Per-agent resource overrides for the chart-managed agents:
-    #   - Strip the CPU LIMIT (chart default limits.cpu=1000m -> null) to
-    #     avoid CFS throttling (repo policy: no CPU limit). Setting null
-    #     deletes that key during Helm coalescing (verified via `helm
-    #     template`), so the rendered Agent CR keeps limits.memory + requests
-    #     but has no CPU cap.
-    #   - Double the chart-default memory REQUEST and LIMIT
-    #     (requests 128Mi -> 256Mi, limits 256Mi -> 512Mi). Pinning them here
-    #     makes them durable in git rather than tracking the chart default.
-    # CPU requests are left intact (chart default 50m). k8s-agent and
-    # cilium-manager-agent aren't toggled above (they ride the chart's
-    # default enabled:true), so they're listed here just for the override.
-    # ------------------------------------------------------------------
-    helm-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      # Bound session growth (see flux-mcp/app/agent.yaml for the full
-      # rationale). At tokenThreshold ADK summarizes older events via the
-      # local model and drops the originals.
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    promql-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
     istio-agent:
       enabled: false
     kgateway-agent:
       enabled: false
-    observability-agent:
-      enabled: true
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    k8s-agent:
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    cilium-manager-agent:
-      resources:
-        requests:
-          memory: 256Mi
-        limits:
-          cpu: null
-          memory: 512Mi
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
     # ------------------------------------------------------------------
     # Grafana MCP subchart. The chart defaults GRAFANA_URL to
     # `grafana.kagent:3000/api`, which is broken here on two counts: no

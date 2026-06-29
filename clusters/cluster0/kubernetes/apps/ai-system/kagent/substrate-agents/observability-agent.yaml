@@ -44,7 +44,7 @@ spec:
         mcpServer:
           apiGroup: kagent.dev
           kind: RemoteMCPServer
-          name: grafana-mcp
+          name: kagent-grafana-mcp
           toolNames:
             - update_dashboard
             - search_dashboards
