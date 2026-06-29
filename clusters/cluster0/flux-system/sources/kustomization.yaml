@@ -31,6 +31,8 @@ resources:
   - fenrir-oci.yaml
   - kagent-crds-oci.yaml
   - kagent-oci.yaml
+  - substrate-crds-oci.yaml
+  - substrate-oci.yaml
   - agent-sandbox-git.yaml
   - oauth2-proxy-repo.yaml
   - flux-operator-mcp-oci.yaml
