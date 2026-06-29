@@ -6,6 +6,6 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1h
-  url: oci://ghcr.io/kgateway-dev/charts/agentgateway-crds
+  url: oci://ghcr.io/agentgateway/charts/agentgateway-crds
   ref:
-    tag: "v2.2.3"
+    tag: "0.0.0-latest-dev"
