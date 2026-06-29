@@ -391,3 +391,17 @@ spec:
         - name: database-url
           mountPath: /etc/kagent-db
           readOnly: true
+      # ------------------------------------------------------------------
+      # Agent Substrate integration. Enables the substrate controller wiring
+      # so the kagent controller can schedule SandboxAgent actors on
+      # substrate workers. The substrate HelmRelease (ai-system/substrate/)
+      # deploys the actual substrate control plane (ate-system namespace).
+      # ------------------------------------------------------------------
+      substrate:
+        enabled: true
+        ateApiEndpoint: "dns:///api.ai-system.svc:443"
+        ateApiInsecure: true
+    substrateWorkerPool:
+      create: true
+      replicas: 1
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.6

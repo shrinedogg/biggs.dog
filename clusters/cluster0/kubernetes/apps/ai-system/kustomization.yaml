@@ -7,6 +7,8 @@ resources:
   # Flux-Kustomizations (CRDs must come before agents that depend on them)
   - ./vllm/ks.yaml
   - ./kagent-crds/ks.yaml
+  - ./substrate-crds/ks.yaml
+  - ./substrate/ks.yaml
   - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
   - ./kagent/cilium-agents/ks.yaml
