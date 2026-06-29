@@ -213,11 +213,11 @@ The single 32 GB RTX 5090 can't host vLLM and a gaming session at once. The [`gp
 
 ### Defined Apps
 
-Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference), **Test Ball** (synthetic videotestsrc), **Steam** (Big Picture + persistent `/home/retro` PVC + DLSS). See [NOTES.md](NOTES.md#dreamcast-engineering-notes) for details.
+Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference), **Test Ball** (synthetic videotestsrc), **Steam** (Big Picture + persistent `/home/retro` PVC + DLSS). See [NOTES.md](docs/NOTES.md#dreamcast-engineering-notes) for details.
 
 ### Forked Images
 
-See [NOTES.md](NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream.
+See [NOTES.md](docs/NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream.
 
 
 ## 🤖 AI & Agents
@@ -232,7 +232,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 | [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only HTTPRoute (`kagent-mcp` at `https://mcp.biggs.dog/mcp` on the internal LAN-only gateway `internal-biggs-dog`, VIP 192.168.6.15, with TLS terminated using the wildcard cert; this replaced the old `kagent-mcp-lan` plain-HTTP LoadBalancer once the agentgateway was confirmed to no longer mangle the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
 | flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. Per-agent memory disabled to avoid exceeding the 131K context window with large tool schemas. |
 | victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
-| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.5.0`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). `v0.5.0` graduated the APIs to `v1beta1` (multi-version CRDs + self-hosted conversion webhook); the controller rewrites the CRD conversion `clientConfig` namespace to `ai-system` at startup since we don't use the upstream-default `agent-sandbox-system`. Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution), used by the classic `kind: Agent` CRs. The kagent `SandboxAgent` platform (`platform: agent-sandbox`) was trialed for all 10 agents and reverted on kagent 0.9.10: those agents run but are never registered in the controller's A2A registry, so they are not invokable via the MCP server (`mcp.biggs.dog`) — see NOTES.md. Controller defined in `apps/ai-system/agent-sandbox/`. |
+| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.5.0`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). `v0.5.0` graduated the APIs to `v1beta1` (multi-version CRDs + self-hosted conversion webhook); the controller rewrites the CRD conversion `clientConfig` namespace to `ai-system` at startup since we don't use the upstream-default `agent-sandbox-system`. Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution), used by the classic `kind: Agent` CRs. The kagent `SandboxAgent` platform (`platform: agent-sandbox`) was trialed for all 10 agents and reverted on kagent 0.9.10: those agents run but are never registered in the controller's A2A registry, so they are not invokable via the MCP server (`mcp.biggs.dog`) — see [NOTES.md](docs/NOTES.md). Controller defined in `apps/ai-system/agent-sandbox/`. |
 | embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` model for kagent's long-term vector memory. Intentionally CPU-only to avoid contending with the GPU-constrained vLLM during gaming. Defined in `apps/ai-system/embeddings/`. |
 | exa-mcp / `exa-agent` | A custom kagent `Agent` backed by the [Exa MCP server](https://github.com/shrinedogg/exa-mcp-server) (`3.2.1`), providing web search, code discovery, and company research. Exposes `web_search_exa`, `web_fetch_exa`, and `web_search_advanced_exa` tools with support for content categories (company, news, people, research papers, financial reports, personal sites). Defined in `apps/ai-system/exa-mcp/`. Requires Exa API key from [exa.com](https://exa.com). |
 
@@ -247,7 +247,7 @@ See [`.rules`](.rules) for agent selection by task domain.
 
 ### BGP Peering
 
-The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
+The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](docs/NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
 
 ## 🔐 Secret Management
 
@@ -257,7 +257,7 @@ Secrets follow a three-tier model:
 2. **External Secrets + 1Password** — Runtime secrets from 1Password vaults (API keys, credentials).
 3. **cert-manager** — Automatic certificate issuance + renewal (ACME Let's Encrypt, CA issuer).
 
-See [NOTES.md](NOTES.md#secrets) for details.
+See [NOTES.md](docs/NOTES.md#secrets) for details.
 
 ## 🚀 Getting Started
 
