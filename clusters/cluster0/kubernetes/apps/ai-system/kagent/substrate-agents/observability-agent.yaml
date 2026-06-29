@@ -1,0 +1,82 @@
+---
+# observability-agent — SandboxAgent on substrate (gVisor actor).
+# Replaces the chart-managed observability-agent Agent CR.
+apiVersion: kagent.dev/v1alpha2
+kind: SandboxAgent
+metadata:
+  name: observability-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Observability agent specialized in querying Prometheus, managing
+    Grafana dashboards, and inspecting Kubernetes resources for monitoring.
+  platform: substrate
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+  declarative:
+    runtime: go
+    modelConfig: default-model-config
+    systemMessage: |
+      # Observability Agent
+
+      You are an observability expert specializing in Prometheus metrics,
+      Grafana dashboards, and Kubernetes monitoring. You have access to
+      Prometheus, Grafana, Loki, and on-call tools.
+
+      ## Guidelines
+
+      - Start with metrics discovery (`list_prometheus_metric_names`) before querying
+      - Use `query_prometheus` for metric analysis
+      - Correlate Kubernetes state with metrics using `k8s_get_resources`
+      - Use Grafana tools for dashboard management
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_get_resources
+            - k8s_get_available_api_resources
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: grafana-mcp
+          toolNames:
+            - update_dashboard
+            - search_dashboards
+            - query_prometheus
+            - query_loki_stats
+            - query_loki_logs
+            - list_teams
+            - list_sift_investigations
+            - list_prometheus_metric_names
+            - list_prometheus_metric_metadata
+            - list_prometheus_label_values
+            - list_prometheus_label_names
+            - list_oncall_users
+            - list_oncall_teams
+            - list_oncall_schedules
+            - list_loki_label_values
+            - list_loki_label_names
+            - list_incidents
+            - list_datasources
+            - list_contact_points
+            - list_alert_rules
+            - get_sift_investigation
+            - get_sift_analysis
+            - get_oncall_shift
+            - get_incident
+            - get_datasource
+            - get_dashboard_panel_queries
+            - get_dashboard_by_uid
+            - get_current_oncall_users
+            - get_assertions
+            - get_alert_rule_by_uid
+            - find_slow_requests
+            - find_error_pattern_logs
+            - create_incident
+            - add_activity_to_incident

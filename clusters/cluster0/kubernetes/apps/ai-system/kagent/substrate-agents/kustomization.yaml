@@ -1,0 +1,12 @@
+---
+# Standalone SandboxAgent manifests for the 5 chart-managed agents, now
+# running on substrate (gVisor actors) instead of plain Deployments.
+# The chart agents are disabled in helmrelease.yaml to avoid conflicts.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ./k8s-agent.yaml
+  - ./helm-agent.yaml
+  - ./promql-agent.yaml
+  - ./observability-agent.yaml
+  - ./cilium-manager-agent.yaml

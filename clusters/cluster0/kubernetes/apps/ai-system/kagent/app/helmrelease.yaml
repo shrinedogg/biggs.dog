@@ -24,182 +24,18 @@ spec:
   # own manifests. A nodeSelector also pins every chart-managed agent to the
   # GPU node (nv-01, via nvidia.com/gpu.present=true); the static
   # vm-agent/cilium agents set the same selector in their own manifests.
+  # Post-renderer patches — only Deployment-level patches remain.
+  # The 5 chart-managed agents (k8s-agent, helm-agent, promql-agent,
+  # observability-agent, cilium-manager-agent) are now deployed as
+  # SandboxAgents on substrate (kagent/substrate-agents/) and disabled
+  # in the chart values, so no Agent patches are needed here.
   postRenderers:
     - kustomize:
         patches:
-          - target:
-              kind: Agent
-              name: k8s-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: k8s-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: observability-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: observability-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: promql-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: promql-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: helm-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: helm-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          - target:
-              kind: Agent
-              name: cilium-manager-agent
-            patch: |
-              apiVersion: kagent.dev/v1alpha2
-              kind: Agent
-              metadata:
-                name: cilium-manager-agent
-              spec:
-                sandbox:
-                  network:
-                    allowedDomains:
-                      - "*.svc.cluster.local"
-                declarative:
-                  executeCodeBlocks: true
-                  deployment:
-                    nodeSelector:
-                      nvidia.com/gpu.present: "true"
-                    podSecurityContext:
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      runAsGroup: 1001
-                      fsGroup: 1001
-                      seccompProfile:
-                        type: RuntimeDefault
-                    securityContext:
-                      privileged: false
-                      allowPrivilegeEscalation: false
-                      runAsNonRoot: true
-                      runAsUser: 1001
-                      capabilities:
-                        drop:
-                          - ALL
-          # ----------------------------------------------------------------
           # Pin every chart-managed Deployment (kagent-controller, kagent-ui,
           # kagent-tools, kagent-grafana-mcp, kagent-querydoc,
           # kagent-kmcp-controller-manager) to the GPU node (nv-01) via a JSON
-          # 6902 patch. Targeting kind: Deployment leaves the Agent CRs
-          # (kind: Agent) untouched -- they carry their own nodeSelector above.
-          # op: add is safe: the chart's Deployments set no nodeSelector.
-          # ----------------------------------------------------------------
+          # 6902 patch. op: add is safe: the chart's Deployments set no nodeSelector.
           - target:
               kind: Deployment
             patch: |-
@@ -249,6 +85,21 @@ spec:
     cilium-debug-agent:
       enabled: false
     cilium-policy-agent:
+      enabled: false
+    # ------------------------------------------------------------------
+    # These agents are now deployed as SandboxAgents on substrate
+    # (kagent/substrate-agents/) with Go runtime. Disable them here
+    # to avoid conflicts — the chart can only render Python Agent CRs.
+    # ------------------------------------------------------------------
+    k8s-agent:
+      enabled: false
+    helm-agent:
+      enabled: false
+    promql-agent:
+      enabled: false
+    observability-agent:
+      enabled: false
+    cilium-manager-agent:
       enabled: false
     # ------------------------------------------------------------------
     # Per-agent resource overrides for the chart-managed agents:

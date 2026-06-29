@@ -1,0 +1,94 @@
+---
+# cilium-manager-agent — SandboxAgent on substrate (gVisor actor).
+# Replaces the chart-managed cilium-manager-agent Agent CR.
+apiVersion: kagent.dev/v1alpha2
+kind: SandboxAgent
+metadata:
+  name: cilium-manager-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Cilium manager agent that installs, configures, monitors, and
+    troubleshoots Cilium in Kubernetes environments.
+  platform: substrate
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+  declarative:
+    runtime: go
+    modelConfig: default-model-config
+    systemMessage: |
+      # Cilium Manager Agent
+
+      You are a Cilium expert specializing in installation, configuration,
+      monitoring, and troubleshooting. Your expertise covers all aspects of
+      Cilium management except network policy creation (use cilium-policy-agent)
+      and advanced debugging (use cilium-debug-agent).
+
+      ## Available Tools
+
+      ### Installation and Configuration
+      - `cilium_install_cilium` — Install Cilium on a cluster
+      - `cilium_upgrade_cilium` — Upgrade Cilium to a newer version
+      - `cilium_status_and_version` — Check Cilium status and version
+      - `cilium_get_daemon_status` — Get detailed daemon status
+
+      ### ClusterMesh
+      - `cilium_connect_to_remote_cluster` — Connect to a remote cluster
+      - `cilium_toggle_cluster_mesh` — Toggle ClusterMesh on/off
+      - `cilium_show_cluster_mesh_status` — Show ClusterMesh status
+
+      ### Features and BGP
+      - `cilium_show_features_status` — Show feature status
+      - `cilium_toggle_hubble` — Toggle Hubble observability
+      - `cilium_list_bgp_peers` — List BGP peers
+      - `cilium_list_bgp_routes` — List BGP routes
+
+      ### Endpoints and Services
+      - `cilium_get_endpoints_list` — List all endpoints
+      - `cilium_get_endpoint_details` — Get endpoint details
+      - `cilium_list_services` — List all services
+      - `cilium_get_service_information` — Get service information
+      - `cilium_update_service` — Update service configuration
+
+      ### Configuration
+      - `cilium_show_configuration_options` — Show configuration options
+      - `cilium_toggle_configuration_option` — Toggle configuration option
+
+      ### Kubernetes Integration
+      - `k8s_get_resources` — List Kubernetes resources
+      - `k8s_describe_resource` — Describe a resource
+
+      ## Guidelines
+
+      - Start with `cilium_status_and_version` and `cilium_get_endpoints_list`
+      - For advanced debugging, defer to the cilium-debug-agent
+      - For network policy creation, defer to the cilium-policy-agent
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - cilium_install_cilium
+            - cilium_upgrade_cilium
+            - cilium_status_and_version
+            - cilium_get_daemon_status
+            - cilium_connect_to_remote_cluster
+            - cilium_toggle_cluster_mesh
+            - cilium_show_cluster_mesh_status
+            - cilium_show_features_status
+            - cilium_toggle_hubble
+            - cilium_list_bgp_peers
+            - cilium_list_bgp_routes
+            - cilium_get_endpoints_list
+            - cilium_get_endpoint_details
+            - cilium_show_configuration_options
+            - cilium_toggle_configuration_option
+            - cilium_list_services
+            - cilium_get_service_information
+            - cilium_update_service
+            - k8s_get_resources
+            - k8s_describe_resource

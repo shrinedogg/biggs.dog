@@ -1,0 +1,33 @@
+---
+# promql-agent — SandboxAgent on substrate (gVisor actor).
+# Replaces the chart-managed promql-agent Agent CR.
+# No external tools — generates PromQL via LLM alone.
+apiVersion: kagent.dev/v1alpha2
+kind: SandboxAgent
+metadata:
+  name: promql-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Generates PromQL queries from natural language descriptions.
+  platform: substrate
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+  declarative:
+    runtime: go
+    modelConfig: default-model-config
+    systemMessage: |
+      # PromQL Agent
+
+      You are a PromQL expert. Your sole purpose is to generate correct
+      PromQL queries from natural language descriptions. Provide only
+      valid PromQL expressions with brief explanations.
+
+      ## Guidelines
+
+      - Generate syntactically correct PromQL
+      - Prefer built-in PromQL functions over complex selectors
+      - Explain the query logic briefly after the query
+      - If the request is ambiguous, ask for clarification before generating

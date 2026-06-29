@@ -1,0 +1,82 @@
+---
+# k8s-agent — SandboxAgent on substrate (gVisor actor).
+# Replaces the chart-managed k8s-agent Agent CR. Go runtime is required
+# for substrate; Python ADK is not supported on substrate yet.
+apiVersion: kagent.dev/v1alpha2
+kind: SandboxAgent
+metadata:
+  name: k8s-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    Kubernetes expert AI agent specializing in cluster operations,
+    troubleshooting, and maintenance.
+  platform: substrate
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+  declarative:
+    runtime: go
+    modelConfig: default-model-config
+    systemMessage: |
+      # Kubernetes AI Agent
+
+      You are a Kubernetes expert specializing in cluster operations,
+      troubleshooting, and maintenance. You have access to k8s tools to
+      inspect, diagnose, and manage cluster resources.
+
+      ## Available Tools
+
+      - `k8s_check_service_connectivity` — Verify connectivity to a service
+      - `k8s_patch_resource` — Make partial updates to a resource
+      - `k8s_remove_annotation` — Remove annotations from resources
+      - `k8s_annotate_resource` — Add annotations to resources
+      - `k8s_remove_label` — Remove labels from resources
+      - `k8s_label_resource` — Add labels to resources
+      - `k8s_create_resource` — Create a new resource from a local file
+      - `k8s_create_resource_from_url` — Create a resource from a URL
+      - `k8s_get_events` — View events in the cluster
+      - `k8s_get_available_api_resources` — View supported API resources
+      - `k8s_get_cluster_configuration` — Retrieve cluster configuration
+      - `k8s_describe_resource` — Get detailed information about a resource
+      - `k8s_delete_resource` — Remove a resource (use with caution)
+      - `k8s_get_resource_yaml` — Obtain YAML representation of a resource
+      - `k8s_execute_command` — Run a command inside a pod
+      - `k8s_apply_manifest` — Apply a YAML resource file
+      - `k8s_get_resources` — List Kubernetes resources
+      - `k8s_get_pod_logs` — Retrieve pod logs
+
+      ## Guidelines
+
+      - Prefer read-only tools first (`k8s_get_resources`, `k8s_describe_resource`, `k8s_get_events`)
+      - Confirm destructive actions before executing them
+      - Always check resource state before modifying
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: kagent-tool-server
+          toolNames:
+            - k8s_check_service_connectivity
+            - k8s_patch_resource
+            - k8s_remove_annotation
+            - k8s_annotate_resource
+            - k8s_remove_label
+            - k8s_label_resource
+            - k8s_create_resource
+            - k8s_create_resource_from_url
+            - k8s_get_events
+            - k8s_get_available_api_resources
+            - k8s_get_cluster_configuration
+            - k8s_describe_resource
+            - k8s_delete_resource
+            - k8s_get_resource_yaml
+            - k8s_execute_command
+            - k8s_apply_manifest
+            - k8s_get_resources
+            - k8s_get_pod_logs
+      - type: BuiltIn
+        builtIn:
+          toolName: GenerateResourceTool

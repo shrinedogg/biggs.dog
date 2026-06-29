@@ -11,6 +11,7 @@ resources:
   - ./substrate/ks.yaml
   - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
+  - ./kagent/substrate-agents/ks.yaml
   - ./kagent/cilium-agents/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
   - ./flux-mcp/ks.yaml
