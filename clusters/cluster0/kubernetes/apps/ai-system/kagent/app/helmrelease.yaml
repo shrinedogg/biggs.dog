@@ -181,3 +181,7 @@ spec:
       create: true
       replicas: 1
       ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.6
+      template:
+        spec:
+          nodeSelector:
+            nvidia.com/gpu.present: "true"
