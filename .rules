@@ -60,16 +60,26 @@ disables per-agent memory to stay under the window. Prefer terse output.
 - **Invocable now (Declarative, stable):**
   `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`,
   `cilium-policy-agent`.
-- **Substrate SandboxAgents: READY=True, but NOT yet in the MCP invocable
-  list.** `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
-  `cilium-manager-agent` are `ACCEPTED=True` / `READY=True` (golden actors
-  built; ActorTemplates in `Ready` phase, zero reconcile errors), but
-  `list_agents` still only returns the five declarative (python) agents above,
-  so `invoke_agent` on a substrate agent may still return "not found". There is
-  a remaining kagent-controller ↔ substrate registration gap (the golden actors
-  exist; the agents aren't exposed via the MCP server yet). Until that's closed,
-  keep using the fallbacks below / direct `kubectl`. `grafana-mcp` itself is
-  healthy (StreamableHTTP, ~65 tools).
+- **Substrate SandboxAgents: READY=True, but NOT in the MCP `list_agents`
+  output (so `invoke_agent` returns "not found").** `k8s-agent`, `helm-agent`,
+  `promql-agent`, `observability-agent`, `cilium-manager-agent` are
+  `ACCEPTED=True` / `READY=True` (golden actors built; ActorTemplates in
+  `Ready` phase, zero reconcile errors; upserted into the kagent Postgres
+  `agents` table on reconcile). The kagent HTTP REST API (`/agents`, kagent-ui)
+  DOES list them; only the MCP `list_agents` tool omits them. Keep using the
+  fallbacks below / direct `kubectl` until this is fixed.
+
+  Root cause of the MCP listing gap — an **upstream kagent limitation, NOT a
+  cluster config issue**, and NOT fixed on `kagent-dev/kagent@main` as of this
+  writing. `MCPHandler.listReadyAgents` (go/core/internal/mcp/mcp_handler.go)
+  (a) lists only `v1alpha2.AgentList` — it never enumerates `SandboxAgent`
+  CRs at all, and (b) hard-codes `condition.Reason == "DeploymentReady"`.
+  Declarative Agents report Ready with reason `DeploymentReady`; substrate
+  SandboxAgents report Ready with reason `WorkloadReady`. So substrate agents
+  are excluded twice (wrong CR type + wrong reason). Fix needs a kagent change
+  (also list `SandboxAgentList` and accept `WorkloadReady`); track upstream and
+  bump kagent when fixed. (`invoke_agent` resolves the agent object directly,
+  so it may work even while `list_agents` omits them — worth trying per-agent.)
 
   Root cause of the long-running degradation, and what's fixed (all verified
   live on `main`). This cluster runs substrate in `ai-system`, but upstream
