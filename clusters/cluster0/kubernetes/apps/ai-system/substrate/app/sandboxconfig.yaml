@@ -7,9 +7,28 @@
 #   "no default SandboxConfig for class \"gvisor\"; set one with spec.default=true
 #    or name one via WorkerPool.spec.sandboxConfigName"
 #
-# runsc is pinned to gVisor release 20260622.0 (x86_64). The worker nodes have
-# internet egress, so the atelet fetches it directly from the GCS release bucket.
-# sha256 verified against the upstream binary (runsc.sha512 sidecar matches).
+# runsc is pinned to gVisor release 20260622.0 (x86_64), sha256 verified against
+# the upstream binary (runsc.sha512 sidecar matches).
+#
+# IMPORTANT — asset URL + egress:
+#   * The atelet's asset fetcher (cmd/atelet/internal/ategcs) parses the asset
+#     URL as url.Parse(url).Host = S3 bucket, path = object key, and serves it
+#     from its configured S3 backend (ATE_STORAGE_BACKEND=s3 -> rustfs at
+#     rustfs.ai-system.svc:9000). A public https:// URL does NOT work: the host
+#     becomes the bucket name and the object is fetched from rustfs, not the
+#     public host (and the worker nodes have no public-internet egress anyway).
+#   * So runsc must be staged IN rustfs bucket `ate-snapshots`. The URL's host is
+#     the bucket name: `https://ate-snapshots/runsc` -> bucket=ate-snapshots,
+#     object=runsc, fetched from rustfs.
+#   * Staging (one-off, when bumping the pinned version): from a host with
+#     internet, download runsc, then stream it into rustfs, e.g.
+#       kubectl run u --rm -i --restart=Never --image=amazon/aws-cli:2.17.0 \
+#         --env=AWS_ACCESS_KEY_ID=rustfsadmin --env=AWS_SECRET_ACCESS_KEY=rustfsadmin \
+#         --env=AWS_DEFAULT_REGION=us-east-1 -n ai-system -- sleep 600   # then:
+#       cat runsc-x86_64 | kubectl exec -i -n ai-system u -- \
+#         aws --endpoint-url http://rustfs.ai-system.svc:9000 s3 cp - \
+#         s3://ate-snapshots/runsc --expected-size <bytes>
+#     The substrate chart's bundled rustfs uses creds rustfsadmin/rustfsadmin.
 apiVersion: ate.dev/v1alpha1
 kind: SandboxConfig
 metadata:
@@ -21,5 +40,6 @@ spec:
   assets:
     amd64:
       runsc:
-        url: https://storage.googleapis.com/gvisor/releases/release/20260622.0/x86_64/runsc
+        # host=ate-snapshots (rustfs bucket), path=runsc (object key)
+        url: https://ate-snapshots/runsc
         sha256: f18a948bf9c8bbb54eb998549a3a8d719a1c7de2efbe8fdd2ff0ee5fecd06f19
