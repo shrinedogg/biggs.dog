@@ -2,111 +2,163 @@
 
 This is a Flux GitOps repo for a Kubernetes homelab (`clusters/cluster0`).
 The kagent MCP server (`https://mcp.biggs.dog/mcp`) exposes specialized
-agents. When a task matches one of the domains below, prefer invoking that
-kagent agent over answering from memory or using generic tools. (The MCP
-endpoint is the `kagent-mcp` HTTPRoute on the internal LAN-only gateway
-`internal-biggs-dog` (VIP `192.168.6.15`); k8s-gateway split-horizon resolves
-`mcp.biggs.dog` to `.6.15` for LAN/VPN clients, TLS terminated with the wildcard
-cert, no auth -- WAN clients hit the public gateway, which has no such route, so
-they 404. This replaced the old `kagent-mcp-lan` plain-HTTP LoadBalancer
-(`192.168.6.13`) once the agentgateway was confirmed to no longer mangle the
-`/mcp` Streamable-HTTP path.)
+agents via two tools: `list_agents` (what's actually invocable right now) and
+`invoke_agent` (run a task on `ai-system/<name>`). When a task matches one of
+the domains below, prefer invoking the matching kagent agent over answering
+from memory or using generic tools.
 
-All agents share a single in-cluster vLLM backend (currently
-`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm` -- a dense 27B
-model with all params active, served at a 131K context window (262K native,
-capped for KV concurrency headroom) -- on `nv-01`'s RTX 5090); inference never
-leaves the cluster. Throughput is solid (~250–350 tok/s single-stream depending
-on context length, ~65 ms TTFT), with real 1.80x concurrency to handle agent
-fan-out, so full multi-step agent tasks work fine -- including heavy ones like
-flux-agent (whose `flux-operator-mcp` tool schemas alone are ~64K tokens). No
-need to keep tasks minimal anymore; long agentic loops complete. The MCP
-LoadBalancer is a plain TCP passthrough with no request timeout. (Still prefer
-terse output over needless verbosity.)
+> ALWAYS call `list_agents` first if you are unsure what is live. The agent set
+> is mid-migration to the substrate runtime and the invocable list changes;
+> the routing table below documents intent, not a guarantee that every agent is
+> ready. See "Current state" before relying on an agent.
 
-Long-term (cross-session) memory is enabled (`vectorEnabled: true`). The 131K
-window easily absorbs tool schemas + memory + conversation (KV cache peaks ~20%
-under load). VRAM utilization: ~18.6 GiB model, ~7.8 GiB fp8 KV at full
-concurrency, with headroom for stable cluster operation.
+## MCP endpoint topology
 
-The live, invocable agent set (`kubectl get agents -n ai-system`) is the ten
-listed below. Most are chart-managed via per-agent `*.enabled` toggles in the
-kagent `HelmRelease`
-(`clusters/cluster0/kubernetes/apps/ai-system/kagent/app/helmrelease.yaml`);
-Flux owns those `Agent` CRs, so disable them there rather than with
-`kubectl delete`. A few are custom (non-chart) `Agent` manifests, deployed as
-their own Flux Kustomizations:
-- `flux-agent` -- `apps/ai-system/flux-mcp/` (read-only Flux inspection).
-- `vm-agent` -- `apps/ai-system/victoria-metrics-mcp/` (VictoriaMetrics MCP).
-- `exa-agent` -- `apps/ai-system/exa-mcp/` (Exa web search and research).
-- `cilium-debug-agent` and `cilium-policy-agent` --
-  `apps/ai-system/kagent/cilium-agents/` (the chart versions are disabled and
-  re-defined statically so they carry generic `k8s_*` tools alongside the
-  Cilium-specific ones).
-The chart's `argo-rollouts-agent`, `istio-agent`, and `kgateway-agent` are
-disabled and not deployed. Keep the entries below in sync with the live set.
+The MCP endpoint is the `kagent-mcp` HTTPRoute (`ai-system`) on the internal
+LAN-only gateway `internal-biggs-dog` (agentgateway, VIP `192.168.6.15`),
+backed by `Service/kagent-controller:8083`. k8s-gateway split-horizon resolves
+`mcp.biggs.dog` to `.6.15` for LAN/VPN clients; TLS terminates with the
+wildcard cert, no auth. WAN clients hit the public gateway (no such route) and
+404. Read-only inspection of the controller is also possible via
+`kubectl port-forward -n ai-system svc/kagent-controller 8083:8083` (see
+`.scripts/test-agents.py`).
+
+Note: long agent runs (e.g. flux-agent ~70–75s) can exceed short client
+timeouts. If `invoke_agent` times out from the editor, retry or fall back to
+the port-forward path / direct `kubectl`.
+
+## Model backend
+
+All agents share one in-cluster vLLM backend (`vllm.ai-system:8000`,
+OpenAI-compatible), served as `qwen36-local` (weights
+`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`, a dense 27B model)
+on `nv-01`'s RTX 5090. Inference never leaves the cluster. Served at a 131K
+context window (262K native, capped via `--max-model-len=131072` for KV
+concurrency headroom), fp8 KV cache, prefix caching + qwen3 tool/reasoning
+parsers enabled. Throughput is solid with real concurrency for agent fan-out,
+so multi-step agent tasks complete — including heavy ones like flux-agent
+(whose `flux-operator-mcp` tool schemas alone are ~64K tokens). Long-term
+(cross-session) vector memory is enabled (`vectorEnabled: true`); flux-agent
+disables per-agent memory to stay under the window. Prefer terse output.
+
+## Architecture: two agent runtimes
+
+1. **Declarative agents (python runtime).** Plain `Agent` CRs
+   (`kubectl get agents -n ai-system`). Each runs as its own Deployment and is
+   directly invocable. This is the stable path.
+2. **Substrate SandboxAgents.** The agent substrate (kagent ATE / actor
+   runtime) is deployed in `apps/ai-system/substrate/` (+ `substrate-crds/`),
+   with worker `atelet` pods, `ate-controller`, `ate-api-server`, and
+   `atenet-router`. Five agents have been re-declared as `SandboxAgent` CRs
+   (`kubectl get sandboxagents -n ai-system`) in
+   `apps/ai-system/kagent/substrate-agents/` and disabled in the chart so the
+   chart can't also render them as python Agents. SandboxAgents support
+   sandboxed code execution.
+
+## Current state (verify before relying on it)
+
+- **Invocable now (Declarative, stable):**
+  `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`,
+  `cilium-policy-agent`.
+- **DEGRADED — substrate SandboxAgents not Ready:**
+  `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
+  `cilium-manager-agent`. They are `ACCEPTED=True` but `READY=False`
+  (`ActorTemplate golden snapshot is not ready`); `ate-controller` fails to
+  create the golden actor (`rpc ... produced zero addresses`), so
+  `invoke_agent` returns "agent not found or not ready". Until the substrate
+  actor wiring is fixed, route their domains to the fallbacks below or use
+  direct `kubectl` / repo edits. `grafana-mcp` itself is healthy now
+  (StreamableHTTP, ~65 tools) — it's the substrate `observability-agent` actor
+  that's down, not its tools.
+
+To check live: `list_agents`, plus
+`kubectl get agents,sandboxagents -n ai-system`.
+
+## Where agents are defined
+
+- Declarative chart-managed Agents — kagent `HelmRelease`
+  (`apps/ai-system/kagent/app/helmrelease.yaml`), toggled via per-agent
+  `*.enabled` values. Flux owns these CRs; disable there, not via
+  `kubectl delete`. (`argo-rollouts-agent`, `istio-agent`, `kgateway-agent`
+  are disabled and not deployed.)
+- `flux-agent` — `apps/ai-system/flux-mcp/` (custom, read-only Flux).
+- `vm-agent` — `apps/ai-system/victoria-metrics-mcp/` (VictoriaMetrics MCP).
+- `exa-agent` — `apps/ai-system/exa-mcp/` (Exa web search/research).
+- `cilium-debug-agent`, `cilium-policy-agent` —
+  `apps/ai-system/kagent/cilium-agents/` (chart versions disabled, re-defined
+  statically so they carry generic `k8s_*` tools alongside Cilium tools).
+- `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
+  `cilium-manager-agent` — `apps/ai-system/kagent/substrate-agents/`
+  (SandboxAgents; currently degraded — see above).
+
+Keep this list in sync with the live set.
 
 ## Agent selection
 
-Pick the single most specific agent for the task:
+Pick the single most specific agent for the task. ✅ = invocable now,
+⚠️ = substrate, currently degraded (use the fallback).
 
-- **k8s-agent** — General Kubernetes cluster operations, resource
-  inspection, and troubleshooting (pods, deployments, services, events,
-  nodes). Default for "what's wrong in the cluster" questions that aren't
-  covered by a more specific agent below.
+- ✅ **flux-agent** — Flux CD / GitOps inspection via the Flux Operator MCP:
+  status of `FluxInstance`, sources (`GitRepository`/`OCIRepository`/
+  `HelmRepository`), `Kustomization`s, `HelmRelease`s, `ResourceSet`s, plus
+  end-to-end reconciliation root-cause analysis and Flux docs. Read-only. Use
+  for "why isn't this reconciling / syncing from git". While `helm-agent` is
+  down, this is also the best agent for live `HelmRelease` reconciliation
+  state.
 
-- **observability-agent** — Monitoring and observability work: querying
-  metrics, building/verifying Grafana dashboards, checking alerting, and
-  correlating cluster state with metrics via Prometheus + Grafana.
+- ✅ **vm-agent** — Direct VictoriaMetrics: execute PromQL/MetricsQL, discover
+  metrics/labels/series, inspect alerting/recording rules, analyze TSDB
+  cardinality, find unused/high-cardinality metrics, diagnose slow queries.
+  Backed by embedded VM docs. Use for raw metric questions and VM diagnostics.
+  While `observability-agent`/`promql-agent` are down, use vm-agent for metric
+  queries and PromQL authoring too.
 
-- **promql-agent** — Use specifically when the deliverable is a PromQL
-  query generated from a natural-language description. For broader
-  metrics/dashboard work, use observability-agent instead.
+- ✅ **exa-agent** — Web search, code discovery, company/competitor research,
+  technical-docs discovery, web intelligence. Requires an Exa API key.
 
-- **helm-agent** — Helm release management and troubleshooting (install,
-  upgrade, rollback, values, failed releases). Note: this repo drives Helm
-  via Flux `HelmRelease`, so prefer helm-agent for live release state and
-  edit the `HelmRelease` YAML for desired state.
+- ✅ **cilium-debug-agent** — Diagnosing a broken/degraded Cilium install:
+  connectivity failures, dropped traffic, advanced diagnostics, Hubble flow
+  inspection. Carries generic `k8s_*` tools, so while `k8s-agent` is down it
+  doubles as a general cluster-inspection agent.
 
-- **vm-agent** — Direct VictoriaMetrics access: execute PromQL/MetricsQL
-  queries, discover metrics/labels/series, inspect alerting and recording
-  rules, analyze TSDB cardinality, find unused or high-cardinality metrics,
-  and diagnose slow queries. Backed by embedded VictoriaMetrics documentation.
-  Use for raw metric questions and VM-specific diagnostics. For Grafana
-  dashboards or cross-Kubernetes observability correlation, use
-  observability-agent instead.
+- ✅ **cilium-policy-agent** — Authoring `CiliumNetworkPolicy` /
+  `CiliumClusterwideNetworkPolicy` from natural-language intent. Use only when
+  the deliverable is a policy manifest. Also carries generic `k8s_*` tools.
 
-- **flux-agent** — Flux CD / GitOps inspection and troubleshooting via the
-  Flux Operator MCP server: status of `FluxInstance`, sources
-  (`GitRepository`/`OCIRepository`/`HelmRepository`), `Kustomization`s,
-  `HelmRelease`s, and `ResourceSet`s, plus end-to-end reconciliation
-  root-cause analysis and Flux docs lookup. Read-only. Use for "why isn't
-  this reconciling / syncing from git" questions. (For Helm release internals
-  specifically, prefer helm-agent.)
+- ⚠️ **k8s-agent** — General Kubernetes ops, resource inspection, and
+  troubleshooting (pods, deployments, services, events, nodes). Default for
+  "what's wrong in the cluster". **Fallback while degraded:** use
+  `cilium-debug-agent` (has `k8s_*` tools) or direct `kubectl`.
 
-- **exa-agent** — Web search, code discovery, and company research via Exa.
-  Use for finding code examples, researching companies/competitors,
-  discovering technical documentation, and gathering web intelligence.
-  Requires Exa API key from [exa.com](https://exa.com). Defined in
-  `apps/ai-system/exa-mcp/`.
+- ⚠️ **observability-agent** — Monitoring/observability: querying metrics,
+  building/verifying Grafana dashboards (grafana-mcp, ~65 tools), checking
+  alerting, correlating cluster state with metrics. **Fallback while
+  degraded:** `vm-agent` for metrics; Grafana dashboard work must wait for the
+  actor to recover.
 
-## Cilium — choose carefully (three overlapping agents)
+- ⚠️ **promql-agent** — Generating a PromQL query from a natural-language
+  description. **Fallback while degraded:** `vm-agent`.
 
-- **cilium-manager-agent** — Installing, configuring, upgrading, and
-  routine monitoring of Cilium. Use for "set up / change Cilium" tasks.
+- ⚠️ **helm-agent** — Helm release management/troubleshooting (install,
+  upgrade, rollback, values, failed releases). This repo drives Helm via Flux
+  `HelmRelease`, so edit the `HelmRelease` YAML for desired state regardless.
+  **Fallback while degraded:** `flux-agent` for live release state, plus direct
+  `helm`/`kubectl`.
 
-- **cilium-debug-agent** — Diagnosing a broken or degraded Cilium install:
-  connectivity failures, dropped traffic, advanced diagnostics, Hubble
-  flow inspection. Use for "Cilium is misbehaving" tasks.
-
-- **cilium-policy-agent** — Authoring `CiliumNetworkPolicy` and
-  `CiliumClusterwideNetworkPolicy` resources from a natural-language intent.
-  Use only when the deliverable is a policy manifest.
+- ⚠️ **cilium-manager-agent** — Installing, configuring, upgrading, and
+  routine monitoring of Cilium ("set up / change Cilium"). **Fallback while
+  degraded:** `cilium-debug-agent` for inspection; make config changes by
+  editing manifests in the repo.
 
 ## Repo conventions
 
-- Desired state lives in Git (`clusters/cluster0/**`); Flux reconciles it.
-  Use agents to inspect/diagnose *live* state, but make persistent changes
-  by editing the YAML here, not by mutating the cluster directly.
+- Desired state lives in Git (`clusters/cluster0/**`); Flux reconciles it. Use
+  agents to inspect/diagnose *live* state, but make persistent changes by
+  editing the YAML here, not by mutating the cluster directly.
 - Secrets are managed via External Secrets + 1Password; never hardcode
-  credentials in manifests.
+  credentials in manifests. (Where 1Password items don't yet exist, a
+  temporary in-cluster Secret + a post-renderer env patch is used — e.g.
+  `kagent-grafana-mcp-token`; replace with an ExternalSecret once the item
+  exists.)
+- The branch Flux tracks is `main`. Pushing fixes to a feature branch will not
+  reconcile — merge to `main`.
