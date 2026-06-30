@@ -22,13 +22,13 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
-          # ate-controller: the chart does NOT pass --ateapi-conn-spec, so the
-          # binary dials its hardcoded default dns:///api.ate-system.svc:443
-          # (upstream's namespace). This cluster runs substrate in ai-system,
-          # so that name is NXDOMAIN and every golden-actor RPC fails with
-          # "name resolver error: produced zero addresses". Point it at the
-          # real service. (The chart correctly sets --ateapi-server-name for
-          # TLS SNI but omits the dial address — upstream assumes ate-system.)
+          # STEP 1 (connection): the chart does NOT pass --ateapi-conn-spec, so
+          # the ate-controller binary dials its hardcoded default
+          # dns:///api.ate-system.svc:443 (upstream's namespace). This cluster
+          # runs substrate in ai-system, so that name is NXDOMAIN and every
+          # golden-actor RPC failed with "name resolver error: produced zero
+          # addresses". The chart sets --ateapi-server-name (TLS SNI) with the
+          # namespace but omits the dial address.
           - target:
               kind: Deployment
               name: ate-controller
@@ -36,6 +36,28 @@ spec:
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--ateapi-conn-spec=dns:///api.ai-system.svc:443"
+          # STEP 2 (auth): the kube-apiserver --service-account-issuer is Omni's
+          # KubeSpan/SideroLink ULA (IPv6, unreachable from the IPv4-only pod
+          # network), and SA tokens carry it as `iss`. ateapi checks `iss` against
+          # --client-jwt-issuer and fetches keys via OIDC discovery from that
+          # issuer host. We (a) set issuer=ULA below so the `iss` check passes,
+          # and (b) run a forked ateapi that adds --client-jwt-jwks-url to fetch
+          # the identical keys directly from the reachable in-cluster API instead
+          # of doing unreachable discovery against the ULA. See
+          # .wip/substrate-jwks-url/README.md.
+          #
+          # !!! Commit ONLY after docker.io/shrinedogg/ateapi:v0.0.7-jwksurl is
+          # !!! built and pushed, else the pod won't pull.
+          - target:
+              kind: Deployment
+              name: ate-api-server-deployment
+            patch: |-
+              - op: replace
+                path: /spec/template/spec/containers/0/image
+                value: docker.io/shrinedogg/ateapi:v0.0.7-jwksurl
+              - op: add
+                path: /spec/template/spec/containers/0/args/-
+                value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
   install:
     remediation:
       retries: 3
@@ -43,4 +65,11 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-  values: {}
+  values:
+    auth:
+      jwt:
+        # Equal to the kube-apiserver --service-account-issuer (the Omni ULA) so
+        # projected SA tokens' `iss` claim matches. Key fetch is redirected via
+        # --client-jwt-jwks-url (forked ateapi). Audience is left at the chart
+        # default (api.ate-system.svc), which both sides agree on.
+        issuer: "https://[fdae:41e4:649b:9303::1]:10000"
