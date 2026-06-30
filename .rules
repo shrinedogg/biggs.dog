@@ -60,19 +60,49 @@ disables per-agent memory to stay under the window. Prefer terse output.
 - **Invocable now (Declarative, stable):**
   `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`,
   `cilium-policy-agent`.
-- **DEGRADED — substrate SandboxAgents not Ready:**
+- **STILL NOT READY — substrate SandboxAgents:**
   `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
-  `cilium-manager-agent`. They are `ACCEPTED=True` but `READY=False`
-  (`ActorTemplate golden snapshot is not ready`); `ate-controller` fails to
-  create the golden actor (`rpc ... produced zero addresses`), so
-  `invoke_agent` returns "agent not found or not ready". Until the substrate
-  actor wiring is fixed, route their domains to the fallbacks below or use
-  direct `kubectl` / repo edits. `grafana-mcp` itself is healthy now
+  `cilium-manager-agent`. Still `ACCEPTED=True` / `READY=False`
+  (`ActorTemplate golden snapshot is not ready`), so `invoke_agent` returns
+  "agent not found or not ready". Route their domains to the fallbacks below or
+  use direct `kubectl` / repo edits. `grafana-mcp` itself is healthy
   (StreamableHTTP, ~65 tools) — it's the substrate `observability-agent` actor
   that's down, not its tools.
 
+  What was wrong and what's fixed (the `.rules` previously blamed "rpc ...
+  produced zero addresses" — that was already fixed before this update; the
+  real remaining blocker is below). This cluster runs substrate in `ai-system`,
+  but upstream hard-codes the `ate-system` namespace everywhere, so a stack of
+  `ate-system`-vs-`ai-system` bugs gated golden-actor creation, each hidden
+  behind the previous. All fixed and verified live on `main`:
+    1. ate-controller dial addr (`--ateapi-conn-spec`, substrate HelmRelease).
+    2. ate-api-server JWT key fetch (`--client-jwt-jwks-url`, forked image
+       `docker.io/shrinedogg/ateapi` — see `.wip/substrate-jwks-url/`).
+    3. ate-api-server atelet discovery (`ATELET_NAMESPACE=ai-system` on the
+       forked image — see `.wip/substrate-atelet-namespace/`).
+    4. kagent env-source RBAC (`controller.substrate.ateApiServer.namespace=`
+       `ai-system` in the kagent HelmRelease — the RoleBinding subject was
+       pointed at the nonexistent `ate-system` SA).
+    5. gVisor `runsc` asset (`SandboxConfig/gvisor-default` + `runsc-cache`
+       DaemonSet; runsc 20260622.0 staged in rustfs `ate-snapshots` and
+       pre-cached per node — the atelet's S3 asset client doesn't honor
+       `AWS_ENDPOINT_URL` and the nodes have no public egress).
+
+  **CURRENT blocker (unresolved): the atelet pulls sandbox container images
+  in-process (`memorypullcache`) and the cluster's worker nodes have NO public
+  internet egress.** Golden-actor creation now reaches image pull and fails:
+  `dial tcp <gcr.io IP>:443: connect: connection timed out` (needs
+  `cr.kagent.dev/.../golang-adk` + `gcr.io/gke-release/pause`). Until the
+  cluster provides either a registry mirror/proxy the atelet can use or public
+  egress, the SandboxAgents cannot build their golden actors. (Node containerd
+  pulls for ordinary Deployments work, but the atelet does not reuse
+  containerd's cache — it pulls independently via go-containerregistry.)
+  `promql-agent` is the canary: its manifest also has no `tools:` block, so even
+  after egress it may need a separate fix.
+
 To check live: `list_agents`, plus
-`kubectl get agents,sandboxagents -n ai-system`.
+`kubectl get agents,sandboxagents -n ai-system`, and
+`kubectl logs -n ai-system deploy/ate-controller | grep -i reconciler`.
 
 ## Where agents are defined
 
