@@ -1,0 +1,25 @@
+---
+# SandboxConfig — tells the atelet which gVisor `runsc` binary to fetch for the
+# `gvisor` sandbox class. The WorkerPool `kagent-default` (kagent HelmRelease,
+# substrateWorkerPool) has sandboxClass=gvisor and no explicit sandboxConfigName,
+# so it resolves to this default config. Without it, ate-api-server's
+# CallAteletRestore workflow fails at sandbox-asset resolution:
+#   "no default SandboxConfig for class \"gvisor\"; set one with spec.default=true
+#    or name one via WorkerPool.spec.sandboxConfigName"
+#
+# runsc is pinned to gVisor release 20260622.0 (x86_64). The worker nodes have
+# internet egress, so the atelet fetches it directly from the GCS release bucket.
+# sha256 verified against the upstream binary (runsc.sha512 sidecar matches).
+apiVersion: ate.dev/v1alpha1
+kind: SandboxConfig
+metadata:
+  name: gvisor-default
+  namespace: ai-system
+spec:
+  sandboxClass: gvisor
+  default: true
+  assets:
+    amd64:
+      runsc:
+        url: https://storage.googleapis.com/gvisor/releases/release/20260622.0/x86_64/runsc
+        sha256: f18a948bf9c8bbb54eb998549a3a8d719a1c7de2efbe8fdd2ff0ee5fecd06f19
