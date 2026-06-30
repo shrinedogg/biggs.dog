@@ -60,21 +60,23 @@ disables per-agent memory to stay under the window. Prefer terse output.
 - **Invocable now (Declarative, stable):**
   `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`,
   `cilium-policy-agent`.
-- **STILL NOT READY — substrate SandboxAgents:**
-  `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
-  `cilium-manager-agent`. Still `ACCEPTED=True` / `READY=False`
-  (`ActorTemplate golden snapshot is not ready`), so `invoke_agent` returns
-  "agent not found or not ready". Route their domains to the fallbacks below or
-  use direct `kubectl` / repo edits. `grafana-mcp` itself is healthy
-  (StreamableHTTP, ~65 tools) — it's the substrate `observability-agent` actor
-  that's down, not its tools.
+- **Substrate SandboxAgents: READY=True, but NOT yet in the MCP invocable
+  list.** `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
+  `cilium-manager-agent` are `ACCEPTED=True` / `READY=True` (golden actors
+  built; ActorTemplates in `Ready` phase, zero reconcile errors), but
+  `list_agents` still only returns the five declarative (python) agents above,
+  so `invoke_agent` on a substrate agent may still return "not found". There is
+  a remaining kagent-controller ↔ substrate registration gap (the golden actors
+  exist; the agents aren't exposed via the MCP server yet). Until that's closed,
+  keep using the fallbacks below / direct `kubectl`. `grafana-mcp` itself is
+  healthy (StreamableHTTP, ~65 tools).
 
-  What was wrong and what's fixed (the `.rules` previously blamed "rpc ...
-  produced zero addresses" — that was already fixed before this update; the
-  real remaining blocker is below). This cluster runs substrate in `ai-system`,
-  but upstream hard-codes the `ate-system` namespace everywhere, so a stack of
+  Root cause of the long-running degradation, and what's fixed (all verified
+  live on `main`). This cluster runs substrate in `ai-system`, but upstream
+  hard-codes the `ate-system` namespace everywhere, so a stack of
   `ate-system`-vs-`ai-system` bugs gated golden-actor creation, each hidden
-  behind the previous. All fixed and verified live on `main`:
+  behind the previous — and the final blocker was a Cilium Network Policy gap,
+  NOT "no pod NAT" as earlier inferred:
     1. ate-controller dial addr (`--ateapi-conn-spec`, substrate HelmRelease).
     2. ate-api-server JWT key fetch (`--client-jwt-jwks-url`, forked image
        `docker.io/shrinedogg/ateapi` — see `.wip/substrate-jwks-url/`).
@@ -86,19 +88,19 @@ disables per-agent memory to stay under the window. Prefer terse output.
     5. gVisor `runsc` asset (`SandboxConfig/gvisor-default` + `runsc-cache`
        DaemonSet; runsc 20260622.0 staged in rustfs `ate-snapshots` and
        pre-cached per node — the atelet's S3 asset client doesn't honor
-       `AWS_ENDPOINT_URL` and the nodes have no public egress).
-
-  **CURRENT blocker (unresolved): the atelet pulls sandbox container images
-  in-process (`memorypullcache`) and the cluster's worker nodes have NO public
-  internet egress.** Golden-actor creation now reaches image pull and fails:
-  `dial tcp <gcr.io IP>:443: connect: connection timed out` (needs
-  `cr.kagent.dev/.../golang-adk` + `gcr.io/gke-release/pause`). Until the
-  cluster provides either a registry mirror/proxy the atelet can use or public
-  egress, the SandboxAgents cannot build their golden actors. (Node containerd
-  pulls for ordinary Deployments work, but the atelet does not reuse
-  containerd's cache — it pulls independently via go-containerregistry.)
-  `promql-agent` is the canary: its manifest also has no `tools:` block, so even
-  after egress it may need a separate fix.
+       `AWS_ENDPOINT_URL`).
+    6. **Cilium egress (the real final blocker):** ai-system is in Cilium
+       default-deny, and `allow-egress-internet` selected only
+       `managed-by=kagent` pods. The atelet (`app=atelet`, Helm-managed)
+       pulls sandbox container images in-process (`memorypullcache`, does NOT
+       reuse node containerd) from `cr.kagent.dev` + `gcr.io`, so its pulls
+       were policy-denied (`dial tcp ...:443: i/o timeout`; hostNetwork bypassed
+       it because Cilium enforces on pod identity). Fixed by
+       `allow-egress-atelet-registries` (CNP, `app=atelet` -> `world:443`).
+  Notes: node containerd pulls (for ordinary Deployments) always worked (host
+  network); only the atelet's pod-network in-process pulls were blocked. There
+  IS selective pod-network egress to `world:443` via CNP for labeled pods
+  (kagent agents, vllm, embeddings) — not "no pod NAT".
 
 To check live: `list_agents`, plus
 `kubectl get agents,sandboxagents -n ai-system`, and
