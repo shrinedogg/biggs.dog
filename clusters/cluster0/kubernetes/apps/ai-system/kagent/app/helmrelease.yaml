@@ -190,6 +190,17 @@ spec:
         enabled: true
         ateApiEndpoint: "dns:///api.ai-system.svc:443"
         ateApiInsecure: true
+        # The chart's substrate-ate-api-rbac template binds the env-source
+        # Role/RoleBinding (secrets+configmaps:get, so ate-api-server can resolve
+        # agent KAGENT_CONFIG_JSON secretKeyRefs during CallAteletRestore) to the
+        # ate-api-server ServiceAccount in `ateApiServer.namespace`. The chart
+        # default is "ate-system" (upstream's namespace) — same hard-coding bug
+        # class as substrate/app STEP 1/2/3. We run ate-api-server in ai-system,
+        # so override here, else the RoleBinding subject points at a nonexistent
+        # ate-system SA and CallAteletRestore fails env resolution with
+        # "secrets ... is forbidden".
+        ateApiServer:
+          namespace: ai-system
     substrateWorkerPool:
       create: true
       replicas: 1
