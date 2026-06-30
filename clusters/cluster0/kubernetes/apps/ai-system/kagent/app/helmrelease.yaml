@@ -55,6 +55,15 @@ spec:
               kind: Deployment
               name: kagent-grafana-mcp
             patch: |-
+              # The chart defaults to --transport sse, but the RemoteMCPServer
+              # CR uses protocol STREAMABLE_HTTP. Override the command to use
+              # Streamable HTTP so the controller can actually connect.
+              - op: replace
+                path: /spec/template/spec/containers/0/command
+                value:
+                  - /app/mcp-grafana
+                  - --transport
+                  - streamable-http
               - op: add
                 path: /spec/template/spec/containers/0/args
                 value:
