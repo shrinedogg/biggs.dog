@@ -197,6 +197,32 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# substrate atelet pulls sandbox container images in-process (its
+# memorypullcache via go-containerregistry) — the agent runtime image
+# (cr.kagent.dev/.../golang-adk) and the pause image (gcr.io/gke-release/pause)
+# — to build golden actors. It does NOT reuse node containerd's cache, so it
+# needs its own :443 egress to those public registries. Without this, golden-
+# actor creation fails at image pull: `dial tcp <gcr.io>:443: i/o timeout`
+# (Cilium default-deny; hostNetwork bypassed it because Cilium enforces on pod
+# identity). Scoped to app=atelet like the vllm/embeddings HF policies. DNS is
+# already allowed by allow-egress-dns.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-atelet-registries
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: atelet
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # Infinity embedding server needs internet access to download model weights
 # (~2.4GB bge-m3) from Hugging Face on first boot. HF serves weights from
 # rotating Xet/LFS CDN hosts (*.xethub.hf.co, CloudFront, etc.) with no
