@@ -78,8 +78,9 @@ disables per-agent memory to stay under the window. Prefer terse output.
   SandboxAgents report Ready with reason `WorkloadReady`. So substrate agents
   are excluded twice (wrong CR type + wrong reason). Fix needs a kagent change
   (also list `SandboxAgentList` and accept `WorkloadReady`); track upstream and
-  bump kagent when fixed. (`invoke_agent` resolves the agent object directly,
-  so it may work even while `list_agents` omits them — worth trying per-agent.)
+  bump kagent when fixed. (`invoke_agent` is ALSO blocked by the same gap —
+  verified: `invoke_agent ai-system/k8s-agent` returns "agent not found or not
+  ready" — so substrate agents are not usable via the MCP layer in 0.9.10.)
 
   Root cause of the long-running degradation, and what's fixed (all verified
   live on `main`). This cluster runs substrate in `ai-system`, but upstream
