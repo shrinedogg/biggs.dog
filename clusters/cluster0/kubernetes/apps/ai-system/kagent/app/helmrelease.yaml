@@ -58,12 +58,16 @@ spec:
               # The chart defaults to --transport sse, but the RemoteMCPServer
               # CR uses protocol STREAMABLE_HTTP. Override the command to use
               # Streamable HTTP so the controller can actually connect.
+              # Also pin address to 0.0.0.0 so the pod listens on all interfaces
+              # (the chart default only sets localhost).
               - op: replace
                 path: /spec/template/spec/containers/0/command
                 value:
                   - /app/mcp-grafana
                   - --transport
                   - streamable-http
+                  - --address
+                  - 0.0.0.0:8000
               - op: add
                 path: /spec/template/spec/containers/0/args
                 value:
