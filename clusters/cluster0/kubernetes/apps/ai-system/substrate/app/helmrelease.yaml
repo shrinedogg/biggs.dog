@@ -46,18 +46,38 @@ spec:
           # of doing unreachable discovery against the ULA. See
           # .wip/substrate-jwks-url/README.md.
           #
-          # !!! Commit ONLY after docker.io/shrinedogg/ateapi:v0.0.7-jwksurl is
-          # !!! built and pushed, else the pod won't pull.
+          # !!! Commit ONLY after the ateapi image referenced below is built
+          # !!! and pushed, else the pod won't pull.
+          #
+          # STEP 3 (atelet discovery): same ate-system hard-coding bug class as
+          # STEP 1, but in ate-api-server's pod informer instead of
+          # ate-controller's dial address. controlapi.AteletInformer() scopes its
+          # SharedInformerFactory to a hard-coded `ateletNamespace = "ate-system"
+          # const (cmd/ateapi/internal/controlapi/informer.go) with no flag, so it
+          # never sees the atelet DaemonSet pods that this chart runs in ai-system.
+          # Result: AteletDialer.DialForWorker() returns "found 0 atelet pods on
+          # node %q, expected 1", the ResumeActor workflow's CallAteletRestore
+          # step fails, the single WorkerPool replica stays pinned by the retrying
+          # golden-actor restore, and the other 4 SandboxAgents fail at
+          # AssignWorker with "no free workers available" -> all 5 stuck at
+          # ActorTemplateNotReady. The fork adds an ATELET_NAMESPACE env override
+          # (default still ate-system) so the informer watches ai-system here. See
+          # .wip/substrate-atelet-namespace/README.md.
           - target:
               kind: Deployment
               name: ate-api-server-deployment
             patch: |-
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: docker.io/shrinedogg/ateapi:v0.0.7-jwksurl
+                value: docker.io/shrinedogg/ateapi:v0.0.7-jwksurl-ateletns
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: ATELET_NAMESPACE
+                  value: ai-system
   install:
     remediation:
       retries: 3
