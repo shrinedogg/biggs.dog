@@ -22,6 +22,20 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          # ate-controller: the chart does NOT pass --ateapi-conn-spec, so the
+          # binary dials its hardcoded default dns:///api.ate-system.svc:443
+          # (upstream's namespace). This cluster runs substrate in ai-system,
+          # so that name is NXDOMAIN and every golden-actor RPC fails with
+          # "name resolver error: produced zero addresses". Point it at the
+          # real service. (The chart correctly sets --ateapi-server-name for
+          # TLS SNI but omits the dial address — upstream assumes ate-system.)
+          - target:
+              kind: Deployment
+              name: ate-controller
+            patch: |-
+              - op: add
+                path: /spec/template/spec/containers/0/args/-
+                value: "--ateapi-conn-spec=dns:///api.ai-system.svc:443"
   install:
     remediation:
       retries: 3
