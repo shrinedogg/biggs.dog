@@ -1,0 +1,69 @@
+---
+# runsc-cache — pre-stage the gVisor `runsc` binary into the atelet's local
+# asset cache so `AteomHerder.fetchAsset` short-circuits on a cache hit and
+# never invokes the (broken-in-this-cluster) S3 asset fetch.
+#
+# Why this exists (not just the SandboxConfig URL):
+#   atelet's `fetchAsset` (cmd/atelet/sandbox_assets.go) checks
+#   `/var/lib/ateom-gvisor/static-files/runsc-<sha256>` FIRST and returns it if
+#   present; only on a miss does it fetch via cmd/atelet/internal/ategcs, whose
+#   S3 client (aws-sdk-go-v2 `config.LoadDefaultConfig`) does not honor
+#   AWS_ENDPOINT_URL in this build and instead dials real AWS S3 (unreachable:
+#   no public egress) -> 28s `context canceled`. rustfs is reachable and serves
+#   the object fine from a normal pod (aws-cli does it in ~1.5s), so this
+#   DaemonSet stages runsc from rustfs into the shared hostPath cache that the
+#   atelet (same hostPath) reads. `fetchAsset` then hits the cache and the
+#   SandboxConfig URL is never contacted.
+#
+# The cached filename embeds the sha256, so bumping the pinned runsc version in
+# sandboxconfig.yaml requires also updating SHA below — the new filename makes
+# the old cache entry a clean miss and this DS writes the new one.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: runsc-cache
+  namespace: ai-system
+spec:
+  selector:
+    matchLabels:
+      app: runsc-cache
+  template:
+    metadata:
+      labels:
+        app: runsc-cache
+    spec:
+      # Run wherever the atelet DaemonSet runs (all nodes).
+      containers:
+      - name: stage
+        image: amazon/aws-cli:2.17.0
+        env:
+        - {name: AWS_ACCESS_KEY_ID, value: rustfsadmin}
+        - {name: AWS_SECRET_ACCESS_KEY, value: rustfsadmin}
+        - {name: AWS_DEFAULT_REGION, value: us-east-1}
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          set -e
+          # Keep this in sync with spec.assets.amd64.runsc.sha256 in sandboxconfig.yaml
+          SHA=f18a948bf9c8bbb54eb998549a3a8d719a1c7de2efbe8fdd2ff0ee5fecd06f19
+          DST=/var/lib/ateom-gvisor/static-files/runsc-$SHA
+          mkdir -p "$(dirname "$DST")"
+          if [ -f "$DST" ]; then
+            echo "runsc already cached at $DST"; sleep infinity; exit 0
+          fi
+          echo "staging runsc (sha256 $SHA) from rustfs -> $DST"
+          aws --endpoint-url http://rustfs.ai-system.svc:9000 s3 cp s3://ate-snapshots/runsc "$DST" --no-progress
+          chmod 0755 "$DST"
+          echo "verifying sha256"
+          echo "$SHA  $DST" | sha256sum -c -
+          echo "runsc cached OK; sleeping"
+          sleep infinity
+        volumeMounts:
+        - {name: ateom, mountPath: /var/lib/ateom-gvisor}
+        securityContext:
+          {runAsUser: 0}
+      volumes:
+      - name: ateom
+        hostPath:
+          path: /var/lib/ateom-gvisor
+          type: DirectoryOrCreate
