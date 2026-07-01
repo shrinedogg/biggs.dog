@@ -46,7 +46,7 @@ spec:
               # udev-data volume and broadcasts synthetic udev netlink
               # events in the pod netns) so SDL/Steam detect controllers.
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
-              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.0
+              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.1
               # Patched wolf: gst-wayland-display no longer advertises the
               # legacy wl_drm global when dmabuf v4 feedback is active, which
               # crashed nested wlroots compositors (sway) with
