@@ -206,34 +206,27 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           env:
-            # Gamescope, not Sway: Sway is a tiling compositor, so when a
-            # game launches windowed (or its fullscreen request isn't honored
-            # through Sway's Xwayland path) it tiles the open surfaces (Steam
-            # BPM + steamwebhelper + the steam_app_* window) instead of giving
-            # the game an exclusive fullscreen surface -> the stream shows the
-            # game split across tiled panes and never renders. Gamescope forces
-            # the target app fullscreen on a single virtual display regardless.
-            # Sway was tried earlier (the wl_drm abort that blocked it under
-            # stock wolf is fixed by the patched shrinedogg/wolf image, see
-            # helmrelease.yaml WOLF_IMAGE), but the tiling behavior makes it
-            # unsuitable for arbitrary titles, so gamescope is preferred.
-            - name: RUN_GAMESCOPE
+            # Sway, not Gamescope: gamescope does its own Vulkan compositing on
+            # the dGPU, and under UE5/DX12 load that extra GPU work triggers
+            # NVRM Xid 109 (CTX SWITCH TIMEOUT) -> vkd3d-proton VK_ERROR_DEVICE_LOST
+            # -> UE5 GPU crash (Fatal error!) every launch. Under Sway the game
+            # runs without that crash (the original symptom was a display/tiling
+            # issue, not a GPU fault), so Sway gets further than gamescope.
+            # Sway's wl_drm abort under stock wolf is fixed by the patched
+            # shrinedogg/wolf image (see helmrelease.yaml WOLF_IMAGE). The
+            # tiling/display behavior is then troubleshot separately.
+            - name: RUN_SWAY
               value: "true"
-            # Gamescope's vulkan backend enumerates every GPU and picks the
-            # first it finds. nv-01's CPU (Ryzen 7800X3D) exposes an AMD iGPU
-            # (RADV RAPHAEL_MENDOCINO, PCI 1002:164e at /dev/dri/renderD128)
-            # which the privileged container sees alongside the RTX 5090
-            # (PCI 10de:2b85 at renderD129); gamescope selects the AMD iGPU,
-            # then aborts at CVulkanTexture::BInit (rendervulkan.cpp:2195,
-            # assertion `modifiers.size() > 0') because the AMD device can't
-            # provide the dmabuf modifiers gamescope needs. Pin gamescope to
-            # the dGPU. GAMESCOPE_MODE defaults to "-b" in launch-comp.sh and
-            # is interpolated unquoted, so it word-splits into multiple args;
-            # --prefer-vk-device takes vendor:device PCI ids.
-            - name: GAMESCOPE_MODE
-              value: "-b --prefer-vk-device 10de:2b85"
-            # - name: RUN_SWAY
+            # Gamescope env kept commented for easy re-enable; unused while
+            # RUN_SWAY=true (launch-comp.sh only honors GAMESCOPE_* when
+            # RUN_GAMESCOPE is set). GAMESCOPE_MODE pins gamescope to the dGPU
+            # via --prefer-vk-device (vendor:device PCI ids) because the
+            # privileged container sees nv-01's AMD iGPU too and gamescope picks
+            # it first otherwise -> CVulkanTexture::BInit assertion.
+            # - name: RUN_GAMESCOPE
             #   value: "true"
+            # - name: GAMESCOPE_MODE
+            #   value: "-b --prefer-vk-device 10de:2b85"
             - name: PROTON_LOG
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the

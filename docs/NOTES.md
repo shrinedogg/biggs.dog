@@ -29,7 +29,7 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 - Useful for diagnosing video pipeline issues without needing a full desktop app.
 
 **Steam** (gaming)
-- Big Picture mode via Gamescope (micro-compositor that forces the game fullscreen on a single virtual display). Sway was tried but is a tiling compositor, so windowed/non-fullscreen titles tiled across the stream instead of rendering.
+- Big Picture mode via Sway (lightweight Wayland compositor). Gamescope was tried (forces fullscreen on a single virtual display) but its Vulkan compositing on the dGPU triggered NVRM Xid 109 (CTX SWITCH TIMEOUT) -> UE5 GPU crash (Fatal error!) on every launch; under Sway the game runs without that crash. Sway's original wl_drm abort is fixed by the patched wolf image.
 - Persistent 250Gi `host-path` PVC at `/home/retro` survives session restarts, storing login, library, and installed games.
 - DLSS support under Proton (via NVIDIA wine NGX bridge DLLs restored in a separate 4Gi `nvngx-cache` PVC).
 
