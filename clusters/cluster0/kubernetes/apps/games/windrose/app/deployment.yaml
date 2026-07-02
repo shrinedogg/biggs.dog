@@ -5,10 +5,17 @@
 # pfeiffermax/windrose-dedicated-server image, which generated
 # ServerDescription.json at runtime from env-style config files; the official
 # image instead reads a mounted ServerDescription.json directly (see
-# https://playwindrose.com/dedicated-server-guide/). That file is rendered by
-# the windrose-secret ExternalSecret and mounted read-only below, so the
-# HelmRelease values (server name, region, invite code, direct-connection port,
-# password, ...) now live in the ExternalSecret template rather than env vars.
+# https://playwindrose.com/dedicated-server-guide/).
+#
+# IMPORTANT: the official image does NOT treat ServerDescription.json as
+# immutable. On first boot it generates a world, then writes the resolved
+# WorldIslandId / PersistentServerId back into ServerDescription.json. Mounting
+# the file read-only (e.g. directly from a Secret) crashes the server with
+# "Cannot save ServerDescription file ... Permission denied" during coop init.
+# So the rendered config (windrose-secret ExternalSecret) is staged into a
+# writable emptyDir by the init container, and the main container reads/writes
+# it from there. Non-secret fields stay in Git (ExternalSecret template); only
+# the password comes from 1Password.
 #
 # Single replica with a dedicated PVC: game-server saves are stateful, so
 # replicas is pinned at 1 (strategy Recreate to avoid two pods contending for
@@ -35,7 +42,7 @@ spec:
       securityContext:
         # windroseserver/windroseserver runs as ue_user (uid/gid 1000,
         # confirmed from the image: useradd --uid 1000 ue_user). Match it so
-        # the saves PVC (chowned to fsGroup) is writable.
+        # the saves PVC (chowned to fsGroup) and the staged config are writable.
         runAsNonRoot: true
         runAsUser: 1000
         runAsGroup: 1000
@@ -43,6 +50,24 @@ spec:
         fsGroupChangePolicy: OnRootMismatch
         seccompProfile:
           type: RuntimeDefault
+      initContainers:
+        # Stage ServerDescription.json into the writable config volume. The
+        # server mutates this file on first boot (writing back the world id it
+        # generates), so it cannot live on the read-only Secret. Reusing the
+        # server image avoids pulling a second image and guarantees the file is
+        # owned by uid 1000 (same as the main container).
+        - name: stage-config
+          image: docker.io/windroseserver/windroseserver:0.10.0.7.33-372c3516@sha256:754336a4bb4807e4471727da9700e10a7c48fe618fb45612102ff05a7f9427f9
+          command:
+            - /bin/bash
+            - -c
+            - "cp /secret-rendered/ServerDescription.json /config/ServerDescription.json"
+          volumeMounts:
+            - name: secret-rendered
+              mountPath: /secret-rendered
+              readOnly: true
+            - name: config
+              mountPath: /config
       containers:
         - name: windrose
           # Pin by digest so Renovate can track and bump it. The tag is kept so
@@ -87,21 +112,23 @@ spec:
               drop:
                 - ALL
           volumeMounts:
-            # Server config — rendered from the windrose-secret ExternalSecret.
-            - name: server-description
+            # Server config — writable copy staged by the init container. The
+            # server reads this on startup and writes back resolved ids.
+            - name: config
               mountPath: /home/ue_user/app/R5/ServerDescription.json
               subPath: ServerDescription.json
-              readOnly: true
             # World / save state, persisted across restarts.
             - name: saved
               mountPath: /home/ue_user/app/R5/Saved
       volumes:
-        - name: server-description
+        # Rendered ServerDescription.json (with password injected) — read-only
+        # source for the init container's staging copy.
+        - name: secret-rendered
           secret:
             secretName: windrose-secret
-            items:
-              - key: ServerDescription.json
-                path: ServerDescription.json
+        # Writable scratch holding the working ServerDescription.json.
+        - name: config
+          emptyDir: {}
         - name: saved
           persistentVolumeClaim:
             claimName: windrose-saved
