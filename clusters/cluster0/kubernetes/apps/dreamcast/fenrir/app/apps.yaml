@@ -206,16 +206,20 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           env:
-            # Sway (wlroots 0.19) used to abort on wolf's compositor: it
-            # advertised both the legacy wl_drm global and dmabuf v4 feedback,
-            # and wlroots asserted on the duplicate device announcement
-            # (backend/wayland/backend.c:311). Fixed in the patched wolf image
-            # (docker.io/shrinedogg/wolf, see helmrelease.yaml WOLF_IMAGE):
-            # the compositor now skips wl_drm when dmabuf v4 feedback is active
-            # (opt back in with GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1).
-            - name: RUN_SWAY
+            # Gamescope, not Sway: Sway is a tiling compositor, so when a
+            # game launches windowed (or its fullscreen request isn't honored
+            # through Sway's Xwayland path) it tiles the open surfaces (Steam
+            # BPM + steamwebhelper + the steam_app_* window) instead of giving
+            # the game an exclusive fullscreen surface -> the stream shows the
+            # game split across tiled panes and never renders. Gamescope forces
+            # the target app fullscreen on a single virtual display regardless.
+            # Sway was tried earlier (the wl_drm abort that blocked it under
+            # stock wolf is fixed by the patched shrinedogg/wolf image, see
+            # helmrelease.yaml WOLF_IMAGE), but the tiling behavior makes it
+            # unsuitable for arbitrary titles, so gamescope is preferred.
+            - name: RUN_GAMESCOPE
               value: "true"
-            # - name: RUN_GAMESCOPE
+            # - name: RUN_SWAY
             #   value: "true"
             - name: PROTON_LOG
               value: "1"
