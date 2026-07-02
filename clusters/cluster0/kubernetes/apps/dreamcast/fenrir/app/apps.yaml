@@ -219,6 +219,19 @@ spec:
             # unsuitable for arbitrary titles, so gamescope is preferred.
             - name: RUN_GAMESCOPE
               value: "true"
+            # Gamescope's vulkan backend enumerates every GPU and picks the
+            # first it finds. nv-01's CPU (Ryzen 7800X3D) exposes an AMD iGPU
+            # (RADV RAPHAEL_MENDOCINO, PCI 1002:164e at /dev/dri/renderD128)
+            # which the privileged container sees alongside the RTX 5090
+            # (PCI 10de:2b85 at renderD129); gamescope selects the AMD iGPU,
+            # then aborts at CVulkanTexture::BInit (rendervulkan.cpp:2195,
+            # assertion `modifiers.size() > 0') because the AMD device can't
+            # provide the dmabuf modifiers gamescope needs. Pin gamescope to
+            # the dGPU. GAMESCOPE_MODE defaults to "-b" in launch-comp.sh and
+            # is interpolated unquoted, so it word-splits into multiple args;
+            # --prefer-vk-device takes vendor:device PCI ids.
+            - name: GAMESCOPE_MODE
+              value: "-b --prefer-vk-device 10de:2b85"
             # - name: RUN_SWAY
             #   value: "true"
             - name: PROTON_LOG
