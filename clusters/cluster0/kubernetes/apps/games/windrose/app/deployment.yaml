@@ -1,0 +1,107 @@
+---
+# Windrose dedicated server (official windroseserver/windroseserver image).
+#
+# Replaces the windrose HelmRelease. The chart wrapped the
+# pfeiffermax/windrose-dedicated-server image, which generated
+# ServerDescription.json at runtime from env-style config files; the official
+# image instead reads a mounted ServerDescription.json directly (see
+# https://playwindrose.com/dedicated-server-guide/). That file is rendered by
+# the windrose-secret ExternalSecret and mounted read-only below, so the
+# HelmRelease values (server name, region, invite code, direct-connection port,
+# password, ...) now live in the ExternalSecret template rather than env vars.
+#
+# Single replica with a dedicated PVC: game-server saves are stateful, so
+# replicas is pinned at 1 (strategy Recreate to avoid two pods contending for
+# the RWO save volume during rollouts).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: windrose
+  namespace: games
+  labels:
+    app.kubernetes.io/name: windrose
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: windrose
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: windrose
+    spec:
+      securityContext:
+        # windroseserver/windroseserver runs as ue_user (uid/gid 1000,
+        # confirmed from the image: useradd --uid 1000 ue_user). Match it so
+        # the saves PVC (chowned to fsGroup) is writable.
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: windrose
+          # Pin by digest so Renovate can track and bump it. The tag is kept so
+          # Renovate has a version to propose updates against.
+          image: docker.io/windroseserver/windroseserver:0.10.0.7.33-372c3516@sha256:754336a4bb4807e4471727da9700e10a7c48fe618fb45612102ff05a7f9427f9
+          imagePullPolicy: IfNotPresent
+          ports:
+            # Direct-connection game port (DirectConnectionServerPort in
+            # ServerDescription.json). The server binds both TCP and UDP.
+            - name: game-tcp
+              containerPort: 28050
+              protocol: TCP
+            - name: game-udp
+              containerPort: 28050
+              protocol: UDP
+          # The UE dedicated server is slow to boot and exposes no HTTP health
+          # endpoint; use a TCP socket probe against the game port. Mirrors the
+          # chart's generous startup window (periodSeconds * failureThreshold).
+          startupProbe:
+            tcpSocket:
+              port: 28050
+            periodSeconds: 10
+            failureThreshold: 100
+            timeoutSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: 28050
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+          resources:
+            requests:
+              # 4-player dedicated server needs ~12 GiB per the official guide;
+              # 15 GiB matches the prior HelmRelease. No CPU limit (repo policy:
+              # avoid CFS throttling on bursty game workloads).
+              memory: 15Gi
+            limits:
+              memory: 15Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            # Server config — rendered from the windrose-secret ExternalSecret.
+            - name: server-description
+              mountPath: /home/ue_user/app/R5/ServerDescription.json
+              subPath: ServerDescription.json
+              readOnly: true
+            # World / save state, persisted across restarts.
+            - name: saved
+              mountPath: /home/ue_user/app/R5/Saved
+      volumes:
+        - name: server-description
+          secret:
+            secretName: windrose-secret
+            items:
+              - key: ServerDescription.json
+                path: ServerDescription.json
+        - name: saved
+          persistentVolumeClaim:
+            claimName: windrose-saved

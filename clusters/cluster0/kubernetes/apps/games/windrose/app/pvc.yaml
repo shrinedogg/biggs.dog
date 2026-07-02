@@ -1,0 +1,20 @@
+---
+# Persistent saves for the Windrose dedicated server. The
+# windroseserver/windroseserver image writes world/save state under
+# /home/ue_user/app/R5/Saved (a declared VOLUME); persisting it across restarts
+# keeps the world and avoids regenerating it on every pod recreation. 5Gi as
+# configured in the original HelmRelease (volumeStorageSize).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: windrose-saved
+  namespace: games
+  labels:
+    app.kubernetes.io/name: windrose
+spec:
+  storageClassName: ceph-block
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

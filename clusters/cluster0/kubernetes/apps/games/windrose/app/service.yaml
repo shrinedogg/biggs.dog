@@ -1,0 +1,28 @@
+---
+# Exposes the Windrose direct-connection game port on the LAN. Pinned to the
+# 192.168.6.0/24 BGP range via Cilium LB-IPAM (clients connect directly to
+# 192.168.6.11:28050). externalTrafficPolicy Cluster lets any node forward
+# traffic, matching the prior HelmRelease.
+apiVersion: v1
+kind: Service
+metadata:
+  name: windrose
+  namespace: games
+  labels:
+    app.kubernetes.io/name: windrose
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.6.11"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: windrose
+  ports:
+    - name: game-tcp
+      port: 28050
+      targetPort: game-tcp
+      protocol: TCP
+    - name: game-udp
+      port: 28050
+      targetPort: game-udp
+      protocol: UDP
