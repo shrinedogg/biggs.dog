@@ -40,9 +40,12 @@ spec:
             # --- Tunable: mitigation for recurring Xid 109 (CTX SWITCH TIMEOUT) ---
             # RTX 5090 stock max boost is 3105 MHz; cap it to curb boost-clock
             # transients. Power limit is intentionally left at stock (600W).
-            # Lower the clock further if Xid 109 persists; raise toward 3105 for perf.
+            # 2850 MHz was tried but Xid 109 still recurred under UE5/DX12 load
+            # (Windrose crashed: vkd3d-proton VK_ERROR_DEVICE_LOST -> UE5 GPU
+            # crash), which lines up 1:1 with an NVRM Xid 109 in dmesg. 2800 is
+            # the previously-known-stable value; lower further if it recurs.
             - name: GPU_CLOCK_MAX_MHZ
-              value: "2850"
+              value: "2800"
             - name: REAPPLY_INTERVAL_SECONDS
               value: "300"
           command:
