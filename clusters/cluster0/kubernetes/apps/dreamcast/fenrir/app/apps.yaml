@@ -243,6 +243,20 @@ spec:
             # created, and Steam never launches -> black stream.
             - name: GBM_BACKENDS_PATH
               value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+            # Pin the Vulkan loader to the NVIDIA ICD only. The privileged
+            # container sees both of nv-01's GPUs (/dev/dri/renderD128 = AMD
+            # 7800X3D iGPU via Mesa's radeon_icd.json, and renderD129 = RTX 5090
+            # via nvidia_icd.json). The Mesa ICD sorts first, so the Vulkan
+            # loader enumerates AMD as device 0 and NVIDIA as device 1. Games
+            # still pick the 5090 (UE5 chooses the dedicated adapter), but Steam's
+            # Hardware page reports the first enumerated device (AMD) and every
+            # app wastes effort skipping the phantom iGPU. VK_DRIVER_FILES
+            # restricts the loader to only nvidia_icd.json so Vulkan exposes just
+            # the RTX 5090 everywhere (Steam UI, DXVK, vkd3d, gamescope). This
+            # also makes the gamescope --prefer-vk-device above a redundant
+            # safety net (kept anyway).
+            - name: VK_DRIVER_FILES
+              value: /etc/vulkan/icd.d/nvidia_icd.json
             # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
             # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
             # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
