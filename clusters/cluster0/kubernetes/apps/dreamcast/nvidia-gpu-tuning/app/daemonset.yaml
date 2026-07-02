@@ -41,16 +41,15 @@ spec:
             # RTX 5090 stock max boost is 3105 MHz / stock TDP 600W. Xid 109
             # (CTX SWITCH TIMEOUT) recurred under UE5/DX12 load (Windrose GPU
             # crash -> vkd3d-proton VK_ERROR_DEVICE_LOST -> UE5 ReportGPUCrash,
-            # matching an NVRM Xid 109 in dmesg 1:1) at 2850, 2800 AND 2600 MHz
-            # with power left at stock 600W — so the clock cap alone isn't the
-            # fix. The Blackwell + open-RM-module combo is a known Xid 109
-            # source; capping power (changes the V/F curve, curbs voltage
-            # transients) is the remaining software lever short of a
-            # driver/vBIOS update (node-level). 450W = 75% of stock TDP.
+            # matching an NVRM Xid 109 in dmesg 1:1) at clock caps of 2850, 2800,
+            # AND 2600 MHz. A 450W power cap (75% of stock) ALSO failed — the
+            # crash reproduced at ~6% GPU util / ~82W, so this is NOT a power/
+            # voltage/thermal transient. Conclusion: no nvidia-smi lever fixes it;
+            # the Blackwell + open-RM-module Xid 109 instability is a driver/
+            # firmware fault requiring a driver/vBIOS update (node-level, not
+            # this repo). Clock kept at the documented 2800 MHz; power at stock.
             - name: GPU_CLOCK_MAX_MHZ
               value: "2800"
-            - name: GPU_POWER_LIMIT_W
-              value: "450"
             - name: REAPPLY_INTERVAL_SECONDS
               value: "300"
           command:
@@ -59,11 +58,10 @@ spec:
             - |
               set -u
               SMI=/usr/local/bin/nvidia-smi
-              echo "[gpu-tuning] applying: persistence=on power=${GPU_POWER_LIMIT_W}W gfx_clock_max=${GPU_CLOCK_MAX_MHZ}MHz"
+              echo "[gpu-tuning] applying: persistence=on power=stock(600W) gfx_clock_max=${GPU_CLOCK_MAX_MHZ}MHz"
               apply() {
                 "${SMI}" -pm 1 || true
                 "${SMI}" -lgc "0,${GPU_CLOCK_MAX_MHZ}" || true
-                "${SMI}" -pl "${GPU_POWER_LIMIT_W}" || true
               }
               apply
               "${SMI}" --query-gpu=persistence_mode,power.limit,clocks.max.gr --format=csv || true
