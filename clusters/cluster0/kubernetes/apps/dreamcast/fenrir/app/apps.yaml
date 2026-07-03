@@ -252,14 +252,19 @@ spec:
               value: /etc/vulkan/icd.d/nvidia_icd.json
             # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
             # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
-            # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
-            # DLSS option stays greyed out regardless of the RTX GPU. These are
-            # Proton-side toggles consumed by the entrypoint, so they take effect
-            # even though the GPU is injected via CDI.
+            # only loaded when PROTON_ENABLE_NVAPI is set. These are Proton-side
+            # toggles consumed by the entrypoint, so they take effect even though
+            # the GPU is injected via CDI. DISABLED (0): under Proton 10 the
+            # staged nvngx.dll/_nvngx.dll bridge (see nvngx-bridge initContainer)
+            # crashes Windrose during DLSS NGX Vulkan RHI pre-init
+            # (FNGXVulkanRHIPreInitModule::StartupModule) ~3s after launch, before
+            # the game ever renders. With NVAPI off, Proton stops injecting the
+            # bridge DLLs and the game skips DLSS (toggle greyed out). Re-enable
+            # (set both to 1) only once the NGX/Proton-10 incompatibility is fixed.
             - name: PROTON_ENABLE_NVAPI
-              value: "1"
+              value: "0"
             - name: DXVK_ENABLE_NVAPI
-              value: "1"
+              value: "0"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
