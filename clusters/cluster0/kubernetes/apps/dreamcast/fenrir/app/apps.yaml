@@ -377,6 +377,29 @@ spec:
                 ) &
               fi
 
+              # Fullscreen watcher (sway only): for_window [class="steam_app_*"]
+              # in custom-cfg does NOT reliably fire for Xwayland windows because
+              # their WM_CLASS is set AFTER the map event, so the criterion misses
+              # at creation time (verified: the rule is loaded but the game window
+              # stays fullscreen_mode=0). This watcher polls the sway tree and, once
+              # a steam_app_* window exists, runs the fullscreen command directly
+              # (idempotent). Matches the focus-guard pattern above. Also
+              # fullscreens Steam Big Picture (class="steam") so BPM isn't tiled
+              # behind the game.
+              if [ "$RUN_SWAY" = "true" ]; then
+                (
+                  while [ ! -S /tmp/.X11-unix/sway.socket ]; do sleep 2; done
+                  while true; do
+                    if SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg -t get_tree 2>/dev/null | \
+                       python3 -c "import sys,json\nt=json.load(sys.stdin)\nf=False\ndef w(n):\n global f\n if isinstance(n,dict):\n  if n.get('type')=='con' and ((n.get('window_properties') or {}).get('class') or '').startswith('steam'): f=True\n  for k in ('nodes','floating_nodes'):\n   for c in n.get(k,[]) or []: w(c)\nw(t)\nsys.exit(0 if f else 1)"; then
+                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam_app_*"] fullscreen enable' >/dev/null 2>&1 || true
+                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam"] fullscreen enable' >/dev/null 2>&1 || true
+                    fi
+                    sleep 2
+                  done
+                ) &
+              fi
+
               chown -R $PUID:$PGID /home/retro
               chmod -R 777 /home/retro
               exec /entrypoint.sh
