@@ -252,19 +252,17 @@ spec:
               value: /etc/vulkan/icd.d/nvidia_icd.json
             # DLSS under Proton is gated behind NVAPI: the game queries NVIDIA's
             # NGX/DLSS support through DXVK-NVAPI (Proton's nvapi64.dll), which is
-            # only loaded when PROTON_ENABLE_NVAPI is set. These are Proton-side
-            # toggles consumed by the entrypoint, so they take effect even though
-            # the GPU is injected via CDI. DISABLED (0): under Proton 10 the
-            # staged nvngx.dll/_nvngx.dll bridge (see nvngx-bridge initContainer)
-            # crashes Windrose during DLSS NGX Vulkan RHI pre-init
-            # (FNGXVulkanRHIPreInitModule::StartupModule) ~3s after launch, before
-            # the game ever renders. With NVAPI off, Proton stops injecting the
-            # bridge DLLs and the game skips DLSS (toggle greyed out). Re-enable
-            # (set both to 1) only once the NGX/Proton-10 incompatibility is fixed.
+            # only loaded when PROTON_ENABLE_NVAPI is set. Without it the in-game
+            # DLSS option stays greyed out regardless of the RTX GPU. These are
+            # Proton-side toggles consumed by the entrypoint, so they take effect
+            # even though the GPU is injected via CDI. NOTE: the staged
+            # nvngx.dll/_nvngx.dll bridge (nvngx-bridge initContainer) crashes
+            # Windrose during DLSS NGX Vulkan RHI pre-init under Proton 10, but
+            # works on Proton Experimental -- so keep DLSS on while on Experimental.
             - name: PROTON_ENABLE_NVAPI
-              value: "0"
+              value: "1"
             - name: DXVK_ENABLE_NVAPI
-              value: "0"
+              value: "1"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
@@ -290,6 +288,22 @@ spec:
                 echo "Waiting for pulse socket..." >&2
                 sleep 1
               done
+
+              # Sway fullscreen rule: the GOW base sway config (see
+              # launch-comp.sh) does NOT fullscreen app windows, so Sway tiles
+              # every Xwayland surface it sees. Windrose launches as MULTIPLE
+              # windows (Steam Big Picture class="steam" + the game
+              # class="steam_app_*" + transient launchers), which Sway tiles
+              # side-by-side into the "split / multiple tiles" display. The base
+              # config includes /home/retro/.config/sway/custom-cfg at the top,
+              # which launch-comp's cp does NOT overwrite -- so writing our rule
+              # there is the clean injection point. Fullscreen both Steam BPM and
+              # the game so each takes the whole output (BPM behind, game front).
+              mkdir -p /home/retro/.config/sway
+              cat > /home/retro/.config/sway/custom-cfg <<'SWAYEOF'
+              for_window [class="steam_app_*"] fullscreen enable
+              for_window [class="steam"] fullscreen enable
+              SWAYEOF
 
               # Do NOT export PULSE_SINK/PULSE_SOURCE here: this image has no
               # pactl, so the old lookup exported PULSE_SINK="" and
