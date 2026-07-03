@@ -49,7 +49,7 @@ spec:
             # firmware fault requiring a driver/vBIOS update (node-level, not
             # this repo). Clock kept at the documented 2800 MHz; power at stock.
             - name: GPU_CLOCK_MAX_MHZ
-              value: "2400"
+              value: "2600"
             - name: REAPPLY_INTERVAL_SECONDS
               value: "300"
           command:
