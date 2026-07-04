@@ -13,10 +13,6 @@ spec:
     controller:
       extraEnv:
         KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
-      # The controller is not hardened by default. We apply the user-agnostic
-      # hardening (drop ALL capabilities, no privilege escalation, RuntimeDefault
-      # seccomp). runAsNonRoot and readOnlyRootFilesystem are omitted because the
-      # controller image's default user and rootfs write paths are not verified.
       podSecurityContext:
         seccompProfile:
           type: RuntimeDefault

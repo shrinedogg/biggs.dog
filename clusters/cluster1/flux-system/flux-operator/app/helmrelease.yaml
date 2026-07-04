@@ -1,0 +1,34 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: flux-operator
+  namespace: flux-system
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: flux-operator
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Exists
+        effect: NoSchedule
+    # Disable the chart's native NetworkPolicy (flux-operator-web). It creates
+    # an ingress default-deny that only allows TCP:9080 from any namespace,
+    # which drops UDP DNS replies from kube-dns and breaks flux-operator's
+    # name resolution intermittently (conntrack race on the reply path).
+    # Network policy for flux-system is owned by the network-policies-infra
+    # Kustomization as CiliumNetworkPolicies instead, which carry the L7 DNS
+    # proxy rule that avoids the reply-drop.
+    web:
+      networkPolicy:
+        create: false

@@ -1,0 +1,91 @@
+# NetBird combined server (management + signal + relay + STUN + embedded IdP
+# in one binary). Config comes from the netbird-server-config ExternalSecret;
+# all HTTP/gRPC traffic is multiplexed on :80 behind cluster0-gateway, STUN
+# stays on 3478/udp via the netbird-stun LoadBalancer Service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-server
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single SQLite store on RWO PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netbird
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: netbird
+        app.kubernetes.io/component: server
+    spec:
+      containers:
+        - name: netbird
+          # NOTE: netbird-server tags have no "v" prefix.
+          image: netbirdio/netbird-server:0.74.2
+          # Image ENTRYPOINT is /go/bin/netbird-server; only override the CMD.
+          args: ["--config", "/etc/netbird/config.yaml"]
+          ports:
+            - containerPort: 80
+              name: http
+            - containerPort: 3478
+              protocol: UDP
+              name: stun
+            - containerPort: 9090
+              name: metrics
+            - containerPort: 9000
+              name: health
+          volumeMounts:
+            - name: netbird-config
+              mountPath: /etc/netbird/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: netbird-data
+              mountPath: /var/lib/netbird
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 9000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: netbird-config
+          secret:
+            secretName: netbird-server-config
+        - name: netbird-data
+          persistentVolumeClaim:
+            claimName: netbird-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netbird-data-pvc
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: upcloud-block-storage-maxiops
+  resources:
+    requests:
+      storage: 1Gi

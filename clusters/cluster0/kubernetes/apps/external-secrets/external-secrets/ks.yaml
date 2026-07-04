@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/external-secrets/external-secrets/app
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -28,7 +28,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/external-secrets/external-secrets/stores
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -36,9 +36,5 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 2m
-  decryption:
-    provider: sops
-    secretRef:
-      name: sops-age
   dependsOn:
     - name: external-secrets

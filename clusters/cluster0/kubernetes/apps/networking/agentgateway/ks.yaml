@@ -9,9 +9,9 @@ spec:
   retryInterval: 1m
   sourceRef:
     kind: GitRepository
-    name: gateway-api-crds
-  path: "./config/crd/experimental"
-  prune: true
+    name: flux-system
+  path: ./config/crd/experimental
+  prune: false
   wait: false
   timeout: 2m
   force: true
@@ -26,7 +26,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/agentgateway-crds
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -47,7 +47,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster0/kubernetes/apps/networking/agentgateway/app
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -57,5 +57,3 @@ spec:
   timeout: 2m
   dependsOn:
     - name: agentgateway-crds
-  
-

@@ -1,0 +1,28 @@
+apiVersion: gpu.biggs.dog/v1alpha1
+kind: GPUArbiter
+metadata:
+  name: cluster1
+  labels:
+    app.kubernetes.io/name: gpu-arbiter
+    app.kubernetes.io/part-of: dreamcast
+spec:
+  vllm:
+    namespace: ai-system
+    name: vllm
+  game:
+    namespace: dreamcast
+    labelSelector:
+      matchExpressions:
+        - key: app
+          operator: In
+          values:
+            - alex-steam
+            - direwolf-worker
+  gateName: gpu.biggs.dog/await-vram
+  metrics:
+    url: http://vmsingle-stack.observability.svc:8428
+    query: max(DCGM_FI_DEV_FB_FREE)
+    timeoutSeconds: 4
+  freeMiB: 8000
+  timeoutSeconds: 45
+  intervalSeconds: 2

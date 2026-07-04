@@ -1,24 +1,13 @@
----
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: wildcard-biggs-dog
+  name: cluster0-gateway
   namespace: networking
 spec:
-  addresses:
-    - type: IPAddress
-      value: 192.168.6.7
   gatewayClassName: agentgateway
   listeners:
-    - hostname: "*.biggs.dog"
-      name: wildcard-biggs-dog-http
-      port: 80
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-    - hostname: "*.biggs.dog"
-      name: wildcard-biggs-dog-https
+    - hostname: omni.biggs.dog
+      name: omni-https
       port: 443
       protocol: HTTPS
       allowedRoutes:
@@ -28,16 +17,9 @@ spec:
         mode: Terminate
         certificateRefs:
           - kind: Secret
-            name: biggs-dog-tls
-    - hostname: "biggs.dog"
-      name: biggs-dog-http
-      port: 80
-      protocol: HTTP
-      allowedRoutes:
-        namespaces:
-          from: All
-    - hostname: "biggs.dog"
-      name: biggs-dog-https
+            name: omni-biggs-dog-tls
+    - hostname: dex.biggs.dog
+      name: dex-https
       port: 443
       protocol: HTTPS
       allowedRoutes:
@@ -47,4 +29,23 @@ spec:
         mode: Terminate
         certificateRefs:
           - kind: Secret
-            name: biggs-dog-tls
+            name: dex-biggs-dog-tls
+    - hostname: netbird.biggs.dog
+      name: netbird-https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: netbird-biggs-dog-tls
+    - hostname: "*.biggs.dog"
+      name: wildcard-http
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
