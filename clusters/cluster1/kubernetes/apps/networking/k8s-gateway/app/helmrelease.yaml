@@ -65,19 +65,44 @@ spec:
     # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)
     watchedResources: ["HTTPRoute", "Service"]
     domain: biggs.dog
-    # fallthrough is intentionally DISABLED. k8s_gateway is authoritative for
-    # biggs.dog and its `forward . /etc/resolv.conf` upstream points at the
-    # in-cluster kube-dns, which forwards biggs.dog BACK here (see the
-    # biggs.dog:53 zone in kube-system/coredns) -> enabling fallthrough creates
-    # an infinite loop and every unknown biggs.dog name returns SERVFAIL
-    # (verified). Cross-cluster hostnames (e.g. omni/netbird/dex on cluster0)
-    # are instead resolved via annotated Services that k8s_gateway watches --
-    # see the omni-dns / netbird-dns / dex-dns ExternalName-style Services
-    # (same pattern as turn.biggs.dog -> Coturn). Do NOT re-enable fallthrough
-    # unless the forward target is first changed to public resolvers.
-    # fallthrough:
-    # enabled: true
-    # zones: [biggs.dog]
+    # Fall through unknown biggs.dog names to PUBLIC resolvers so services on
+    # OTHER clusters resolve (e.g. omni/netbird/dex on cluster0 -> 87.58.147.51
+    # via public DNS) for LAN/VPN clients whose UDM conditionally forwards
+    # *.biggs.dog here. cluster1 services keep resolving via k8s_gateway to LAN IPs.
+    #
+    # LOOP HAZARD: the chart's DEFAULT extraZonePlugins forward is
+    # `forward . /etc/resolv.conf`, which points at in-cluster kube-dns, which
+    # forwards biggs.dog BACK here (biggs.dog:53 zone in kube-system/coredns ->
+    # 10.105.74.41). With the default forward, fallthrough loops -> SERVFAIL.
+    # The extraZonePlugins list below is the chart default REPLICATED IN FULL,
+    # with ONLY the forward parameters changed from `/etc/resolv.conf` to the
+    # homelab's NextDNS resolvers (45.90.28.232 / 45.90.30.232) to break that
+    # loop. The ready/health/prometheus plugins MUST stay -- they back the liveness/readiness probes
+    # and the ServiceMonitor; dropping them (an earlier attempt set only the
+    # forward entry) left pods NotReady and the LB with no endpoints.
+    fallthrough:
+      enabled: true
+      zones: [biggs.dog]
+    extraZonePlugins:
+      - name: log
+      - name: errors
+      # Serves a /health endpoint on :8080, required for livenessProbe
+      - name: health
+        configBlock: |-
+          lameduck 5s
+      # Serves a /ready endpoint on :8181, required for readinessProbe
+      - name: ready
+      # Serves a /metrics endpoint on :9153, required for serviceMonitor
+      - name: prometheus
+        parameters: 0.0.0.0:9153
+      # NextDNS resolvers ONLY -- NOT /etc/resolv.conf (-> kube-dns -> loop).
+      # These are the homelab's NextDNS IPs (filtering/logging); the k8s-gateway
+      # CNP allows egress world:53 so they're reachable from the pod.
+      - name: forward
+        parameters: . 45.90.28.232 45.90.30.232
+      - name: loop
+      - name: reload
+      - name: loadbalance
     dnsChallenge:
       enabled: true
       domain: dns01.clouddns.com
