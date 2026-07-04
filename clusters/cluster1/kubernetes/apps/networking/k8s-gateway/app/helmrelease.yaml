@@ -65,9 +65,18 @@ spec:
     # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)
     watchedResources: ["HTTPRoute", "Service"]
     domain: biggs.dog
-    # fallthrough:
-    # enabled: true
-    # zones: [biggs.dog]
+    # Fall through to upstream (forward . /etc/resolv.conf -> public DNS) for
+    # biggs.dog names NOT served by this k8s_gateway (i.e. not cluster1
+    # HTTPRoute/Service resources). Without this, k8s_gateway is authoritative
+    # for biggs.dog and returns NXDOMAIN for anything it doesn't know -- which
+    # breaks resolution of services hosted on OTHER clusters (e.g. omni/netbird/
+    # dex on cluster0) for LAN/VPN clients whose UDM conditionally forwards
+    # *.biggs.dog here. With fallthrough, those resolve via public DNS instead
+    # (e.g. omni.biggs.dog -> 87.58.147.51), while cluster1 services keep
+    # resolving to their LAN IPs.
+    fallthrough:
+      enabled: true
+      zones: [biggs.dog]
     dnsChallenge:
       enabled: true
       domain: dns01.clouddns.com
