@@ -9,7 +9,7 @@ spec:
   retryInterval: 1m
   sourceRef:
     kind: GitRepository
-    name: flux-system
+    name: gateway-api-crds
   path: ./config/crd/experimental
   prune: false
   wait: false
