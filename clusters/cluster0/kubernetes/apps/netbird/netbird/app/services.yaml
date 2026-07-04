@@ -43,6 +43,20 @@ spec:
       targetPort: 80
       protocol: TCP
 ---
+# STUN (UDP 3478) exposure.
+#
+# The UpCloud Managed Load Balancer (used by type: LoadBalancer via the UpCloud
+# CCM) only supports TCP/HTTP frontends -- there is NO UDP mode (product-level
+# limitation). So a LoadBalancer Service for UDP stays pending forever
+# (SyncLoadBalancerFailed, LB stuck at 'setup-server'). agentgateway likewise
+# can't route UDP. So STUN is exposed directly on the node's public IP instead.
+#
+# 87.58.147.51 is bound on the node's eth2 (verified), and the single node owns
+# it, so externalIPs makes Cilium (kube-proxy-replacement) serve UDP 3478 on the
+# node's public NIC -> the netbird-server pod. NetBird advertises STUN to
+# clients as stun:netbird.biggs.dog:3478 (auto-derived from exposedAddress); once
+# netbird.biggs.dog is DNS-only -> 87.58.147.51 and the UpCloud firewall allows
+# inbound UDP 3478, road-warrior clients reach STUN here. No cloud LB involved.
 apiVersion: v1
 kind: Service
 metadata:
@@ -52,7 +66,9 @@ metadata:
     app.kubernetes.io/name: netbird
     app.kubernetes.io/component: server
 spec:
-  type: LoadBalancer
+  type: ClusterIP
+  externalIPs:
+    - 87.58.147.51 # node eth2 public IP (single-node cluster0)
   selector:
     app.kubernetes.io/name: netbird
     app.kubernetes.io/component: server
