@@ -4,55 +4,72 @@
 
 ## 📖 Overview
 
-This is a mono repository for my home infrastructure and Kubernetes cluster, following Infrastructure as Code (IaC) and GitOps practices using [Flux](https://fluxcd.io/).
+This is a mono repository for my home infrastructure and Kubernetes clusters, following Infrastructure as Code (IaC) and GitOps practices using [Flux](https://fluxcd.io/). Desired state lives in Git; Flux reconciles it into the clusters.
+
+The homelab is split across **two clusters** (an in-progress migration — see [Architecture](#-architecture)):
+
+- **`cluster0`** — a single-node cloud cluster on [UpCloud](https://upcloud.com/) (public WAN IP `87.58.147.51`) acting as the **edge / management plane**: public ingress, identity (Dex), VPN (NetBird), and the Talos management plane (Omni).
+- **`cluster1`** — the **on-prem bare-metal workload cluster** (the original 6-node homelab): all applications, storage, GPU/AI workloads, and observability.
 
 ## 🏗️ Architecture
 
 ### GitOps with Flux
 
-The cluster is managed by [Flux Operator](https://fluxcd.controlplane.io/operator/) syncing from the `main` branch of this repository. Flux components include:
+Each cluster runs its own [Flux Operator](https://fluxcd.controlplane.io/operator/) instance syncing a dedicated path on the `main` branch of this repository:
 
-- Source Controller
-- Kustomize Controller
-- Helm Controller
-- Notification Controller
+| Cluster  | Sync path            | Flux distribution | Contents                                                                 |
+| -------- | -------------------- | ----------------- | ------------------------------------------------------------------------ |
+| `cluster0` | `clusters/cluster0`  | Flux `2.9.0`      | Edge/mgmt: Dex, NetBird, Omni, cert-manager, external-secrets, Cilium    |
+| `cluster1` | `clusters/cluster1`  | Flux `2.9.0`      | All workloads: apps, storage, database, AI/agents, observability, etc.   |
+
+Flux components on each cluster: Source Controller, Kustomize Controller, Helm Controller, Notification Controller.
+
+> **Migration note:** The workload tree was recently split out of `cluster0` into a new on-prem `cluster1`, and `cluster0` was rebuilt as a single-node cloud edge cluster. As a safety measure during the cutover, **Flux pruning is disabled** on the root sync Kustomization of *both* clusters (`spec.prune: false` patched onto the operator-generated `flux-system` Kustomization) so tree churn can't garbage-collect directly-applied objects (namespaces cascade-delete everything beneath them). This will be re-enabled once the migration settles.
 
 ### Repository Structure
 
 ```
 clusters/
-└── cluster0/
-    ├── flux-system/          # Flux instance and Helm/OCI sources
-    │   ├── flux-instance.yaml
-    │   └── sources/          # HelmRepository and OCIRepository definitions
-    └── kubernetes/
-        └── apps/             # Application deployments
-            ├── affine/
-            ├── ai-system/         # Local LLM (vLLM) + kagent agents + Flux MCP
-            ├── auth/              # SSO stack (Pocket ID + OAuth2 Proxy)
-            ├── biggs/
-            ├── cert-manager/
-            ├── cnpg/
-            ├── dragonfly/
-            ├── dreamcast/         # GPU game streaming (Fenrir/Wolf + NVIDIA GPU Operator)
-            ├── external-secrets/
-            ├── games/             # Dedicated game servers (Windrose)
-            ├── jitsi/
-            ├── kube-system/
-            ├── manticore/
-            ├── matrix/
-            ├── media/
-            ├── network-policies/    # Tiered Cilium NetworkPolicies (apps + infra)
-            ├── networking/
-            ├── observability/
-            ├── openebs/
-            ├── renovate/
-            └── rook-ceph/
+├── cluster0/                      # ⛅ UpCloud cloud edge/mgmt cluster (single node)
+│   ├── flux-system/               # FluxInstance + HelmRepository/OCIRepository sources
+│   └── kubernetes/apps/
+│       ├── auth/dex/              # Dex OIDC IdP (root identity for edge apps)
+│       ├── cert-manager/          # Certificate issuance (ACME + CA issuers)
+│       ├── external-secrets/      # External Secrets + 1Password Connect
+│       ├── kube-system/cilium/    # Cilium CNI (L2 announcement, single WAN IP)
+│       ├── netbird/               # NetBird WireGuard VPN (road-warrior access)
+│       ├── networking/            # agentgateway (public ingress) + Cilium LB/L2
+│       └── omni/                  # Sidero Omni (in-cluster Talos management plane)
+└── cluster1/                      # 🏠 On-prem bare-metal workload cluster (6 nodes)
+    ├── flux-system/               # FluxInstance + sources
+    └── kubernetes/apps/
+        ├── affine/                # Collaborative workspace
+        ├── ai-system/             # vLLM + kagent agents + substrate runtime + Flux/VM/Exa MCP
+        ├── auth/                  # SSO stack (Pocket ID + OAuth2 Proxy)
+        ├── biggs/                 # Tribute
+        ├── cnpg/                  # CloudNativePG databases
+        ├── dragonfly/             # Redis-compatible cache
+        ├── dreamcast/             # GPU game streaming (Fenrir/Wolf + NVIDIA GPU Operator)
+        ├── external-secrets/      # External Secrets + 1Password Connect
+        ├── games/                 # Dedicated game servers (Windrose)
+        ├── jitsi/                 # Video conferencing
+        ├── kube-system/           # Cilium (BGP), CoreDNS, NFD, GPU plugins, storage
+        ├── manticore/             # Full-text search
+        ├── matrix/                # Continuwuity (Matrix)
+        ├── media/                 # Emby, Bookboss, Ersatz, Nsyncd
+        ├── network-policies/      # Tiered CiliumNetworkPolicies (apps + infra)
+        ├── networking/            # k8s-gateway, lan-dns, agentgateway (LAN + public)
+        ├── observability/         # VictoriaMetrics/Logs, Grafana Operator
+        ├── openebs/               # Container-attached storage
+        ├── renovate/              # Automated dependency updates
+        └── rook-ceph/             # Distributed storage
 ```
 
 ## 🖥️ Cluster Nodes
 
-Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all running **Talos Linux v1.13.5** with Kubernetes **v1.36.2**.
+### `cluster1` — on-prem bare metal
+
+Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/) (now run in-cluster on `cluster0` — see [Core Components](#-core-components)), all running **Talos Linux v1.13.5** with Kubernetes **v1.36.2**. This is where all workloads (and the GPU) live.
 
 | Hostname     | Role          | CPU                                          | RAM    | GPU                                                                          |
 | ------------ | ------------- | -------------------------------------------- | ------ | ---------------------------------------------------------------------------- |
@@ -63,29 +80,32 @@ Six bare-metal nodes managed via [Omni](https://omni.siderolabs.io/), all runnin
 | `worker-03`  | worker        | Intel Core i7-1360P (Raptor Lake-P, 16T)    | 32 GB  | Intel Iris Xe Graphics iGPU (`8086:a7a0`)                                    |
 | `worker-04`  | worker        | Intel Core Ultra 5 125H (Meteor Lake, 18T)  | 32 GB  | Intel Arc Graphics iGPU (`8086:7d55`)                                        |
 
-> **GPU notes:** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas. vLLM (the in-cluster LLM, see [AI & Agents](#-ai--agents)) and the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack) can't coexist on the 32 GB card (vLLM alone pins ~31 GB), so the [GPU Arbiter](#gpu-arbiter) scales vLLM to 0 for the duration of any gaming session and restores it after; the time-slices then serve the session's Wolf sidecar + game container plus an always-on GPU-tuning DaemonSet. The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
+### `cluster0` — cloud edge (UpCloud)
+
+A single-node cluster hosted on UpCloud, exposed on the public WAN IP `87.58.147.51`. It fronts the homelab (public ingress via Cloudflare → agentgateway) and runs the identity, VPN, and Talos-management planes. Node specs are cloud-VM sized and not pinned in this repo. VIP advertisement uses a Cilium L2 announcement policy with a single-IP pool (`87.58.147.51/32`); the UpCloud Managed LB only supports TCP/HTTP (no UDP), so UDP services like NetBird STUN are exposed via `externalIPs` bound on the node's NIC instead of a LoadBalancer Service.
+
+> **GPU notes (`cluster1`):** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01`'s RTX 5090 is time-sliced into 4 `nvidia.com/gpu` replicas. vLLM (the in-cluster LLM, see [AI & Agents](#-ai--agents)) and the [Dreamcast game-streaming stack](#-dreamcast-game-streaming-stack) can't coexist on the 32 GB card (vLLM alone pins ~27–31 GB), so the [GPU Arbiter](#gpu-arbiter) scales vLLM to 0 for the duration of any gaming session and restores it after; the time-slices then serve the session's Wolf sidecar + game container plus an always-on GPU-tuning DaemonSet. The AMD integrated graphics on the two AMD nodes are present but unused (nodes run headless).
 
 ## 🔧 Core Components
 
 ### Networking
 
+| Cluster   | Component                                                | Description                                                  |
+| --------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| both      | [Cilium](https://cilium.io/)                             | CNI (kube-proxy replacement). `cluster0`: L2 announcement + single-IP pool (`87.58.147.51/32`). `cluster1`: BGP peering with the UDM (ASN 64564 ↔ 64563) advertising LoadBalancer IPs from `192.168.6.6–254`. |
+| `cluster1` | [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`, ClusterIP `10.105.74.41`) |
+| `cluster1` | lan-dns                                                  | LAN resolver (CoreDNS, LB `192.168.6.16`): forwards `biggs.dog` → k8s-gateway (split-horizon) and everything else → NextDNS over DoT (encrypted upstream). The UDM hands out `.6.16` via per-VLAN DHCP. |
+| both      | [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                         |
+| both      | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation; OCI charts pinned to a known-good alpha build (`0.0.0-alpha.a655af15`). |
 
-| Component                                                | Description                                                  |
-| -------------------------------------------------------- | ------------------------------------------------------------ |
-| [Cilium](https://cilium.io/)                             | CNI (kube-proxy replacement) with BGP for LoadBalancer IPs (`192.168.6.0/24`) |
-| [k8s-gateway](https://github.com/ori-edge/k8s_gateway)   | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`, ClusterIP `10.105.74.41`) |
-| lan-dns                                                  | LAN resolver (CoreDNS, LB `192.168.6.16`): forwards `biggs.dog` → k8s-gateway (split-horizon) and everything else → NextDNS over DoT (encrypted upstream). The UDM hands out `.6.16` via per-VLAN DHCP. |
-| [Gateway API](https://gateway-api.sigs.k8s.io/)          | Kubernetes ingress using Gateway API                         |
-| [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation installed from OCI charts         |
+`cluster1` DNS: LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards to k8s-gateway for internal VIPs and to NextDNS over DoT for everything else. In-cluster, **CoreDNS** (kube-dns, Talos-managed) forwards `biggs.dog` to k8s-gateway's ClusterIP (`10.105.74.41`), so pods resolve `*.biggs.dog` internally instead of hairpinning through Cloudflare. Both forward targets use the ClusterIP (not the LB VIP) to avoid a Cilium same-node LB hairpin failure when a resolver pod is co-located with k8s-gateway.
 
-LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards to k8s-gateway for internal VIPs and to NextDNS over DoT for everything else. In-cluster, **CoreDNS** (kube-dns) is patched via Talos to forward `biggs.dog` to k8s-gateway's ClusterIP (`10.105.74.41`), so pods resolve `*.biggs.dog` internally instead of hairpinning through Cloudflare. Both forward targets use the ClusterIP (not the LB VIP) to avoid a Cilium same-node LB hairpin failure when a resolver pod is co-located with k8s-gateway.
+`cluster0` ingress is the `cluster0-gateway` (`networking` namespace) with HTTPS listeners for the edge hostnames `omni.biggs.dog`, `dex.biggs.dog`, and `netbird.biggs.dog` (TLS terminated with per-host certs issued in the `networking` namespace via the `letsencrypt-prod` ClusterIssuer — DNS-01/Cloudflare), plus a wildcard `*.biggs.dog` HTTP listener. Omni re-encrypts to its pod's own cert (HTTPS backend).
 
 **Service-specific gateways:**
-- **ersatz** (game server): LAN-only HTTPS gateway at `ersatz.biggs.dog`
+- **ersatz** (`cluster1`, game server): LAN-only HTTPS gateway at `ersatz.biggs.dog`
 
-
-### Storage
-
+### Storage  (`cluster1`)
 
 | Component                                                                     | Description                                  |
 | ----------------------------------------------------------------------------- | -------------------------------------------- |
@@ -96,9 +116,7 @@ LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards
 | NFS CSI Driver                                                                | NFS storage provisioner                      |
 | ZFS                                                                           | ZFS volume management                        |
 
-
-### Database
-
+### Database  (`cluster1`)
 
 | Component                                   | Description                                    |
 | ------------------------------------------- | ---------------------------------------------- |
@@ -106,19 +124,16 @@ LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards
 | [Barman Cloud](https://pgbarman.org/)       | CNPG plugin for PostgreSQL backup and recovery |
 | [Dragonfly](https://www.dragonflydb.io/)    | Redis-compatible in-memory datastore           |
 
-
-### Security & Secrets
-
+### Security & Secrets  (both)
 
 | Component                                                          | Description                                     |
 | ------------------------------------------------------------------ | ----------------------------------------------- |
 | [cert-manager](https://cert-manager.io/)                           | Certificate management with CA and ACME issuers |
 | [External Secrets](https://external-secrets.io/)                   | Sync secrets from external providers            |
-| [1Password Connect](https://developer.1password.com/docs/connect/) | Secret backend for External Secrets             |
-| [SOPS](https://github.com/getsops/sops)                            | Encrypted secrets (age key)                     |
+| [1Password Connect](https://developer.1password.com/docs/connect/) | Secret backend for External Secrets. The `connect` chart (`v2.4.1`) is deployed on **both** clusters, with its `1password-credentials.json` and API `token` shipped as **SOPS-encrypted Secrets in Git** (decrypted in-cluster by Flux's `sops-age` key), not inline chart values. |
+| [SOPS](https://github.com/getsops/sops)                            | Encrypted secrets (age key). The repo-wide age key was rotated on 2026-07-04; `sops.yaml` now lists the deployed key plus a pre-staged next key. |
 
-
-### Network Policies
+### Network Policies  (`cluster1`)
 
 The cluster runs a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
 
@@ -127,24 +142,25 @@ The cluster runs a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/
 
 ### Identity & SSO
 
-The `auth` namespace provides single sign-on for the cluster. [Pocket ID](https://github.com/pocket-id/pocket-id) is a passkey-first OIDC provider, and [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy) acts as its OIDC client to gate browser apps.
+The two clusters run **different identity stacks**:
 
+**`cluster0` (edge) — Dex** (`dex.biggs.dog`):
+[Dex](https://dexidp.io/) (`v2.45.1`) is the root OIDC identity provider for the edge plane, backing Omni and NetBird. It runs stateless (`storage.type: memory`) with `enablePasswordDB: true` and a static admin user; clients/secrets are templated into the config from 1Password. Config lives in `apps/auth/dex/`.
 
-| Component                                                       | Description                                                                                                  |
-| -------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| [Pocket ID](https://github.com/pocket-id/pocket-id)            | Passkey-based OIDC provider at `id.biggs.dog` (Postgres via CNPG, uploads stored in the database)            |
-| [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy)   | OIDC client at `auth.biggs.dog`; provides forward-auth for apps with a shared `.biggs.dog` session cookie    |
+| Component                                       | Description                                                                                       |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| [Dex](https://dexidp.io/) (`cluster0`)          | Root OIDC IdP for edge apps (Omni, NetBird). Stateless, static admin user.                        |
+| [Pocket ID](https://github.com/pocket-id/pocket-id) (`cluster1`) | Passkey-based OIDC provider at `id.biggs.dog` (Postgres via CNPG, uploads stored in the database) |
+| [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy) (`cluster1`) | OIDC client at `auth.biggs.dog`; forward-auth for apps with a shared `.biggs.dog` session cookie  |
 
-Protected apps attach an agentgateway `AgentgatewayPolicy` with `traffic.extAuth` that calls OAuth2 Proxy's `/oauth2/auth` endpoint (Envoy ext-authz compatible) and redirects unauthenticated users to the Pocket ID sign-in. A cross-namespace `ReferenceGrant` lets each app's policy reach the OAuth2 Proxy service in the `auth` namespace.
+On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `traffic.extAuth` that calls OAuth2 Proxy's `/oauth2/auth` endpoint and redirects unauthenticated users to the Pocket ID sign-in. OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cookie stays a small session ticket (a cookie-based session carrying tokens grows past 4 KB, gets chunked, and didn't survive the ext-authz subrequest — causing a forward-auth redirect loop).
 
-OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cookie stays a small session ticket. A cookie-based session carrying the access/id/refresh tokens grows past 4 KB and gets chunked, and that large cookie didn't survive the ext-authz subrequest to `/oauth2/auth` — causing a forward-auth redirect loop. A NetworkPolicy authorizes the `auth` namespace to reach `dragonfly-db:6379`.
+- **Forward-auth (`cluster1`, via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI
+- **Native OIDC (`cluster1`, direct Pocket ID client):** Grafana
 
-- **Forward-auth (via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI
-- **Native OIDC (direct Pocket ID client):** Grafana
+> NetBird (≥ v0.65) authenticates against its **own embedded IdP**; the `cluster0` Dex is attached to that embedded IdP as an upstream OIDC connector at runtime (NetBird dashboard → Settings → Identity Provider). The dashboard never talks to Dex directly.
 
-
-### Observability
-
+### Observability  (`cluster1`)
 
 | Component                                                       | Description                                 |
 | --------------------------------------------------------------- | ------------------------------------------- |
@@ -152,9 +168,7 @@ OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cooki
 | [Victoria Logs](https://docs.victoriametrics.com/victorialogs/) | Log aggregation (includes Talos kernel logs with GPU Xid alerting) |
 | [Grafana Operator](https://grafana.github.io/grafana-operator/) | Grafana deployment and dashboard management |
 
-
-### System
-
+### System  (`cluster1`)
 
 | Component                                                                           | Description                                                                                     |
 | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
@@ -162,16 +176,22 @@ OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cooki
 | Intel GPU Plugin                                                                    | Intel GPU device plugin for hardware acceleration                                               |
 | [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator)                       | NVIDIA device plugin with GPU time-slicing (driver/toolkit provided by Talos system extensions) |
 
+### Edge / Management Plane  (`cluster0`)
+
+| Component                                       | Description                                                                                          |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [NetBird](https://netbird.io/)                  | Zero-config WireGuard VPN for road-warrior access to the homelab. Combined server (mgmt + signal + relay + STUN + embedded IdP) at `netbird.biggs.dog` (`0.74.2`) plus a dashboard. SQLite store on a 1Gi PVC (`Recreate`). STUN/UDP 3478 exposed via `externalIPs` (`87.58.147.51`) because the UpCloud Managed LB has no UDP mode. |
+| [Omni](https://omni.siderolabs.io/) (Sidero)    | In-cluster Talos management plane at `omni.biggs.dog` (`v1.9.1`): UI, machine API, Siderolink (WireGuard `:50180`), and Kubernetes-in-Kubernetes proxy. Manages the on-prem `cluster1` nodes (which phone home over Siderolink). Runs privileged with `/dev/net/tun`; double-TLS (gateway terminates, re-encrypts to the pod's own cert). |
+| [Dex](https://dexidp.io/)                       | See [Identity & SSO](#identity--sso).                                                                |
 
 ### Automation
 
-
 | Component                                 | Description                                                                  |
 | ----------------------------------------- | ---------------------------------------------------------------------------- |
-| [Renovate](https://docs.renovatebot.com/) | Automated dependency updates (HelmRelease chart versions + container images) |
+| [Renovate](https://docs.renovatebot.com/) (`cluster1`) | Automated dependency updates (HelmRelease chart versions + container images) |
 
 
-## 📺 Applications
+## 📺 Applications  (`cluster1`)
 
 | Category | Applications | Notes |
 | -------- | ------------ | ----- |
@@ -183,14 +203,13 @@ OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cooki
 | **Game Servers** | Windrose Online | Persistent MMO on Wine backend |
 | **Other** | biggs | Tribute |
 
-Detailed app deployment configs are in `clusters/cluster0/kubernetes/apps/<namespace>/`.
+Detailed app deployment configs are in `clusters/cluster1/kubernetes/apps/<namespace>/`.
 
-## 🎮 Dreamcast Game Streaming Stack
+## 🎮 Dreamcast Game Streaming Stack  (`cluster1`)
 
-The `dreamcast` namespace is the newest addition to the cluster: an on-demand, GPU-accelerated game-streaming platform built on [Games on Whales](https://games-on-whales.github.io/) Fenrir/Wolf. A [Moonlight](https://moonlight-stream.org/) client pairs with an in-cluster `moonlight-proxy`, and the `direwolf-operator` spins up a per-session pod (Wolf compositor + the app) on the NVIDIA node, encodes the desktop with NVENC, and streams it back over RTSP/RTP.
+The `dreamcast` namespace is an on-demand, GPU-accelerated game-streaming platform built on [Games on Whales](https://games-on-whales.github.io/) Fenrir/Wolf. A [Moonlight](https://moonlight-stream.org/) client pairs with an in-cluster `moonlight-proxy`, and the `direwolf-operator` spins up a per-session pod (Wolf compositor + the app) on the NVIDIA node, encodes the desktop with NVENC, and streams it back over RTSP/RTP.
 
 ### Components
-
 
 | Component | Description |
 | --------- | ----------- |
@@ -199,7 +218,6 @@ The `dreamcast` namespace is the newest addition to the cluster: an on-demand, G
 | [Wolf](https://games-on-whales.github.io/wolf/) | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input. |
 | [gpu-arbiter-operator](https://github.com/shrinedogg/gpu-arbiter-operator) (custom) | controller-runtime operator that reconciles a cluster-scoped `GPUArbiter` CR: scales the `vllm` Deployment to 0 whenever an `alex-steam`/`direwolf-worker` session pod appears in `dreamcast`, and back to 1 when idle, then lifts the `gpu.biggs.dog/await-vram` scheduling gate once VRAM is free (vLLM down, DCGM free-VRAM above threshold, or a safety timeout). Replaces the original `alpine/k8s` bash loop. Without it the session and vLLM would both claim the 32 GB card and OOM. See [GPU Arbiter](#gpu-arbiter). |
 | `nvidia-gpu-tuning` (DaemonSet) | Privileged DaemonSet pinned to `nv-01` running `nvidia-smi -pm 1 -lgc 0,2800` to cap the RTX 5090's boost clock (stock max 3105 MHz), mitigating recurring Xid 109 (CTX SWITCH TIMEOUT) errors under gaming load; re-asserted every 5 min. Consumes one of the 4 GPU time-slices to trigger CDI injection of `nvidia-smi`. |
-
 
 ### GPU Arbiter
 
@@ -210,7 +228,6 @@ The single 32 GB RTX 5090 can't host vLLM and a gaming session at once. The [`gp
 
 **Deployment:** `apps/dreamcast/gpu-arbiter-{operator,instance}`. Image: `shrinedogg/gpu-arbiter-operator:v0.1.1`. Query status with `kubectl get gpuarbiter cluster0`.
 
-
 ### Defined Apps
 
 Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference), **Test Ball** (synthetic videotestsrc), **Steam** (Big Picture + persistent `/home/retro` PVC + DLSS). See [NOTES.md](docs/NOTES.md#dreamcast-engineering-notes) for details.
@@ -219,8 +236,7 @@ Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference), **Test 
 
 See [NOTES.md](docs/NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream.
 
-
-## 🤖 AI & Agents
+## 🤖 AI & Agents  (`cluster1`)
 
 The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack: an OpenAI-compatible LLM served in-cluster by [vLLM](https://github.com/vllm-project/vllm), and [kagent](https://kagent.dev/) agents that use it to inspect and troubleshoot the cluster over MCP. No inference leaves the cluster. Per-task agent routing for this repo is documented in [`.rules`](.rules).
 
@@ -228,60 +244,71 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 
 | Component | Description |
 | --------- | ----------- |
-| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices (v0.23.0). Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the [GPU Arbiter](#gpu-arbiter) (the 32 GB card can't fit vLLM and a session at once) and back to 1 when idle. Serves [`nvidia/Qwen3.6-35B-A3B-NVFP4`](https://huggingface.co/nvidia/Qwen3.6-35B-A3B-NVFP4) — NVIDIA's ModelOpt **NVFP4** quant of Qwen3.6-35B-A3B: a 35B MoE (~3B active), ~19B on disk, **131K context** (native max 262K) with Mamba-hybrid attention, running on the 5090's native Blackwell FP4 tensor cores. |
-| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a default `ModelConfig` pointing at the local vLLM, runs the built-in agents, and exposes an MCP server over a LAN-only HTTPRoute (`kagent-mcp` at `https://mcp.biggs.dog/mcp` on the internal LAN-only gateway `internal-biggs-dog`, VIP 192.168.6.15, with TLS terminated using the wildcard cert; this replaced the old `kagent-mcp-lan` plain-HTTP LoadBalancer once the agentgateway was confirmed to no longer mangle the `/mcp` Streamable-HTTP path) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
-| flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. Per-agent memory disabled to avoid exceeding the 131K context window with large tool schemas. |
-| victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`), providing direct PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, and embedded VM documentation search. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
-| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.5.0`, installed with `controller.extensions: true` so `SandboxTemplate`/`SandboxClaim`/`SandboxWarmPool` are also registered). `v0.5.0` graduated the APIs to `v1beta1` (multi-version CRDs + self-hosted conversion webhook); the controller rewrites the CRD conversion `clientConfig` namespace to `ai-system` at startup since we don't use the upstream-default `agent-sandbox-system`. Provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks` (code execution), used by the classic `kind: Agent` CRs. The kagent `SandboxAgent` platform (`platform: agent-sandbox`) was trialed for all 10 agents and reverted on kagent 0.9.10: those agents run but are never registered in the controller's A2A registry, so they are not invokable via the MCP server (`mcp.biggs.dog`) — see [NOTES.md](docs/NOTES.md). Controller defined in `apps/ai-system/agent-sandbox/`. |
-| embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` model for kagent's long-term vector memory. Intentionally CPU-only to avoid contending with the GPU-constrained vLLM during gaming. Defined in `apps/ai-system/embeddings/`. |
-| exa-mcp / `exa-agent` | A custom kagent `Agent` backed by the [Exa MCP server](https://github.com/shrinedogg/exa-mcp-server) (`3.2.1`), providing web search, code discovery, and company research. Exposes `web_search_exa`, `web_fetch_exa`, and `web_search_advanced_exa` tools with support for content categories (company, news, people, research papers, financial reports, personal sites). Defined in `apps/ai-system/exa-mcp/`. Requires Exa API key from [exa.com](https://exa.com). |
+| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server (`v0.23.0`, CUDA 12.9 for Blackwell) pinned to `nv-01`, consuming one of the RTX 5090's 4 `nvidia.com/gpu` time-slices. Scaled to 0 during [Dreamcast](#-dreamcast-game-streaming-stack) gaming sessions by the [GPU Arbiter](#gpu-arbiter) and back to 1 when idle. Serves [`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`](https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm) (served as `qwen36-local`) — a **27B dense** model with a Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep paged KV), NVFP4 via compressed-tensors (~18 GiB resident on the 32 GB card), **192K context** (`--max-model-len=196608`; native max 262K). fp8 KV cache, `--max-num-seqs 16`, `--gpu-memory-utilization 0.95`, `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3`, `--language-model-only` (skips the vision encoder), prefix caching enabled. The 192K cap (raised from 131K) was driven by `exa-agent` search results (~38 KB each) overflowing 131K session windows. |
+| [kagent](https://kagent.dev/) | Agent framework + controller. Renders a `ModelConfig` (`qwen36-local` → local vLLM) and exposes an MCP server over a LAN-only HTTPRoute (`kagent-mcp` at `https://mcp.biggs.dog/mcp` on the internal LAN-only gateway `internal-biggs-dog`, VIP 192.168.6.15, TLS via the wildcard cert) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term (cross-session) vector memory. Embedding model: `BAAI/bge-m3` (via the `embeddings` service, CPU-only Infinity deployment). |
+| **Substrate runtime** (kagent ATE / actor runtime) | A control plane for **sandboxed agent code execution via gVisor**, deployed in `ai-system` (upstream hard-codes `ate-system`, so several namespace overrides are patched in). Components: `ate-controller`, `ate-api-server` (runs a forked image `shrinedogg/ateapi` carrying JWT-JWKS-url + atelet-namespace fixes), `atelet` worker DaemonSet, and `atenet-router`. gVisor `runsc` (`20260622.0`) is staged in the rustfs `ate-snapshots` bucket and pre-cached per node via a `runsc-cache` DaemonSet (the atelet's S3 client doesn't honor `AWS_ENDPOINT_URL`, so it can't pull from rustfs directly). A `WorkerPool` (`kagent-default`, `sandboxClass: gvisor`, `ateom-gvisor:v0.0.7`) is created by the kagent chart. Defined in `apps/ai-system/substrate/` + `substrate-crds/`. |
+| flux-mcp / `flux-agent` | A custom (non-chart) **read-only** kagent `Agent` wired to the Flux Operator MCP server, for GitOps inspection and reconciliation root-cause analysis. Defined in `apps/ai-system/flux-mcp/`. Per-agent memory disabled to avoid saturating the context window with large tool schemas. |
+| victoria-metrics-mcp / `vm-agent` | A custom kagent `Agent` backed by the [VictoriaMetrics MCP server](https://github.com/VictoriaMetrics/mcp-victoriametrics) (`v1.20.2`): PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis, embedded VM docs. Defined in `apps/ai-system/victoria-metrics-mcp/`. |
+| exa-mcp / `exa-agent` | A custom kagent `Agent` backed by the [Exa MCP server](https://github.com/shrinedogg/exa-mcp-server) (`3.2.1`): web search, code discovery, company research (`web_search_exa`, `web_fetch_exa`, `web_search_advanced_exa`). Defined in `apps/ai-system/exa-mcp/`. Requires an Exa API key. Long-term memory **enabled** (with context compaction at 80K tokens); the 192K vLLM cap is what keeps large Exa result sets from overflowing. |
+| [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, pinned to upstream `v0.5.0`, `controller.extensions: true`). Provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks` (code execution). Defined in `apps/ai-system/agent-sandbox/`. |
+| embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` for kagent's long-term vector memory. Intentionally CPU-only to avoid contending with the GPU-constrained vLLM. Defined in `apps/ai-system/embeddings/`. |
 
-**Available agents** (`kubectl get agents -n ai-system`):
-- **Chart-managed**: `k8s-agent`, `observability-agent`, `promql-agent`, `helm-agent`, `cilium-manager-agent`.
-- **Custom (non-chart)**: `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`.
-- **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
+**Available agents** (`kubectl get agents,sandboxagents -n ai-system`):
 
-See [`.rules`](.rules) for agent selection by task domain.
+The 10 agents split across **two deployment patterns**:
+
+- **Classic `kind: Agent` CRs** (invocable now via MCP): `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`. The last two are re-defined statically in `apps/ai-system/kagent/cilium-agents/` (disabled in the chart) so they carry generic `k8s_*` tools alongside Cilium tools.
+- **`kind: SandboxAgent` CRs on the substrate runtime** (`apps/ai-system/kagent/substrate-agents/`): `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`. These are `READY=True` with golden actors built, but are **not yet invocable via the MCP server** — an upstream kagent limitation (`MCPHandler.listReadyAgents` lists only `v1alpha2.Agent` and hard-codes reason `DeploymentReady`, while substrate agents report `WorkloadReady`). Use the fallbacks in [`.rules`](.rules) / direct `kubectl` until kagent wires `SandboxAgent` → A2A.
+- **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent` (plus the 5 substrate agents and 2 cilium agents are disabled in the chart so they don't double-render as classic `Agent` CRs).
+
+See [`.rules`](.rules) for agent selection by task domain and the live invocability status.
 
 ## 🌐 Networking Configuration
 
-### BGP Peering
+### BGP Peering  (`cluster1`)
 
-The cluster uses Cilium BGP to peer with the UDM router (ASN 64563, 192.168.1.1) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254`. This allows in-cluster services to reach external networks and vice versa. See [NOTES.md](docs/NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
+`cluster1` uses Cilium BGP to peer with the UDM router (ASN 64563, `192.168.1.1`) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254` (deliberately off-subnet from the nodes on `192.168.2.0/24`, so VIPs route via the UDM). This allows in-cluster services to advertise VIPs to the LAN. See [NOTES.md](docs/NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
+
+### Edge Ingress  (`cluster0`)
+
+`cluster0` advertises its single WAN IP (`87.58.147.51/32`) via a Cilium L2 announcement policy (no BGP — it's a single cloud node). Public DNS for `omni`/`dex`/`netbird`/`*.biggs.dog` resolves through Cloudflare to the `cluster0-gateway`; per-host TLS certs are issued in the `networking` namespace by the `letsencrypt-prod` ClusterIssuer (DNS-01/Cloudflare). UDP STUN (NetBird `3478`) bypasses the cloud LB via `externalIPs`.
 
 ## 🔐 Secret Management
 
-Secrets follow a three-tier model:
+Secrets follow a three-tier model (on both clusters):
 
-1. **SOPS with age encryption** — Git-committed secrets (Cilium policies, app defaults).
-2. **External Secrets + 1Password** — Runtime secrets from 1Password vaults (API keys, credentials).
+1. **SOPS with age encryption** — Git-committed secrets (Cilium policies, app defaults, and the 1Password Connect credentials/token). The repo-wide age key was rotated on 2026-07-04; `sops.yaml` lists the deployed key plus a pre-staged next key.
+2. **External Secrets + 1Password** — Runtime secrets from 1Password vaults (API keys, credentials) via 1Password Connect (`connect` chart `v2.4.1` on both clusters).
 3. **cert-manager** — Automatic certificate issuance + renewal (ACME Let's Encrypt, CA issuer).
 
-See [NOTES.md](docs/NOTES.md#secrets) for details.
+See [NOTES.md](docs/NOTES.md#security-model) for details.
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Kubernetes cluster
+- Kubernetes cluster(s)
 - [Flux CLI](https://fluxcd.io/flux/cmd/)
-- [SOPS](https://github.com/getsops/sops) with age key for decryption
+- [SOPS](https://github.com/getsops/sops) with the age key for decryption
 - 1Password Connect credentials
 
 ### Bootstrap
 
-The cluster bootstraps via Flux Operator syncing from:
+Each cluster bootstraps via its own Flux Operator syncing from:
 
 ```
 https://github.com/shrinedogg/biggs.dog.git
 ```
 
-Flux will automatically reconcile the cluster state based on the manifests in `clusters/cluster0/`.
+- `cluster0` syncs `clusters/cluster0` (edge/mgmt).
+- `cluster1` syncs `clusters/cluster1` (workloads).
+
+Flux automatically reconciles each cluster's state based on the manifests in its path. Secrets are decrypted by SOPS (age key) before Flux applies them.
 
 ## 🔁 Dependency Updates
 
 Dependency updates are managed by Renovate using the repository config in `renovate.json`.
-It is set up to update Flux `HelmRelease` chart versions (HelmRepository and OCI-based sources) and container images referenced in Kubernetes manifests, including the media stack under `clusters/cluster0/kubernetes/apps/media/`.
+It is set up to update Flux `HelmRelease` chart versions (HelmRepository and OCI-based sources) and container images referenced in Kubernetes manifests, including the media stack under `clusters/cluster1/kubernetes/apps/media/`.
 
 ## 📁 App Structure Pattern
 

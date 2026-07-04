@@ -2,7 +2,9 @@
 
 This document contains detailed architectural decisions, engineering notes, and historical context that is less critical for operators but helpful for maintainers and contributors.
 
-> **Note**: Cluster node specs (Talos Linux version, Kubernetes version, OS versions) in `README.md` are managed externally via Omni and reflect state at time of documentation. For live cluster versions, use `kubectl version` and check the Omni console. This Git repo drives desired state for workloads (manifests in `clusters/cluster0/`), not node OS versions.
+> **Two clusters (migration in progress).** The homelab is split across `cluster0` — a single-node **UpCloud cloud** edge/mgmt cluster (public WAN `87.58.147.51`, Cilium L2 announcement) running Dex, NetBird, Omni, cert-manager, and external-secrets — and `cluster1` — the **on-prem 6-node bare-metal** workload cluster (Cilium BGP → UDM, `192.168.6.0/24` VIPs) running all applications, storage, GPU/AI, and observability. Flux pruning is disabled on both during the cutover. Most sections below describe `cluster1` workloads; cluster-specific notes are called out inline.
+>
+> **Note**: `cluster1` node specs (Talos Linux version, Kubernetes version, OS versions) in `README.md` are managed via Omni and reflect state at time of documentation. For live cluster versions, use `kubectl version` and check the Omni console (now run in-cluster on `cluster0` — see [System & Hardware](#system--hardware)). This Git repo drives desired state for workloads, not node OS versions.
 
 ## Dreamcast Engineering Notes
 
@@ -77,11 +79,17 @@ Getting the full stack running required several insights:
 
 ### Networking Stack
 
-The cluster uses:
-- **Cilium** as the CNI (replaces kube-proxy), with BGP for LoadBalancer IP advertisement.
-- **k8s-gateway** for split-horizon DNS: `*.biggs.dog` resolves to the internal gateway LB (`192.168.6.7`) in-cluster and to the external gateway LB (`192.168.6.6`) for LAN clients.
-- **CoreDNS** patched (via Talos `inlineManifests`) to conditionally forward `biggs.dog` queries to k8s-gateway instead of Cloudflare, keeping pod traffic in-cluster.
-- **Gateway API** with **AgentGateway** (OCI HelmRelease) as the ingress controller.
+Both clusters run **Cilium** as the CNI (replaces kube-proxy) and **Gateway API** with **AgentGateway** (OCI HelmRelease, charts pinned to a known-good alpha build `0.0.0-alpha.a655af15`), but they advertise service VIPs differently:
+
+- **`cluster1` (on-prem)** — Cilium **BGP** peers with the UDM router (local ASN 64564 ↔ peer 64563 @ `192.168.1.1`), advertising the `192.168.6.6–254` pool (off-subnet from the nodes on `192.168.2.0/24`, so VIPs route via the UDM).
+- **`cluster0` (cloud)** — single-node, so it uses a Cilium **L2 announcement** policy with a single-IP pool (`87.58.147.51/32`). The UpCloud Managed LB only supports TCP/HTTP (no UDP), so UDP services (NetBird STUN `3478`) are exposed via `externalIPs` bound on the node's NIC instead of a LoadBalancer Service.
+
+`cluster1` split-horizon DNS:
+- **k8s-gateway** — authoritative for `*.biggs.dog` (LB `192.168.6.6`, ClusterIP `10.105.74.41`); resolves internal gateway VIPs in-cluster and external gateway VIPs for LAN clients.
+- **CoreDNS** (Talos-managed `kube-dns`) conditionally forwards `biggs.dog` queries to k8s-gateway's ClusterIP instead of Cloudflare, keeping pod traffic in-cluster.
+- **lan-dns** — LAN CoreDNS resolver (LB `192.168.6.16`) forwards `biggs.dog` → k8s-gateway and everything else → NextDNS over DoT.
+
+`cluster0` public ingress is the `cluster0-gateway` (`networking` ns) with HTTPS listeners for `omni`/`dex`/`netbird.biggs.dog`, each backed by a per-host cert issued **in the `networking` namespace** (Gateway API resolves name-only `certificateRefs` to the gateway's own namespace) via the `letsencrypt-prod` ClusterIssuer (DNS-01/Cloudflare).
 
 ### Storage Layers
 
@@ -124,23 +132,31 @@ This two-tier approach allows staged rollouts and rapid rollback without affecti
 
 ### Identity & SSO Details
 
-**Pocket ID** (`id.biggs.dog`):
+The two clusters run **different identity stacks** (a deliberate split: the edge cluster needs a always-on cloud IdP reachable before any on-prem dependency is up; the on-prem workload cluster uses the passkey-first stack for its apps).
+
+**Dex** (`cluster0`, `dex.biggs.dog`) — the root OIDC IdP for the edge plane:
+- `ghcr.io/dexidp/dex:v2.45.1`, stateless (`storage.type: memory`, single replica; tokens don't survive restarts, fine for interactive logins).
+- `enablePasswordDB: true` with a static admin user; clients/secrets templated into the config from 1Password.
+- Static clients: `omni` (Omni OIDC login), `netbird` (NetBird's embedded IdP upstream connector).
+- `connectors: []` — Dex is the root IdP here, not a federator in front of Pocket ID.
+
+**Pocket ID** (`cluster1`, `id.biggs.dog`) — passkey-first OIDC for workload apps:
 - Passkey-first OIDC provider (FIDO2 WebAuthn).
 - Postgres backend via CNPG (user database, secret storage).
 - File uploads stored in the same database.
 
-**OAuth2 Proxy** (`auth.biggs.dog`):
+**OAuth2 Proxy** (`cluster1`, `auth.biggs.dog`):
 - OIDC client to Pocket ID.
 - Provides forward-auth for browser apps (agentgateway `AgentgatewayPolicy` with `traffic.extAuth`).
 - Uses **Dragonfly (Redis)** for session storage (small session ticket instead of large cookie).
 - Protected apps attach a `ReferenceGrant` to reach the OAuth2 Proxy service in the `auth` namespace.
 
-**Protected apps:**
+**Protected apps (`cluster1`):**
 - Rook-Ceph dashboard
 - Bookboss
 - kagent UI
 
-**Native OIDC apps:**
+**Native OIDC apps (`cluster1`):**
 - Grafana (direct Pocket ID client, no forward-auth needed)
 
 ### Observability Stack
@@ -156,7 +172,8 @@ The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-
 - **NFD** (Node Feature Discovery) — detects hardware capabilities (GPU models, CPU flags, etc.) and labels nodes.
 - **Intel GPU Plugin** — enables Intel iGPU device plugin for media transcoding on worker nodes.
 - **NVIDIA GPU Operator** — device plugin with time-slicing (driver/toolkit provided by Talos system extensions, not by the operator).
-- **Omni / Talos machine config** — node-level config lives in Omni (Sidero) as per-machine `ConfigPatch`es, not in the Flux tree. Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). Local copies of these patches live under `omni/` (git-ignored, outside `clusters/cluster0/` so Flux never reconciles them). Each node carries a `10-<machine-id>` user patch (hostname, NIC rings, node-specific tweaks); nodes imported from existing Talos clusters got this auto-generated on import, whereas machines scaled directly from Omni do not, so their equivalent settings must be authored by hand. CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
+- **Omni (Sidero)** — now run **in-cluster on `cluster0`** (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.9.1`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `87.58.147.51:50180`). It manages the on-prem `cluster1` nodes, which phone home over Siderolink. Runs privileged with `/dev/net/tun`; double-TLS (gateway terminates, re-encrypts to the pod's own Let's Encrypt cert). Backed by embedded etcd + SQLite PVCs; OIDC login via Dex.
+- **Per-machine Omni `ConfigPatch`es** — node-level config still lives in Omni as per-machine `ConfigPatch`es (each node carries a `10-<machine-id>` user patch: hostname, NIC rings, node-specific tweaks). Local copies live under `omni/` (git-ignored, outside `clusters/` so Flux never reconciles them). Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). Nodes imported from existing Talos clusters got this auto-generated on import; machines scaled directly from Omni did not, so their equivalent settings must be authored by hand. CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
 
 ### Automation
 
@@ -168,43 +185,45 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### vLLM Deployment
 
-- **Model**: `nvidia/Qwen3.6-35B-A3B-NVFP4` (35B MoE, ~3B active parameters, **131K context** served, native max 262K) with Mamba-hybrid attention.
+- **Model**: [`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`](https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm) (served as `qwen36-local`) — a **27B dense** model (all params active) with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), NVFP4 via compressed-tensors (~18 GiB resident on the 32 GB card). **192K context** served (`--max-model-len=196608`; native max 262K).
 - **Version**: v0.23.0 (CUDA 12.9 for Blackwell GPU support on RTX 5090).
-- **Quant**: NVIDIA **NVFP4** (native Blackwell FP4 tensor core support, ~19B on disk).
-- **GPU**: One of the RTX 5090's 4 time-slices (~8 GB per slice, vLLM pins ~31 GB, one per session games at ~1–2 GB).
+- **GPU**: One of the RTX 5090's 4 time-slices; vLLM pins the bulk of the 32 GB card.
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
 
 ### vLLM Configuration & Performance
 
-**Context cap rationale**: The model's native max is 262K, but at 262K the KV pool on the 32 GB card only covers ~3.2 concurrent full-context requests. Capping at 131K doubles that to ~6.4 concurrent requests while staying well above flux-agent's ~64K tool-schema need.
+**Context cap rationale**: The model's native max is 262K. It was long capped at 131K (to roughly double KV concurrency on the 32 GB card), but was **raised to 192K** (`--max-model-len=196608`) because `exa-agent` web-search results (~38 KB each) were overflowing 131K session windows (one session hit ~164K tokens). The Gated-DeltaNet hybrid keeps most layers' KV bounded, so even 192K is affordable.
 
-**Configuration details** (`--max-num-seqs 32` capped for stability):
-- Runs with `fp8` KV cache, `--max-num-seqs 32` / `--max-cudagraph-capture-size 32` (lowered from 64 after a vLLM stall/restart under parallel kagent fan-out — 6-9 agents firing long-context tool-schema prompts simultaneously saturated GPU compute during prefill and stalled the async event loop past the 10s×6 liveness headroom; 32-way lets vLLM queue excess requests instead of compute-locking).
-- **`--max-model-len 131072` (131K; native max is 262K, but at 262K the ~838K-token KV pool covers ~3.2 concurrent full-context reqs, so capped at 131K for ~6x headroom)**.
-- **`--gpu-memory-utilization 0.90` (reduced from 0.97)**: On this time-sliced, shared GPU, 0.97 reserved ~31.6GB and left only ~1GB free — co-scheduled consumers then hit NVRM `NV_ERR_NO_MEMORY`, contributing to a full node lockup (2026-06-25). `0.90` reserves ~29.3GB (leaves ~3.2GB headroom). The earlier `0.97` had trimmed KV-exhaustion preemptions (decode min 146 → 166 tok/s, stddev −29%), so this trades a little tail latency for stability.
-- **`--max-num-batched-tokens=8192` (bumped from 4096)**: Reduces prefill scheduling rounds for medium prompts. Halves prefill rounds for 200–400 token range, shaving 2–5% off total time for those scenarios.
-- **Tool-call parser**: Qwen3.6 uses `--tool-call-parser qwen3_xml` + `--reasoning-parser qwen3` (per NVIDIA's model card), with `--enable-auto-tool-choice`, paired with the model's built-in chat template.
-- **Quantization**: `--quantization modelopt` (vLLM auto-detects NVIDIA ModelOpt's NVFP4 config from the checkpoint). `--trust-remote-code` is set per the model card.
-- **Mamba-hybrid attention** — keeps most layers' KV bounded, so even the full 131K window is cheap.
-- **Text-only inference** — `--limit-mm-per-prompt={"image":0,"video":0}` skips the vision encoder on this multimodal checkpoint.
+**Configuration details** (from `apps/ai-system/vllm/app/deployment.yaml`):
+- **`--max-model-len 196608` (192K)** — raised from 131K for exa-agent search-result headroom (see above).
+- **`--max-num-seqs 16` / `--max-cudagraph-capture-size 16`** (lowered from 32): the dense 27B model has far more active params per token than the prior MoE, so 16-way keeps prefill responsive under parallel kagent fan-out (the prior 32-way stall was on the MoE; this is a further stability margin).
+- **`--gpu-memory-utilization 0.95`** (raised from 0.90): the 27B dense NVFP4 quant is lighter on residency (~18 GiB), leaving headroom to grow the KV pool back toward the 192K cap.
+- **`--max-num-batched-tokens=8192`** (bumped from 4096): reduces prefill scheduling rounds for medium prompts.
+- **`--kv-cache-dtype fp8`**.
+- **Quantization**: auto-detected `compressed-tensors` NVFP4 from the checkpoint — **no `--quantization` flag** is passed (vLLM reads the model's NVFP4 config directly).
+- **Tool-call parser**: `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3` (with `--enable-auto-tool-choice`), paired with the model's built-in chat template. (The prior MoE used `qwen3_xml`; this quant recommends `qwen3_coder`.)
+- **`--language-model-only`** — skips the vision encoder on this multimodal checkpoint (replaces the old `--limit-mm-per-prompt`).
+- `--enable-prefix-caching`, `--trust-remote-code`.
 
 **Benchmark methodology** (`scripts/vllm-benchmark.py`):
 - Runs 8 prompt profiles (short query, short factual, medium conversation, medium analysis, long tool-context, long reasoning, very long conversation history, structured response) at configurable concurrency/warmup/repetitions via raw aiohttp SSE parsing (bypasses OpenAI client streaming bugs).
 - Results saved as JSON; compare with `scripts/compare-benchmarks.py`.
 - Synthetic workload benchmark simulates 8 kagent-style prompt profiles (50 → 4,000 prompt tokens, 80 → 500 gen tokens) at concurrency 4 with 3 rep/scenario.
-- **Measured performance** (at 0.97 GPU util, now running 0.90 for stability):
+- **Measured performance** (measured on the prior MoE config; current dense 27B runs at `gpu-mem-util 0.95` / `max-num-seqs 16` / 192K):
   - Median TTFT **~1.12s** (stddev 0.07s)
   - Decode throughput **~186 tok/s** (stddev 10)
   - Total request time **~2.44s** median
   - Tail TTFT improved ~11% and decode stddev dropped ~29% vs baseline (fewer KV-preemptions, fewer prefill rounds)
-- **Raw `vllm bench serve` on the 5090**:
+- **Raw `vllm bench serve` on the 5090** (prior MoE, at the then-served 131K context):
   - Single-stream **~250 tok/s @ ~65 ms TTFT** (TPOT ~4 ms)
-  - Batched aggregate **~2,450 tok/s @ 32-way** and **~3,070 tok/s @ 64-way** concurrency (0 failures) *at served 131K context*
+  - Batched Aggregate **~2,450 tok/s @ 32-way** and **~3,070 tok/s @ 64-way** concurrency (0 failures)
   - Well within the 32 GB card
-  - **Note:** `max-num-seqs` is now capped at 32 for production stability (64-way stalled under real agent fan-out), but the 64-way benchmark figure remains valid as the theoretical throughput ceiling.
+  - **Note:** these figures are from the prior model; `max-num-seqs` is now 16 for production stability (the dense model is compute-heavier per token), but the 64-way figure remains valid as a theoretical throughput ceiling for the card.
 
-**Model right-sizing (history)**: The cluster previously ran `NeuralNet-Hub/Qwen3.6-27B-NVFP4`, but per its author that was a suboptimal `llm-compressor` quant only validated on a **48 GB** card ([discussion](https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4/discussions/1)) — it barely fit the 32 GB 5090 (util pinned near 0.984, 65K context max), causing OOM/`no cache blocks` churn and overflowing `flux-agent`'s ~64K tool schemas. An intermediate swap to the smaller, KV-efficient Gemma-4-26B-A4B (14B on disk, sliding-window attention, 256K context) resolved the OOM/context churn. The current model, NVIDIA's official `nvidia/Qwen3.6-35B-A3B-NVFP4` (NVFP4, ~19B on disk), keeps the KV headroom (Mamba-hybrid attention, served at 131K) while moving back to a stronger MoE base — flux-agent and the other heavy agents now fit with long-term memory on and no overflow.
+**Model right-sizing (history)**: The cluster previously ran `NeuralNet-Hub/Qwen3.6-27B-NVFP4`, but per its author that was a suboptimal `llm-compressor` quant only validated on a **48 GB** card ([discussion](https://huggingface.co/NeuralNet-Hub/Qwen3.6-27B-NVFP4/discussions/1)) — it barely fit the 32 GB 5090 (util pinned near 0.984, 65K context max), causing OOM/`no cache blocks` churn and overflowing `flux-agent`'s ~64K tool schemas. An intermediate swap to the smaller, KV-efficient Gemma-4-26B-A4B (14B on disk, sliding-window attention, 256K context) resolved the OOM/context churn. A move to NVIDIA's official `nvidia/Qwen3.6-35B-A3B-NVFP4` (35B MoE, ~19B on disk, Mamba-hybrid, served at 131K) restored a stronger base with KV headroom.
+
+The **current** model is [`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`](https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm) — a **27B dense** NVFP4 quant. The prior `unsloth/Qwen3.6-27B-NVFP4` dense quant left the vision tower + embeddings in BF16 (~23 GiB resident), capping context at ~80K; this quant compresses those too (~18 GiB resident), restoring the full window **and** concurrency. Paired with a Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep paged KV) and `max-model-len` raised to 192K, it now fits `exa-agent`'s large search-result sessions alongside long-term memory with no overflow. See `apps/ai-system/vllm/app/deployment.yaml` for the in-tree rationale comments.
 
 ### Embeddings Service
 
@@ -217,48 +236,65 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### kagent Agents
 
-The 10 agents split into two deployment patterns:
+The 10 agents split across **two deployment patterns** — classic `kind: Agent` CRs (the python runtime, each its own Deployment) and `kind: SandboxAgent` CRs on the substrate runtime (gVisor-sandboxed actors):
 
-**Chart-managed agents** (enabled via kagent HelmRelease toggles):
+**Classic `kind: Agent` CRs** (invocable now via MCP) — the python runtime, each runs as its own Deployment:
+- `flux-agent` (read-only) — Flux GitOps inspection (custom, `apps/ai-system/flux-mcp/`).
+- `vm-agent` — VictoriaMetrics query + TSDB analysis (custom, `apps/ai-system/victoria-metrics-mcp/`).
+- `exa-agent` — Web search and research (custom, `apps/ai-system/exa-mcp/`).
+- `cilium-debug-agent` — Cilium diagnosis (static, `apps/ai-system/kagent/cilium-agents/`; carries generic `k8s_*` tools).
+- `cilium-policy-agent` — Cilium policy authoring (static, `apps/ai-system/kagent/cilium-agents/`; carries generic `k8s_*` tools).
+
+**`kind: SandboxAgent` CRs on the substrate runtime** (`apps/ai-system/kagent/substrate-agents/`, `platform: substrate`, `workerPoolRef: kagent-default`):
 - `k8s-agent` — general Kubernetes inspection/troubleshooting.
 - `observability-agent` — metrics, dashboards, alerting.
 - `promql-agent` — PromQL query generation.
 - `helm-agent` — Helm release management.
 - `cilium-manager-agent` — Cilium install/config/upgrade.
 
-**Custom (non-chart) agents** (static manifests in dedicated Kustomizations):
-- `flux-agent` (read-only) — Flux GitOps inspection (defined in `apps/ai-system/flux-mcp/`).
-- `vm-agent` — VictoriaMetrics query + TSDB analysis (defined in `apps/ai-system/victoria-metrics-mcp/`).
-- `exa-agent` — Web search and research (defined in `apps/ai-system/exa-mcp/`).
-- `cilium-debug-agent` — Cilium diagnosis (defined in `apps/ai-system/kagent/cilium-agents/`).
-- `cilium-policy-agent` — Cilium policy authoring (defined in `apps/ai-system/kagent/cilium-agents/`).
+These five are `ACCEPTED=True` / `READY=True` (golden actors built; ActorTemplates in `Ready` phase, upserted into the kagent Postgres `agents` table) and are listed by the kagent REST API (`/agents`, kagent-ui) — but are **not yet invocable via the MCP server** (`list_agents` omits them; `invoke_agent` returns "not found"). See [Agent Sandbox & Code Execution](#agent-sandbox--code-execution) for the root cause and the [`.rules`](.rules) fallbacks.
 
-**Disabled agents** (chart toggles): `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`.
+**Disabled chart agents** (kagent HelmRelease toggles): `argo-rollouts-agent`, `istio-agent`, `kgateway-agent`. The 5 substrate agents and the 2 static cilium agents are also disabled in the chart so they don't double-render as classic `Agent` CRs.
 
-All 10 agents are deployed as classic `kind: Agent` CRs, which run in pod runtimes with `executeCodeBlocks: true` and isolated `sandbox` specs (see Agent Sandbox section below). Agent selection for MCP tasks is documented in [`.rules`](.rules); each agent has a specific domain and preferred use case.
+The classic agents run in pod runtimes with `executeCodeBlocks: true` and isolated `sandbox` specs via the SIG-Apps `Sandbox` controller (below). Agent selection for MCP tasks is documented in [`.rules`](.rules); each agent has a specific domain and preferred use case.
 
 ### Agent Sandbox & Code Execution
 
-The cluster runs **SIG-Apps `Sandbox`** CRD + controller (`agents.x-k8s.io`, pinned to `v0.5.0` with `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for agents that opt into `executeCodeBlocks`. All 10 kagent agents are configured with code execution enabled.
+There are **two sandboxing mechanisms** deployed in `ai-system`:
 
-**Multi-version CRD upgrade path**: `v0.5.0` graduated the core + extension APIs from `v1alpha1` to `v1beta1` (multi-version CRDs with a self-hosted conversion webhook served by the controller on `:9443`). Because the controller is installed into `ai-system` rather than the upstream-default `agent-sandbox-system`, it rewrites each CRD's `conversion.webhook.clientConfig.service.namespace` to `ai-system` at startup (via `--webhook-namespace`). On an in-place `v0.4.6`->`v0.5.0` upgrade, the controller can deadlock during initial cache sync if pre-existing `v1alpha1` CRs must be converted before its own webhook Service has Ready endpoints — clear the (ephemeral) Sandbox/SandboxClaim/SandboxTemplate/SandboxWarmPool CRs so the first sync has nothing to convert, then let it come up clean.
+1. **SIG-Apps `Sandbox` CRD + controller** (`agents.x-k8s.io`, pinned to `v0.5.0` with `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks` (code execution). All 5 classic agents are configured with code execution enabled.
+2. **kagent substrate runtime (ATE / actor runtime)** — a separate control plane for sandboxed code execution via **gVisor**, used by the `kind: SandboxAgent` CRs. See [Substrate Runtime](#substrate-runtime) below.
+
+**Multi-version CRD upgrade path** (SIG-Apps Sandbox): `v0.5.0` graduated the core + extension APIs from `v1alpha1` to `v1beta1` (multi-version CRDs with a self-hosted conversion webhook served by the controller on `:9443`). Because the controller is installed into `ai-system` rather than the upstream-default `agent-sandbox-system`, it rewrites each CRD's `conversion.webhook.clientConfig.service.namespace` to `ai-system` at startup (via `--webhook-namespace`). On an in-place `v0.4.6`->`v0.5.0` upgrade, the controller can deadlock during initial cache sync if pre-existing `v1alpha1` CRs must be converted before its own webhook Service has Ready endpoints — clear the (ephemeral) Sandbox/SandboxClaim/SandboxTemplate/SandboxWarmPool CRs so the first sync has nothing to convert, then let it come up clean.
 
 **Two hard requirements** (both learned the hard way):
 
-1. **Ingress from the kube-apiserver to the conversion webhook (`:9443`) must be allowed.** `ai-system` runs implicit Cilium default-deny ingress (`allow-intra-namespace` selects `endpointSelector: {}`), and the apiserver runs host-network on a *remote* control-plane node, so it isn't covered by Cilium's allow-localhost exemption. Without an explicit allow, every `v1alpha1<->v1beta1 Sandbox` conversion the apiserver issues is silently dropped: the controller crash-loops on cache-sync, `kubectl get sandboxes` hangs, and anything that creates a `Sandbox` (executeCodeBlocks Agents, or old SandboxAgent reconciles) stalls to a 30s timeout. Fixed by the `allow-ingress-apiserver-to-sandbox-webhook` CiliumNetworkPolicy in `network-policies/policies/infra/ai-system.yaml` (`fromEntities: [kube-apiserver]` -> `:9443`). This rule is permanent (both for Sandbox CRD conversion on classic agents *and* for any future SandboxAgent use).
+1. **Ingress from the kube-apiserver to the conversion webhook (`:9443`) must be allowed.** `ai-system` runs implicit Cilium default-deny ingress (`allow-intra-namespace` selects `endpointSelector: {}`), and the apiserver runs host-network on a *remote* control-plane node, so it isn't covered by Cilium's allow-localhost exemption. Without an explicit allow, every `v1alpha1<->v1beta1 Sandbox` conversion the apiserver issues is silently dropped: the controller crash-loops on cache-sync, `kubectl get sandboxes` hangs, and anything that creates a `Sandbox` (executeCodeBlocks Agents, or SandboxAgent reconciles) stalls to a 30s timeout. Fixed by the `allow-ingress-apiserver-to-sandbox-webhook` CiliumNetworkPolicy in `network-policies/policies/infra/ai-system.yaml` (`fromEntities: [kube-apiserver]` -> `:9443`). This rule is permanent (both for Sandbox CRD conversion on classic agents *and* for SandboxAgent use on the substrate).
 
-2. **Agent architecture: Classic `Agent` CRs only (not `SandboxAgent`)** — `SandboxAgent` was tried for all 10 agents and reverted (2026-06-27). The sandboxagent controller does create the Sandbox pod (and `/api/agents` lists it), but it never registers the agent in the controller's **A2A registry** — so the agent is *not invokable* via the kagent MCP server (`mcp.biggs.dog`) or UI (`/api/a2a/...` returns "Agent not found", and `list_agents` returns empty). There is no config knob to wire it up; it needs an upstream kagent code change. The agents stay as classic `kind: Agent` CRs (chart-managed toggles in the kagent HelmRelease for the built-ins; custom manifests under `flux-mcp/`, `victoria-metrics-mcp/`, `exa-mcp/`, and `kagent/cilium-agents/`), which remain fully invokable *and* still use the `Sandbox` controller for sandboxed code execution via `executeCodeBlocks`. The controller install (`apps/ai-system/agent-sandbox/`) is kept for that and for a future kagent release that wires `SandboxAgent` -> A2A.
+2. **`SandboxAgent` agents run but are not yet MCP-invocable.** The substrate `SandboxAgent` controller creates the Sandbox pod (and the kagent REST API `/agents` lists it), but the kagent **MCP** layer omits it. Root cause is an **upstream kagent limitation, not a cluster config issue** (verified live, still present on kagent 0.9.10 / `kagent-dev/kagent@main`): `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` (it never enumerates `SandboxAgent` CRs) and hard-codes `condition.Reason == "DeploymentReady"`; classic agents report Ready with reason `DeploymentReady`, while substrate agents report `WorkloadReady`. So substrate agents are excluded twice. `invoke_agent` is blocked by the same gap (returns "agent not found or not ready"). Fix needs an upstream kagent change (also list `SandboxAgentList` and accept `WorkloadReady`); track upstream and bump kagent when fixed. Until then, use the [`.rules`](.rules) fallbacks / direct `kubectl` for the 5 substrate agents. (Historically `SandboxAgent` was tried for all 10 agents and reverted on 2026-06-27 for exactly this reason; it was re-introduced for the 5 built-ins once the substrate runtime itself was stood up — the A2A/MCP gap is the remaining blocker, not the runtime.)
 
-**Sandbox network scoping**: Each agent declares allowed egress via `spec.sandbox.network.allowedDomains`:
+**Substrate namespace overrides**: upstream hard-codes the `ate-system` namespace everywhere, but this cluster runs substrate in `ai-system`. A stack of `ate-system`-vs-`ai-system` bugs gated golden-actor creation, each hidden behind the previous; all are fixed live:
+  1. `ate-controller` dial addr (`--ateapi-conn-spec`, substrate HelmRelease).
+  2. `ate-api-server` JWT key fetch (`--client-jwt-jwks-url`, on a forked image `shrinedogg/ateapi`). The JWKS URL points at the Kubernetes openid endpoint to work around Omni's IPv6 ULA issuer (`--service-account-issuer`) being unreachable from the IPv4 pod network.
+  3. `ate-api-server` atelet discovery (`ATELET_NAMESPACE=ai-system` on the forked image).
+  4. kagent env-source RBAC (`controller.substrate.ateApiServer.namespace=ai-system` in the kagent HelmRelease — the RoleBinding subject otherwise points at the nonexistent `ate-system` SA).
+  5. gVisor `runsc` asset (`SandboxConfig/gvisor-default` + a `runsc-cache` DaemonSet; runsc `20260622.0` staged in the rustfs `ate-snapshots` bucket and pre-cached per node, because the atelet's S3 asset client doesn't honor `AWS_ENDPOINT_URL` and would otherwise dial real AWS S3).
+  6. **Cilium egress (the real final blocker):** `ai-system` is in Cilium default-deny, and `allow-egress-internet` selected only `managed-by=kagent` pods. The atelet (`app=atelet`, Helm-managed) pulls sandbox container images in-process (`memorypullcache`, does NOT reuse node containerd) from `cr.kagent.dev` + `gcr.io`, so its pulls were policy-denied. Fixed by `allow-egress-atelet-registries` (CNP, `app=atelet` -> `world:443`). Node containerd pulls (for ordinary Deployments) always worked (host network); only the atelet's pod-network in-process pulls were blocked.
+
+**Sandbox network scoping** (classic agents): each classic agent declares allowed egress via `spec.sandbox.network.allowedDomains`:
 - Most sandboxes lock egress to `*.svc.cluster.local`, so prompt-injected code can hit in-cluster services (e.g. query VictoriaMetrics directly via `requests`/`httpx`) but can't phone out to the internet.
 - `flux-agent` is stricter still (`sandbox.network: {}` = no outbound network at all), since it's a read-only diagnostic agent whose code only needs tool-call results.
 - That allow-list is layered on the namespace's Cilium policies (`allow-egress-internet` still governs the agent pods themselves); the sandbox allow-list is the tighter boundary for *executed* code specifically.
 
-**Security & de-privileging**: The `vm-agent` runner is de-privileged (`runAsNonRoot`, drop `ALL` capabilities, `privileged: false`) because `executeCodeBlocks` writes to the container filesystem — kagent otherwise schedules agent pods privileged, which combined with tool access is too large a blast radius for a prompt-injectable LLM. **Caveat:** the chart-managed agents are *not* de-privileged (the `postRenderers` patches only add the sandbox fields, not a `securityContext`), so kagent still schedules their pods privileged — enabling code execution there raises blast radius until they're hardened the same way vm-agent is.
+**Security & de-privileging**: The `vm-agent` runner is de-privileged (`runAsNonRoot`, drop `ALL` capabilities, `privileged: false`) because `executeCodeBlocks` writes to the container filesystem — kagent otherwise schedules agent pods privileged, which combined with tool access is too large a blast radius for a prompt-injectable LLM. **Caveat:** the other classic agents are *not* de-privileged, so kagent still schedules their pods privileged — enabling code execution there raises blast radius until they're hardened the same way vm-agent is.
+
+### Substrate Runtime
+
+The kagent **substrate** (ATE / actor runtime) is deployed in `apps/ai-system/substrate/` (+ `substrate-crds/`) and backs the 5 `SandboxAgent` agents. Components: `ate-controller`, `ate-api-server` (Deployment `ate-api-server-deployment`, running the forked image `docker.io/shrinedogg/ateapi:v0.0.7-jwksurl-ateletns`), `atelet` worker DaemonSet, and `atenet-router`. A `WorkerPool` (`kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.7`) is created by the kagent chart. JWT issuer is the Omni KubeSpan/SideroLink ULA. All substrate Deployments are pinned to the GPU node `nv-01`. gVisor `runsc` (`20260622.0`) is staged in rustfs and pre-cached per node via the `runsc-cache` DaemonSet. The kagent chart wires it in via `controller.substrate.enabled: true`, `ateApiEndpoint: dns:///api.ai-system.svc:443`, `ateApiInsecure: true`, and `substrateWorkerPool.create: true` (`replicas: 1`).
 
 ### Long-Term Memory
 
-kagent is configured with vectorized memory (long-term, cross-session) backed by CNPG Postgres + pgvector, using the `embeddings` service for embedding generation. Per-agent memory is disabled on `flux-agent` (custom) because its ~64K tool schemas already bring the 131K context window to saturation; other agents have memory enabled and remain well under the cap (~20% KV cache peak under load).
+kagent is configured with vectorized memory (long-term, cross-session) backed by CNPG Postgres + pgvector, using the `embeddings` service for embedding generation. Per-agent memory is disabled on `flux-agent` (custom) because its ~64K tool schemas already push the context window toward saturation; all other classic agents (including `exa-agent`) have memory enabled. `exa-agent` additionally sets `context.compaction` at an 80K-token threshold and pairs with the 192K vLLM cap to absorb large web-search result sets without overflow — an earlier attempt to disable exa memory (suspected context overflow) was reverted once it was clear the overflow came from Exa results, not memory (the pgvector `memory` table had 0 rows). The 5 substrate agents declare no per-agent `memory:` block. None of the disabled chart agents are in scope.
 
 ### MCP Servers
 
@@ -273,13 +309,13 @@ The MCP endpoint is the `kagent-mcp` HTTPRoute (`https://mcp.biggs.dog/mcp`) on 
 
 ## Cluster Bootstrapping
 
-The cluster bootstraps via **Flux Operator** syncing from `https://github.com/shrinedogg/biggs.dog.git` (main branch). Flux automatically reconciles the cluster state based on manifests in `clusters/cluster0/`:
+Each cluster bootstraps via its own **Flux Operator** syncing from `https://github.com/shrinedogg/biggs.dog.git` (main branch). `cluster0` syncs `clusters/cluster0` (edge/mgmt); `cluster1` syncs `clusters/cluster1` (workloads). On each, Flux reconciles:
 
 1. **FluxInstance** (Flux system components).
 2. **Sources** (GitRepository, HelmRepository, OCIRepository).
 3. **Kustomizations** and **HelmReleases** (ordered via `dependsOn`).
 
-Secrets are decrypted by SOPS (age key) before Flux applies them.
+Flux pruning is currently **disabled** on both root syncs as a migration safety measure (see [Architecture](../README.md#-architecture) in the README). Secrets are decrypted by SOPS (age key) before Flux applies them.
 
 ## Dependency Update Workflow
 
@@ -321,7 +357,7 @@ On a match, Renovate opens a PR with updated versions. CI validates the changes,
 
 ### Agents & MCP
 
-- **The `SandboxAgent` gap is not a network/configuration issue** — the `kind: SandboxAgent` agent runs a pod successfully, but the kagent controller never registers it in the A2A registry (the in-memory map/service lookup that `mcp.biggs.dog` queries). No Service, no ingress rule, no helm value can fix this on kagent 0.9.10 — it requires upstream code that ties `SandboxAgent` reconciliation to A2A registration. This was verified by probing `/api/a2a/ai-system/flux-agent/.well-known/agent-card.json` → "Agent not found" (registry lookup, not network).
+- **The `SandboxAgent` MCP-listing gap is upstream, not config** — the substrate `kind: SandboxAgent` agents run, build golden actors, and are listed by the kagent REST API (`/agents`), but `MCPHandler.listReadyAgents` lists only `v1alpha2.Agent` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`, so they're excluded from `list_agents` and `invoke_agent` returns "not found". No Service/ingress/Helm value fixes this on kagent 0.9.10 — it needs an upstream kagent change. Verified by probing `/api/a2a/ai-system/<agent>/.well-known/agent-card.json` → "Agent not found" (registry lookup, not network).
 - **The apiserver→webhook netpol is non-obvious but critical** — Cilium's implicit default-deny dropped all apiserver traffic to the controller because the apiserver runs on a *remote* host (control-plane node). Took tracing through the CRD conversion path and the controller's deadlock during cache-sync to diagnose. This rule is now permanent (both for `SandboxAgent` use *and* for classic agents with `executeCodeBlocks`).
 - **Git history is the source of truth for restoration** — when rolling back from a partial deployment state, the backup YAML contains *generated* objects (not the source manifests). Restoring from git history (`git checkout <commit> -- <file>`) is necessary to get the canonical, working manifests. Post-migration cleanup (e.g., kustomization.yaml deletions in custom agent app dirs) don't need to be restored — Flux auto-generates kustomizations for leaf app directories. Only the source manifests and the Flux Kustomization references need recovery.
 
@@ -330,5 +366,6 @@ On a match, Renovate opens a PR with updated versions. CI validates the changes,
 - **Cilium Egress Gateway** — route outbound traffic through a dedicated node to stabilize external IPs (useful for services that block by IP).
 - **Distributed Tracing** — add Jaeger or Tempo for end-to-end tracing across kafka, game streaming, and agent operations.
 - **GPU Metrics Dashboard** — Grafana dashboard for DCGM metrics, game session lifecycle, vLLM scaling events.
-- **Multi-cluster Flux** — expand to manage additional clusters (e.g., edge nodes) from a central repo.
-- **Agent hardening** — de-privilege and add `securityContext` to chart-managed agents (currently only vm-agent is hardened).
+- **Finish the cluster split** — re-enable Flux pruning on both clusters once the `cluster0`/`cluster1` cutover is confirmed stable, and reconcile any remaining drift between the two trees.
+- **Substrate agents via MCP** — bump kagent once upstream lists `SandboxAgent` CRs and accepts `WorkloadReady` in `listReadyAgents`, so `k8s-agent`/`helm-agent`/`promql-agent`/`observability-agent`/`cilium-manager-agent` become MCP-invocable.
+- **Agent hardening** — de-privilege and add `securityContext` to the other classic agents (currently only vm-agent is hardened).
