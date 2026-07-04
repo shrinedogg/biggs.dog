@@ -1,7 +1,10 @@
+---
+# Cluster-scoped. spec.loadBalancerIPs is a boolean in the CRD schema.
+# Empty nodeSelector/serviceSelector = announce LoadBalancer IPs for all
+# Services from all nodes.
 apiVersion: cilium.io/v2alpha1
 kind: CiliumL2AnnouncementPolicy
 metadata:
   name: cluster0-l2-announcement
-  namespace: kube-system
 spec:
-  loadBalancerIPs: {}
+  loadBalancerIPs: true

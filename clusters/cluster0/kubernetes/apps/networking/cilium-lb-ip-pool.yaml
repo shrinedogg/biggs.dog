@@ -1,10 +1,10 @@
-apiVersion: cilium.io/v2alpha1
+---
+# Cluster-scoped. Cilium >=1.15 removed spec.cidrs in favor of spec.blocks;
+# validated against the live 1.19.5 CRD (cilium.io/v2, storage version).
+apiVersion: cilium.io/v2
 kind: CiliumLoadBalancerIPPool
 metadata:
   name: cluster0-lb-ip-pool
-  namespace: kube-system
 spec:
-  cidrs:
-    - 87.58.147.51/32
-  loadBalancerIPs:
-    - ip: 87.58.147.51
+  blocks:
+    - cidr: 87.58.147.51/32
