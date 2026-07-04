@@ -1,66 +1,7 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: netbird-config
-  namespace: netbird
-  labels:
-    app.kubernetes.io/name: netbird
-    app.kubernetes.io/component: server
-data:
-  config.yaml: |
-    ---
-    Id:
-      Type: string
-      AutoGenerate: true
-    HttpConfig:
-      Listen: "0.0.0.0:5432"
-      Config:
-        ReadTimeout: 30
-        WriteTimeout: 30
-        IdleTimeout: 120
-    ManagementServer:
-      ConfigPath: ""
-      Listen: "0.0.0.0:4222"
-      Endpoint: ""
-      PeerListen: "0.0.0.0:4222"
-      DataStore:
-        Type: sqlite
-        Url: /var/lib/netbird/datastore.v2.db
-      SignUp:
-        Enabled: true
-        Idp:
-          Auto: true
-      SingleAccountPerUser: true
-      DisableAnonymousMetrics: true
-      UseIdentityProviderUi: true
-    SignalServer:
-      ConfigPath: ""
-      Listen: "0.0.0.0:4223"
-      Endpoint: ""
-    Relay:
-      Enabled: true
-      Listen: "0.0.0.0:4224"
-      Endpoint: ""
-    STUN:
-      - "0.0.0.0:3478"
-    Peer:
-      ConfigPath: ""
-      ManagementURL: "http://localhost:4222"
-      ManagementProxy: true
-      Signal:
-        URL: "ws://localhost:4223/ws-proxy"
-        ProxyURL: "http://localhost:4222"
-      Update:
-        Enabled: false
-        Interval: 300
-      Firewall:
-        Enabled: true
-      WireguardBindPort: 0
-    Linux:
-      RunAsRootUser: false
-    LogFile: /var/log/netbird/server.log
-    LogLevel: info
----
+# NetBird combined server (management + signal + relay + STUN + embedded IdP
+# in one binary). Config comes from the netbird-server-config ExternalSecret;
+# all HTTP/gRPC traffic is multiplexed on :80 behind cluster0-gateway, STUN
+# stays on 3478/udp via the netbird-stun LoadBalancer Service.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -71,6 +12,8 @@ metadata:
     app.kubernetes.io/component: server
 spec:
   replicas: 1
+  strategy:
+    type: Recreate # single SQLite store on RWO PVC
   selector:
     matchLabels:
       app.kubernetes.io/name: netbird
@@ -81,62 +24,52 @@ spec:
         app.kubernetes.io/name: netbird
         app.kubernetes.io/component: server
     spec:
-      securityContext:
-        runAsNonRoot: false
       containers:
         - name: netbird
-          image: netbirdio/netbird:v0.31.0
-          command: ["netbird", "server"]
-          env:
-            - name: DATASTORE_ENCRYPTION_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: netbird-secrets
-                  key: encryption-key
-            - name: NETBIRD_RELAY_AUTH_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: netbird-secrets
-                  key: relay-secret
+          # NOTE: netbird-server tags have no "v" prefix.
+          image: netbirdio/netbird-server:0.74.2
+          # Image ENTRYPOINT is /go/bin/netbird-server; only override the CMD.
+          args: ["--config", "/etc/netbird/config.yaml"]
           ports:
-            - containerPort: 4222
-              name: mgmt
-            - containerPort: 4223
-              name: signal
-            - containerPort: 4224
-              name: relay
+            - containerPort: 80
+              name: http
             - containerPort: 3478
               protocol: UDP
               name: stun
+            - containerPort: 9090
+              name: metrics
+            - containerPort: 9000
+              name: health
           volumeMounts:
             - name: netbird-config
               mountPath: /etc/netbird/config.yaml
               subPath: config.yaml
+              readOnly: true
             - name: netbird-data
               mountPath: /var/lib/netbird
           resources:
             requests:
               cpu: 100m
-              memory: 128Mi
+              memory: 256Mi
             limits:
               cpu: 500m
-              memory: 512Mi
+              memory: 1Gi
           livenessProbe:
             httpGet:
-              path: /ready
-              port: 4222
+              path: /health
+              port: 9000
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
-              path: /ready
-              port: 4222
+              path: /health
+              port: 9000
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
         - name: netbird-config
-          configMap:
-            name: netbird-config
+          secret:
+            secretName: netbird-server-config
         - name: netbird-data
           persistentVolumeClaim:
             claimName: netbird-data-pvc

@@ -1,3 +1,8 @@
+# HTTP(S)/websocket routes for the combined server + dashboard.
+# Path split mirrors upstream's reference reverse-proxy config:
+#   /relay, /ws-proxy, /api, /oauth2 -> netbird-server (single HTTP port)
+#   /                                -> dashboard (catch-all)
+# Native gRPC paths live in grpc-httproute.yaml (h2c backend).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -9,6 +14,8 @@ spec:
   parentRefs:
     - name: cluster0-gateway
       namespace: networking
+  hostnames:
+    - netbird.biggs.dog
   rules:
     - matches:
         - path:
@@ -16,28 +23,35 @@ spec:
             value: /api
       backendRefs:
         - name: netbird-server
-          port: 4222
+          port: 80
     - matches:
         - path:
             type: PathPrefix
             value: /ws-proxy
       backendRefs:
         - name: netbird-server
-          port: 4223
+          port: 80
+      # Long-lived websocket stream; override agentgateway's 15s default
+      # (upstream recommends ~1 day for websocket/gRPC connections).
+      timeouts:
+        request: 24h
     - matches:
         - path:
             type: PathPrefix
             value: /relay
       backendRefs:
         - name: netbird-server
-          port: 4224
+          port: 80
+      # Long-lived websocket stream (see /ws-proxy note).
+      timeouts:
+        request: 24h
     - matches:
         - path:
             type: PathPrefix
             value: /oauth2
       backendRefs:
         - name: netbird-server
-          port: 4222
+          port: 80
     - matches:
         - path:
             type: PathPrefix

@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: https://github.com/kubernetes-sigs/gateway-api.git
   ref:
-    tag: "v1.3.0"
+    tag: "v1.5.1"

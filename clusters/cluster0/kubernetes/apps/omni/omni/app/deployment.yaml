@@ -39,7 +39,7 @@ spec:
             secretName: omni-biggs-dog-tls
       containers:
         - name: omni
-          image: ghcr.io/siderolabs/omni:v1.10.0
+          image: ghcr.io/siderolabs/omni:v1.9.1
           imagePullPolicy: Always
           securityContext:
             privileged: true
@@ -56,8 +56,10 @@ spec:
             - --bind-addr=0.0.0.0:443
             - --k8s-proxy-bind-addr=0.0.0.0:8100
             - --private-key-source=file:///etc/omni/omni.asc
+            - --etcd-embedded-db-path=/_out/omni-etcd/
+            - --sqlite-storage-path=/_out/sqlite/sqlite.db
             - --advertised-api-url=https://omni.biggs.dog/
-            - --siderolink-api-advertised-url=https://omni.biggs.dog:8090/
+            - --machine-api-advertised-url=https://omni.biggs.dog:8090/
             - --siderolink-wireguard-advertised-addr=87.58.147.51:50180
             - --advertised-kubernetes-proxy-url=https://omni.biggs.dog:8100/
             - --auth-auth0-enabled=false
@@ -69,7 +71,7 @@ spec:
             - --auth-oidc-scopes=profile
             - --auth-oidc-scopes=email
             - --initial-users=jshriner@protonmail.com
-            - --eula-accept-name="Shrinedogg"
+            - --eula-accept-name=Shrinedogg
             - --eula-accept-email=jshriner@protonmail.com
           env:
             - name: OMNI_DEX_CLIENT_SECRET

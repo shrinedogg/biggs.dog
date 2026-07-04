@@ -1,3 +1,6 @@
+# Native gRPC (signal + management) needs an HTTP/2 cleartext (h2c) backend
+# connection; kept as a separate route so the h2c annotation doesn't apply
+# to the plain HTTP/websocket paths.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -12,6 +15,8 @@ spec:
   parentRefs:
     - name: cluster0-gateway
       namespace: networking
+  hostnames:
+    - netbird.biggs.dog
   rules:
     - matches:
         - path:
@@ -19,11 +24,18 @@ spec:
             value: /signalexchange.SignalExchange
       backendRefs:
         - name: netbird-server
-          port: 4223
+          port: 80
+      # Peers hold these gRPC streams open indefinitely; override
+      # agentgateway's 15s default (upstream recommends ~1 day).
+      timeouts:
+        request: 24h
     - matches:
         - path:
             type: PathPrefix
             value: /management.ManagementService
       backendRefs:
         - name: netbird-server
-          port: 4222
+          port: 80
+      # Management Sync stream is also long-lived (see above).
+      timeouts:
+        request: 24h
