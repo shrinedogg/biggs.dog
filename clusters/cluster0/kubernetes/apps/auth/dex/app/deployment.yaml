@@ -54,8 +54,11 @@ spec:
             - name: config
               mountPath: /etc/dex
               readOnly: true
+            # docker-entrypoint expands env vars in the config into
+            # /tmp/dex.config.yaml-*, so /tmp itself must be writable
+            # (root fs is read-only).
             - name: tmp
-              mountPath: /tmp/dex
+              mountPath: /tmp
       volumes:
         - name: config
           secret:
