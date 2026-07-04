@@ -1,2 +1,14 @@
+# SOPS age recipients.
+#
+# - age1mlu0sfuj... : the key deployed as the sops-age secret on BOTH clusters
+#   (repo-local age.agekey, rotated 2026-07-04). Files must be decryptable by
+#   this key or kustomize-controller decryption fails.
+# - age1tcr89ez...  : additional recipient (pre-staged next key). Its identity
+#   is NOT on the clusters yet; do not remove age1mlu0sfuj until it is.
+#
+# NOTE: the pre-2026-07-04 key (age190ldxpe...) is LOST. Anything still
+# encrypted only to it cannot be recovered from git.
 creation_rules:
-  - age: age1tcr89ezp74jk9xmfzmra3k26644w38xmep7azhxgy968285jrvvska5j8k
+  - age: >-
+      age1mlu0sfujfyh3w0hm94azdz6d88yu0jmvdy8t5hs7j8q6jtwm2ejsch03hg,
+      age1tcr89ezp74jk9xmfzmra3k26644w38xmep7azhxgy968285jrvvska5j8k
