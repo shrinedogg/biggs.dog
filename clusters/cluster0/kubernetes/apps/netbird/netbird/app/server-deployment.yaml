@@ -54,16 +54,21 @@ spec:
             limits:
               cpu: 500m
               memory: 1Gi
+          # Probes target the local multiplexed HTTP listener (mgmt/signal/
+          # relay/IdP on :80), NOT the relay external-reachability healthcheck
+          # on :9000/health. That endpoint dials the server's own public URL
+          # (rels://netbird.biggs.dog:443), which from inside the cluster
+          # resolves to Cloudflare and 404s — gating liveness on it caused a
+          # restart loop (catch-22: pod never Ready -> no svc endpoints ->
+          # self-dial never succeeds). Keep :9000 for external monitoring only.
           livenessProbe:
-            httpGet:
-              path: /health
-              port: 9000
+            tcpSocket:
+              port: 80
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /health
-              port: 9000
+            tcpSocket:
+              port: 80
             initialDelaySeconds: 5
             periodSeconds: 5
       volumes:
