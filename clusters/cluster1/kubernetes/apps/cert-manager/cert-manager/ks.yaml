@@ -7,8 +7,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/app
-  prune: true
+  path: ./clusters/cluster1/kubernetes/apps/cert-manager/cert-manager/app
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -26,8 +26,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/issuers
-  prune: true
+  path: ./clusters/cluster1/kubernetes/apps/cert-manager/cert-manager/issuers
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -47,8 +47,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/ca-certificates
-  prune: true
+  path: ./clusters/cluster1/kubernetes/apps/cert-manager/cert-manager/ca-certificates
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -68,8 +68,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/certificates
-  prune: true
+  path: ./clusters/cluster1/kubernetes/apps/cert-manager/cert-manager/certificates
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

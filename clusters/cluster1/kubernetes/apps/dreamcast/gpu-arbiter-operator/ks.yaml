@@ -15,7 +15,7 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./clusters/cluster1/kubernetes/apps/dreamcast/gpu-arbiter-operator/crds
-  prune: true
+  prune: false
   wait: false
   timeout: 2m
   force: true
@@ -36,7 +36,7 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./clusters/cluster1/kubernetes/apps/dreamcast/gpu-arbiter-operator/ai-system-rbac
-  prune: true
+  prune: false
   wait: false
   timeout: 2m
   force: true
@@ -57,7 +57,7 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./clusters/cluster1/kubernetes/apps/dreamcast/gpu-arbiter-operator/app
-  prune: true
+  prune: false
   wait: true
   timeout: 2m
   dependsOn:

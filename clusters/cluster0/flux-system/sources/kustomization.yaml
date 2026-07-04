@@ -6,6 +6,7 @@ resources:
   - cert-manager-repo.yaml
   - external-secrets-repo.yaml
   - onepass-repo.yaml
+  - cilium-repo.yaml
   - gateway-api-crds-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml

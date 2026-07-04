@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster1/kubernetes/apps/media/nsyncd/app/
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

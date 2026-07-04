@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: *app
   path: ./clusters/cluster1/kubernetes/apps/jitsi/jitsi/app
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

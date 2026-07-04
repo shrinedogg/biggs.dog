@@ -12,7 +12,7 @@ spec:
   # monitoring). Suspend this Kustomization to pause/roll back independently:
   #   flux suspend kustomization network-policies-infra
   path: ./clusters/cluster1/kubernetes/apps/network-policies/policies/infra
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

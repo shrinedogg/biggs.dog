@@ -14,7 +14,7 @@ spec:
     kind: GitRepository
     name: flux-system
   path: ./clusters/cluster1/kubernetes/apps/dreamcast/gpu-arbiter-instance/app
-  prune: true
+  prune: false
   wait: true
   timeout: 2m
   dependsOn:

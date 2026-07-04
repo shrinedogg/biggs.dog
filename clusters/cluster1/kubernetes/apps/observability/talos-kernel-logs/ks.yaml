@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: talos-kernel-logs
   path: ./clusters/cluster1/kubernetes/apps/observability/talos-kernel-logs/app
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

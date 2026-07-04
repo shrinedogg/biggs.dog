@@ -34,4 +34,5 @@ resources:
   - substrate-oci.yaml
   - agent-sandbox-git.yaml
   - oauth2-proxy-repo.yaml
+  - flux-operator-repo.yaml
   - flux-operator-mcp-oci.yaml

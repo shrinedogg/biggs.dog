@@ -7,8 +7,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/flux-system/flux-operator/app
-  prune: true
+  path: ./clusters/cluster1/flux-system/flux-operator/app
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

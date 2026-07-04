@@ -10,7 +10,7 @@ spec:
     labels:
       app.kubernetes.io/name: cnpg-barman-certs
   path: ./clusters/cluster1/kubernetes/apps/cnpg/barman/certificates/
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -34,7 +34,7 @@ spec:
     labels:
       app.kubernetes.io/name: cnpg-barman
   path: ./clusters/cluster1/kubernetes/apps/cnpg/barman/app/
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -55,7 +55,7 @@ spec:
     labels:
       app.kubernetes.io/name: cnpg-barman-object-store
   path: ./clusters/cluster1/kubernetes/apps/cnpg/barman/stores/
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

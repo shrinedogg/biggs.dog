@@ -9,7 +9,7 @@ spec:
     labels:
       app.kubernetes.io/name: victoria-logs-collector
   path: ./clusters/cluster1/kubernetes/apps/observability/victoria-logs/victoria-logs-collector
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
@@ -28,7 +28,7 @@ spec:
     labels:
       app.kubernetes.io/name: victoria-logs-single
   path: ./clusters/cluster1/kubernetes/apps/observability/victoria-logs/victoria-logs-single
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system

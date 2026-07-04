@@ -10,7 +10,7 @@ spec:
       app.kubernetes.io/name: *app
   # Policies carry their own explicit metadata.namespace, so no targetNamespace.
   path: ./clusters/cluster1/kubernetes/apps/network-policies/policies/apps
-  prune: true
+  prune: false
   sourceRef:
     kind: GitRepository
     name: flux-system
