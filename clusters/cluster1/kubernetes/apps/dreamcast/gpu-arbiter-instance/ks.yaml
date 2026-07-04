@@ -1,0 +1,21 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app gpu-arbiter-instance
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/cluster1/kubernetes/apps/dreamcast/gpu-arbiter-instance/app
+  prune: true
+  wait: true
+  timeout: 2m
+  dependsOn:
+    - name: gpu-arbiter-operator

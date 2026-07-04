@@ -9,8 +9,8 @@ spec:
   retryInterval: 1m
   sourceRef:
     kind: GitRepository
-    name: gateway-api-crds
-  path: "./config/crd/experimental"
+    name: flux-system
+  path: ./config/crd/experimental
   prune: true
   wait: false
   timeout: 2m
@@ -57,5 +57,3 @@ spec:
   timeout: 2m
   dependsOn:
     - name: agentgateway-crds
-  
-

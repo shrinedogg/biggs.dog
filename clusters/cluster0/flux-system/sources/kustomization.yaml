@@ -1,37 +1,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - cnpg-repo.yaml
-  - victoria-metrics-repo.yaml
-  - nfd-repo.yaml
-  - k8s-gateway-repo.yaml
+  - flux-system-git.yaml
+  - flux-operator-repo.yaml
   - cert-manager-repo.yaml
   - external-secrets-repo.yaml
   - onepass-repo.yaml
-  - grafana-operator-repo.yaml
-  - rook-ceph-repo.yaml
-  - volsync-repo.yaml
-  - snapshot-controller-repo.yaml
-  - cilium-repo.yaml
-  - openebs-repo.yaml
-  - nfs-driver-repo.yaml
   - gateway-api-crds-git.yaml
-  - gpu-arbiter-operator-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
-  - continuwuity-oci.yaml
-  - dragonfly-oci.yaml
-  - jitsi-repo.yaml
-  - barman-oci.yaml
-  - affine-oci.yaml
-  - manticore-repo.yaml
-  - nvidia-repo.yaml
-  - fenrir-git.yaml
-  - fenrir-oci.yaml
-  - kagent-crds-oci.yaml
-  - kagent-oci.yaml
-  - substrate-crds-oci.yaml
-  - substrate-oci.yaml
-  - agent-sandbox-git.yaml
-  - oauth2-proxy-repo.yaml
-  - flux-operator-mcp-oci.yaml

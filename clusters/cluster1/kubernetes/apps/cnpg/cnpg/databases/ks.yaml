@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-databases
+  namespace: flux-system
+spec:
+  dependsOn:
+    - name: cnpg-secrets
+    - name: openebs
+    # Clusters use the barman-cloud plugin; the plugin + ObjectStore must exist
+    # (and its TLS be valid) before the Clusters can become healthy.
+    - name: cnpg-barman-object-store
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: cnpg-databases
+  path: ./clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m

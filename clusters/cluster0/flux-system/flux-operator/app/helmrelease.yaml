@@ -22,13 +22,6 @@ spec:
       - key: node-role.kubernetes.io/control-plane
         operator: Exists
         effect: NoSchedule
-    # Disable the chart's native NetworkPolicy (flux-operator-web). It creates
-    # an ingress default-deny that only allows TCP:9080 from any namespace,
-    # which drops UDP DNS replies from kube-dns and breaks flux-operator's
-    # name resolution intermittently (conntrack race on the reply path).
-    # Network policy for flux-system is owned by the network-policies-infra
-    # Kustomization as CiliumNetworkPolicies instead, which carry the L7 DNS
-    # proxy rule that avoids the reply-drop.
     web:
       networkPolicy:
         create: false

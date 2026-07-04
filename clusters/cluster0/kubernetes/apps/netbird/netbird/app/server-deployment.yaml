@@ -1,0 +1,158 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: netbird-config
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+data:
+  config.yaml: |
+    ---
+    Id:
+      Type: string
+      AutoGenerate: true
+    HttpConfig:
+      Listen: "0.0.0.0:5432"
+      Config:
+        ReadTimeout: 30
+        WriteTimeout: 30
+        IdleTimeout: 120
+    ManagementServer:
+      ConfigPath: ""
+      Listen: "0.0.0.0:4222"
+      Endpoint: ""
+      PeerListen: "0.0.0.0:4222"
+      DataStore:
+        Type: sqlite
+        Url: /var/lib/netbird/datastore.v2.db
+      SignUp:
+        Enabled: true
+        Idp:
+          Auto: true
+      SingleAccountPerUser: true
+      DisableAnonymousMetrics: true
+      UseIdentityProviderUi: true
+    SignalServer:
+      ConfigPath: ""
+      Listen: "0.0.0.0:4223"
+      Endpoint: ""
+    Relay:
+      Enabled: true
+      Listen: "0.0.0.0:4224"
+      Endpoint: ""
+    STUN:
+      - "0.0.0.0:3478"
+    Peer:
+      ConfigPath: ""
+      ManagementURL: "http://localhost:4222"
+      ManagementProxy: true
+      Signal:
+        URL: "ws://localhost:4223/ws-proxy"
+        ProxyURL: "http://localhost:4222"
+      Update:
+        Enabled: false
+        Interval: 300
+      Firewall:
+        Enabled: true
+      WireguardBindPort: 0
+    Linux:
+      RunAsRootUser: false
+    LogFile: /var/log/netbird/server.log
+    LogLevel: info
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: netbird-server
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netbird
+      app.kubernetes.io/component: server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: netbird
+        app.kubernetes.io/component: server
+    spec:
+      securityContext:
+        runAsNonRoot: false
+      containers:
+        - name: netbird
+          image: netbirdio/netbird:v0.31.0
+          command: ["netbird", "server"]
+          env:
+            - name: DATASTORE_ENCRYPTION_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: netbird-secrets
+                  key: encryption-key
+            - name: NETBIRD_RELAY_AUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: netbird-secrets
+                  key: relay-secret
+          ports:
+            - containerPort: 4222
+              name: mgmt
+            - containerPort: 4223
+              name: signal
+            - containerPort: 4224
+              name: relay
+            - containerPort: 3478
+              protocol: UDP
+              name: stun
+          volumeMounts:
+            - name: netbird-config
+              mountPath: /etc/netbird/config.yaml
+              subPath: config.yaml
+            - name: netbird-data
+              mountPath: /var/lib/netbird
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 4222
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 4222
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: netbird-config
+          configMap:
+            name: netbird-config
+        - name: netbird-data
+          persistentVolumeClaim:
+            claimName: netbird-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: netbird-data-pvc
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: upcloud-block-storage-maxiops
+  resources:
+    requests:
+      storage: 1Gi

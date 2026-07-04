@@ -1,0 +1,7 @@
+apiVersion: cilium.io/v2alpha1
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: cluster0-l2-announcement
+  namespace: kube-system
+spec:
+  loadBalancerIPs: {}

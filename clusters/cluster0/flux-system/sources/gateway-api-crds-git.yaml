@@ -1,3 +1,4 @@
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
 metadata:
@@ -5,6 +6,6 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1h
-  url: https://github.com/kubernetes-sigs/gateway-api
+  url: https://github.com/kubernetes-sigs/gateway-api.git
   ref:
-    tag: v1.5.1
+    tag: "v1.3.0"

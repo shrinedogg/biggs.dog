@@ -2,8 +2,6 @@
 .talos/
 .omni/
 .scripts/
-.sops*
 .tmp/
 .zed/
 age.agekey
-bootstrap-flux.sh
