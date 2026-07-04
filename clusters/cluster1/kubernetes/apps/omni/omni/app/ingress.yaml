@@ -1,0 +1,27 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: omni-ui
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: omni
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/backend-protocol: HTTPS
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - omni.biggs.dog
+      secretName: omni-biggs-dog-tls
+  rules:
+    - host: omni.biggs.dog
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: omni-ui
+                port:
+                  number: 443

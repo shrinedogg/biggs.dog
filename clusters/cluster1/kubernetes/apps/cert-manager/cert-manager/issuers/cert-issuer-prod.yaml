@@ -1,0 +1,18 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    email: jshriner@protonmail.com
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod-key
+    preferredChain: "ISRG Root X1"
+    solvers:
+    - dns01:
+        cloudflare:
+          email: jshriner@protonmail.com
+          apiTokenSecretRef:
+            key: api-token
+            name: cloudflare-api-token

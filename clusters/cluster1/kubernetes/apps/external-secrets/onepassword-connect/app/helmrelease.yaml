@@ -1,0 +1,103 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: onepassword-connect
+  namespace: external-secrets
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: connect
+      version: 2.4.1
+      sourceRef:
+        kind: HelmRepository
+        name: onepass
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    connect:
+      create: true
+      replicas: 1
+      api:
+        name: connect-api
+        imageRepository: 1password/connect-api
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            cpu: 0.2
+        httpPort: 8080
+        httpsPort: 8443
+        logLevel: info
+        serviceMonitor:
+          enabled: false
+      sync:
+        name: connect-sync
+        imageRepository: 1password/connect-sync
+        resources: {}
+        httpPort: 8081
+        logLevel: info
+      applicationName: onepassword-connect
+      host: onepassword-connect
+      serviceType: ClusterIP
+      credentialsName: onepassword-connect-secret
+      credentialsKey: 1password-credentials.json
+      imagePullPolicy: IfNotPresent
+      nodeSelector:
+        kubernetes.io/os: linux
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app.kubernetes.io/name
+                      operator: In
+                      values:
+                        - onepassword-connect
+                topologyKey: kubernetes.io/hostname
+      hpa:
+        enabled: false
+      pdb:
+        enabled: false
+      probes:
+        liveness: true
+        readiness: true
+      priorityClassName: ""
+      tolerations:
+        - key: node-role.kubernetes.io/control-plane
+          operator: Exists
+          effect: NoSchedule
+      dataVolume:
+        name: shared-data
+        type: emptyDir
+        values: {}
+      tls:
+        enabled: false
+        secret: op-connect-tls
+      ingress:
+        enabled: false
+      profiler:
+        enabled: false
+        interval: 6h
+        keepLast: 12
+      customEnvVars: []
+    operator:
+      create: false
+    acceptanceTests:
+      enabled: false
+      fixtures: {}
+      healthCheck:
+        enabled: true
+        image:
+          repository: curlimages/curl
+          tag: "latest"

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: auth
+  labels:
+    app.kubernetes.io/name: dex
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: dex
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5556

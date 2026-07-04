@@ -1,0 +1,38 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: netbird-grpc
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: grpc
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`netbird.biggs.dog`) && PathPrefix(`/signalexchange.SignalExchange`)
+      kind: Rule
+      services:
+        - name: netbird-server
+          port: 4223
+          scheme: h2c
+    - match: Host(`netbird.biggs.dog`) && PathPrefix(`/management.ManagementService`)
+      kind: Rule
+      services:
+        - name: netbird-server
+          port: 4222
+          scheme: h2c
+  tls:
+    secretName: netbird-biggs-dog-tls
+  serversTransports:
+    - name: netbird-h2c
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: ServersTransport
+metadata:
+  name: netbird-h2c
+  namespace: netbird
+spec:
+  forwardingTimeouts:
+    idleTimeout: 300s
+    responseHeaderTimeout: 15s

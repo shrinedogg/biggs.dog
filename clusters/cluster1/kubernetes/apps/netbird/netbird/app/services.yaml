@@ -1,0 +1,64 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-server
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+  ports:
+    - name: mgmt
+      port: 4222
+      targetPort: 4222
+      protocol: TCP
+    - name: signal
+      port: 4223
+      targetPort: 4223
+      protocol: TCP
+    - name: relay
+      port: 4224
+      targetPort: 4224
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-dashboard
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: dashboard
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: 5100
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: netbird-stun
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+spec:
+  type: LoadBalancer
+  selector:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: server
+  ports:
+    - name: stun
+      port: 3478
+      targetPort: 3478
+      protocol: UDP
