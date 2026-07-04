@@ -37,25 +37,18 @@ spec:
         tokenThreshold: 80000
         summarizer:
           modelConfig: default-model-config
-    # NOTE: per-agent vector memory is DISABLED for exa-agent, same root cause
-    # as flux-agent (see flux-mcp/app/agent.yaml). The Exa MCP tool schemas
-    # (web_search_exa / web_fetch_exa / web_search_advanced_exa) are large, and
-    # against the 131K vLLM serve cap (vllm/app/deployment.yaml
-    # --max-model-len=131072) the assembled prompt (system message + builtin
-    # prompt includes + tool schemas + top-K memory retrieval + task) tips over
-    # the ceiling on any non-trivial query. Observed via the port-forward MCP
-    # path: a trivial task ("ping") fits, but a real research prompt returns
-    # HTTP 400 input_tokens=131073 before the first tool call. The session
-    # compaction above only bounds intra-session events; it cannot shrink tool
-    # schemas or memory injection, so memory must stay off. To re-enable, prune
-    # the kagent pgvector store (or raise --max-model-len toward the 262K native
-    # window, dropping --max-num-seqs per the vLLM deployment notes), THEN
-    # uncomment the block below.
-    # memory:
-    #   # Long-term (cross-session) vector memory via the in-cluster
-    #   # Infinity embedding server (ModelConfig `embedding-model`) + pgvector.
-    #   modelConfig: embedding-model
-    #   ttlDays: 30
+    # Per-agent vector memory is enabled. The earlier overflow on exa was NOT
+    # caused by memory (the pgvector `memory` table had 0 rows); it was from
+    # Exa search results (~38KB/result) ballooning session history past the
+    # 131K vLLM cap (one session hit ~164K tokens). The real fix was raising
+    # vLLM --max-model-len to 192K (vllm/app/deployment.yaml); memory stays on.
+    # If overflow recurs, prune the kagent pgvector store or raise max-model-len
+    # further (see the vLLM deployment notes).
+    memory:
+      # Long-term (cross-session) vector memory via the in-cluster
+      # Infinity embedding server (ModelConfig `embedding-model`) + pgvector.
+      modelConfig: embedding-model
+      ttlDays: 30
     deployment:
       nodeSelector:
         nvidia.com/gpu.present: "true"
