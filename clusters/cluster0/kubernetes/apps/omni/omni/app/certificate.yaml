@@ -1,0 +1,27 @@
+# Certificate for omni's OWN TLS (the omni binary serves HTTPS directly:
+# --cert=/tls/tls.crt --key=/tls/tls.key, mounted from this Secret at /tls).
+# This Secret MUST live in the `omni` namespace because the omni Pod mounts it.
+#
+# This is NOT a duplicate of networking/omni-biggs-dog: that one feeds the
+# cluster0-gateway's client-facing omni-https listener (TLS terminate); this one
+# feeds the Pod's self-TLS (the gateway then re-encrypts to it, see the omni-ui
+# HTTPRoute annotation agentgateway.dev/backend-protocol: "HTTPS"). Two Secrets
+# in two namespaces, same hostname, both Let's Encrypt, both auto-renew.
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: omni-biggs-dog
+  namespace: omni
+spec:
+  commonName: omni.biggs.dog
+  dnsNames:
+    - omni.biggs.dog
+  secretName: omni-biggs-dog-tls
+  duration: 720h # 30 days
+  renewBefore: 168h # 7 days
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  usages:
+    - digital signature
+    - key encipherment
