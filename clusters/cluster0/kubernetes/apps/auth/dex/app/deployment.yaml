@@ -18,8 +18,12 @@ spec:
       containers:
         - name: dex
           image: ghcr.io/dexidp/dex:v2.45.1
+          # The dexidp image entrypoint (docker-entrypoint) expects the full
+          # command; dex serve takes the config path positionally.
           args:
-            - --config=/etc/dex/config.yaml
+            - dex
+            - serve
+            - /etc/dex/config.yaml
           ports:
             - containerPort: 5556
               name: http
