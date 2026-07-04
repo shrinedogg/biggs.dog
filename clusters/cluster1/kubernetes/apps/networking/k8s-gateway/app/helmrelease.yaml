@@ -65,28 +65,19 @@ spec:
     # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)
     watchedResources: ["HTTPRoute", "Service"]
     domain: biggs.dog
-    # Fall through unknown biggs.dog names to PUBLIC resolvers so services on
-    # OTHER clusters resolve (e.g. omni/netbird/dex on cluster0 -> 87.58.147.51
-    # via public DNS) for LAN/VPN clients whose UDM conditionally forwards
-    # *.biggs.dog here. cluster1 services still resolve via k8s_gateway to their
-    # LAN IPs.
-    #
-    # LOOP HAZARD: the chart's DEFAULT extraZonePlugins forward is
-    # `forward . /etc/resolv.conf`, which points at the in-cluster kube-dns --
-    # and kube-dns forwards biggs.dog BACK here (biggs.dog:53 zone in
-    # kube-system/coredns -> 10.105.74.41). With the default forward, enabling
-    # fallthrough creates an infinite loop and every unknown biggs.dog name
-    # returns SERVFAIL (verified). The extraZonePlugins override below repoints
-    # the forward at public resolvers (1.1.1.1 / 8.8.8.8) to break that loop.
-    # Do NOT change extraZonePlugins back to /etc/resolv.conf while fallthrough
-    # is enabled.
-    fallthrough:
-      enabled: true
-      zones: [biggs.dog]
-    extraZonePlugins:
-      - name: forward
-        # Public resolvers ONLY. NOT /etc/resolv.conf (-> kube-dns -> loop).
-        parameters: . 1.1.1.1 8.8.8.8
+    # fallthrough is intentionally DISABLED. k8s_gateway is authoritative for
+    # biggs.dog and its `forward . /etc/resolv.conf` upstream points at the
+    # in-cluster kube-dns, which forwards biggs.dog BACK here (see the
+    # biggs.dog:53 zone in kube-system/coredns) -> enabling fallthrough creates
+    # an infinite loop and every unknown biggs.dog name returns SERVFAIL
+    # (verified). Cross-cluster hostnames (e.g. omni/netbird/dex on cluster0)
+    # are instead resolved via annotated Services that k8s_gateway watches --
+    # see the omni-dns / netbird-dns / dex-dns ExternalName-style Services
+    # (same pattern as turn.biggs.dog -> Coturn). Do NOT re-enable fallthrough
+    # unless the forward target is first changed to public resolvers.
+    # fallthrough:
+    # enabled: true
+    # zones: [biggs.dog]
     dnsChallenge:
       enabled: true
       domain: dns01.clouddns.com
