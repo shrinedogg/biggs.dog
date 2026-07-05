@@ -1,0 +1,18 @@
+# ClusterIP service for the Image Factory.
+# Exposed externally via HTTPRoute -> cluster0-gateway (TLS termination).
+apiVersion: v1
+kind: Service
+metadata:
+  name: image-factory
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+spec:
+  selector:
+    app.kubernetes.io/name: image-factory
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
+  type: ClusterIP

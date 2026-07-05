@@ -42,6 +42,18 @@ spec:
         certificateRefs:
           - kind: Secret
             name: netbird-biggs-dog-tls
+    - hostname: factory.biggs.dog
+      name: factory-https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: factory-biggs-dog-tls
     - hostname: "*.biggs.dog"
       name: wildcard-http
       port: 80

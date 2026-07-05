@@ -73,6 +73,7 @@ spec:
             - --initial-users=jshriner@protonmail.com
             - --eula-accept-name=Shrinedogg
             - --eula-accept-email=jshriner@protonmail.com
+            - --image-factory-address=https://factory.biggs.dog/
           env:
             - name: OMNI_DEX_CLIENT_SECRET
               valueFrom:
