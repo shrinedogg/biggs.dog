@@ -1,0 +1,18 @@
+# ClusterIP service for the internal Docker registry.
+# Only the Image Factory pod talks to it; never exposed externally.
+apiVersion: v1
+kind: Service
+metadata:
+  name: image-factory-registry
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+spec:
+  selector:
+    app.kubernetes.io/name: image-factory-registry
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+      protocol: TCP
+  type: ClusterIP

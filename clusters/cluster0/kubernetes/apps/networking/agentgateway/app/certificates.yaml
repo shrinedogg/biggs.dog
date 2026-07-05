@@ -14,6 +14,8 @@
 #    mount is satisfied by the separate Certificate in the `omni` namespace
 #    (apps/omni/omni/app/certificate.yaml); THIS one feeds only the gateway's
 #    client-facing omni-https listener. Two certs for one hostname is expected.
+#  - image-factory: plain-HTTP backend like dex/netbird; the gateway is the
+#    sole TLS terminator, so this is the only cert it needs.
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:
@@ -62,6 +64,25 @@ spec:
   dnsNames:
     - omni.biggs.dog
   secretName: omni-biggs-dog-tls
+  duration: 720h # 30 days
+  renewBefore: 168h # 7 days
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  usages:
+    - digital signature
+    - key encipherment
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: factory-biggs-dog
+  namespace: networking
+spec:
+  commonName: factory.biggs.dog
+  dnsNames:
+    - factory.biggs.dog
+  secretName: factory-biggs-dog-tls
   duration: 720h # 30 days
   renewBefore: 168h # 7 days
   issuerRef:

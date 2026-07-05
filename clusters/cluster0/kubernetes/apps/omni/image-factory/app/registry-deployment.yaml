@@ -1,0 +1,53 @@
+# In-cluster Docker registry for Image Factory schematics, installer images,
+# and signed boot-asset cache.
+#
+# Internal-only, plain HTTP (never exposed via the gateway).
+# Holds schematics + installer images + signed boot-asset cache.
+# Only the Image Factory pod talks to it (insecure: true in config).
+#
+# Uses Recreate strategy because the PVC is RWO — two pods cannot co-mount
+# during a rolling update.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-factory-registry
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory-registry
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: image-factory-registry
+    spec:
+      volumes:
+        - name: registry-data
+          persistentVolumeClaim:
+            claimName: image-factory-registry
+      containers:
+        - name: registry
+          image: registry:2.8.3
+          imagePullPolicy: Always
+          env:
+            - name: REGISTRY_HTTP_ADDR
+              value: "0.0.0.0:5000"
+          ports:
+            - name: http
+              containerPort: 5000
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          volumeMounts:
+            - name: registry-data
+              mountPath: /var/lib/registry

@@ -1,0 +1,39 @@
+# Image Factory configuration.
+# Connected mode: base images/extensions pull from ghcr.io with the
+# DEFAULT cosign keyless verification (no containerSignature override).
+# Only schematics, built installer images, and the boot-asset cache are
+# stored in the in-cluster registry (plain HTTP, cluster-internal only ->
+# insecure: true).
+#
+# Note: cache.oci defaults to ghcr.io/siderolabs/image-factory/cache which
+# we cannot push to. It MUST be overridden to the internal registry even
+# though the quick-start docs omit it. Symptom if missed: push errors in
+# factory logs on every build.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: image-factory-config
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+data:
+  image-factory.yaml: |
+    artifacts:
+      schematic:
+        registry: image-factory-registry.omni.svc.cluster.local:5000
+        insecure: true
+      installer:
+        internal:
+          registry: image-factory-registry.omni.svc.cluster.local:5000
+          insecure: true
+        # external: unset ON PURPOSE -- the factory then proxies installer
+        # image pulls through itself (factory.biggs.dog), so Talos machines
+        # never need to reach the internal registry.
+    cache:
+      oci:
+        registry: image-factory-registry.omni.svc.cluster.local:5000
+        insecure: true
+      signingKeyPath: /keys/signing-key.key
+    http:
+      httpListenAddr: ":8080"
+      externalURL: https://factory.biggs.dog/

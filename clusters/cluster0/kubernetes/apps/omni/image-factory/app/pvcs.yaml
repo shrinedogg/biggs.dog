@@ -1,0 +1,20 @@
+# Persistent storage for the in-cluster Docker registry that holds:
+# - Schematics (built on-demand by the factory)
+# - Installer images (pushed after build)
+# - Signed boot-asset cache (kernel, initramfs, etc.)
+#
+# Cache grows with every (schematic × Talos version × asset type).
+# Start at 20Gi; monitor usage and bump or add GC when it fills.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: image-factory-registry
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

@@ -1,0 +1,61 @@
+# Image Factory Deployment.
+# Stateless HTTP service on :8080; gateway terminates TLS.
+# Everything durable lives in the registry PVC.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-factory
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: image-factory
+    spec:
+      volumes:
+        - name: config
+          configMap:
+            name: image-factory-config
+        - name: signing-key
+          secret:
+            secretName: image-factory-signing-key
+        - name: tmp
+          emptyDir: {}
+      containers:
+        - name: image-factory
+          image: ghcr.io/siderolabs/image-factory:v1.3.3
+          imagePullPolicy: Always
+          args:
+            - --config
+            - /config/image-factory.yaml
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: metrics
+              containerPort: 2122
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          volumeMounts:
+            - name: config
+              mountPath: /config
+              readOnly: true
+            - name: signing-key
+              mountPath: /keys
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
