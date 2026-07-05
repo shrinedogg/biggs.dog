@@ -8,6 +8,8 @@ metadata:
   annotations:
     agentgateway.dev/backend-protocol: "HTTPS"
 spec:
+  hostnames:
+    - omni.biggs.dog
   parentRefs:
     - name: cluster0-gateway
       namespace: networking

@@ -6,6 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: dex
 spec:
+  hostnames:
+    - dex.biggs.dog
   parentRefs:
     - name: cluster0-gateway
       namespace: networking
