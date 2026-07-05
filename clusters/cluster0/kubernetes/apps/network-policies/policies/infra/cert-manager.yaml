@@ -47,7 +47,7 @@ metadata:
 spec:
   endpointSelector: {}
   egress:
-    - toCIDRs:
+    - toCIDR:
         - "1.1.1.1/32"
         - "1.0.0.1/32"
       toPorts:
