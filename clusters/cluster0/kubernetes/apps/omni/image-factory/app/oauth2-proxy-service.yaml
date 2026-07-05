@@ -1,0 +1,18 @@
+# ClusterIP service for the oauth2-proxy.
+# Used by the HTTPRoute `ui` rule to route authenticated UI traffic.
+apiVersion: v1
+kind: Service
+metadata:
+  name: image-factory-oauth2
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory-oauth2
+spec:
+  selector:
+    app.kubernetes.io/name: image-factory-oauth2
+  ports:
+    - name: http
+      port: 4180
+      targetPort: 4180
+      protocol: TCP
+  type: ClusterIP

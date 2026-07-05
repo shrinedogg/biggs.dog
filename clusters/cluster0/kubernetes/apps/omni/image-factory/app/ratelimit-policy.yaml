@@ -1,0 +1,60 @@
+# Rate limiting for the Image Factory anonymous API paths via agentgateway
+# local token buckets. These policies protect against abuse on the paths that
+# cannot be gated by OIDC auth (machine pulls, Omni server-side calls, etc.).
+#
+# Known semantics:
+# - Local buckets are per-gateway-replica. The agentgateway HPA runs 1-5
+#   replicas, so the effective cluster-wide ceiling is `limit x replicas`.
+#   This is acceptable for abuse-bounding; exact global limits would require
+#   `rateLimit.global` + an external rate-limit service (out of scope).
+# - Local buckets are shared across all clients (one bucket per replica, not
+#   per client IP). A determined abuser can starve legitimate anonymous
+#   callers within a bucket window. Per-client fairness requires `global` mode.
+# - Exceeded buckets return 429; Omni surfaces media-generation failures
+#   visibly, so a mis-tuned limit is loud, not silent.
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: image-factory-ratelimit-build
+  namespace: omni
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: image-factory
+      sectionName: api-build
+  traffic:
+    rateLimit:
+      # Tight bucket for build-triggering POSTs only.
+      conditional:
+        - condition: request.method == 'POST'
+          policy:
+            local:
+              - requests: 10
+                burst: 5
+                unit: Minutes
+      # Loose bucket for everything on /schematics (incl. the POSTs above;
+      # buckets stack — a request must pass both).
+      local:
+        - requests: 120
+          burst: 30
+          unit: Minutes
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: image-factory-ratelimit-artifacts
+  namespace: omni
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: image-factory
+      sectionName: api-artifacts
+  traffic:
+    rateLimit:
+      local:
+        - requests: 600
+          burst: 120
+          unit: Minutes

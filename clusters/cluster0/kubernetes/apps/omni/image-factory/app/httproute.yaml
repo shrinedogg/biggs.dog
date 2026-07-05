@@ -1,6 +1,24 @@
-# Routes factory.biggs.dog to the Image Factory (plain HTTP backend on :8080).
-# The gateway terminates TLS; no backend-protocol annotation needed (unlike
-# omni which self-serves TLS).
+# Routes factory.biggs.dog to the Image Factory, with a path split between
+# open API paths and the OIDC-gated web UI.
+#
+# **Open paths (must stay anonymous):**
+# - `/schematics` (POST/GET) — called server-side by Omni when generating
+#   installation media, and by the factory UI's own JavaScript. Omni cannot
+#   do an OIDC browser flow.
+# - `/v2/*` — OCI registry frontend; Talos machines' containerd pulls
+#   installer images during install/upgrade.
+# - `/image/*` — boot-asset downloads (ISOs, kernels, disk images). Fetched
+#   by browsers from Omni-generated links AND by machines (via PXE scripts).
+# - `/pxe/*` — iPXE scripts (future PXE flows).
+# - `/versions`, `/version/*` — version/extension/overlay catalogs; called
+#   by Omni and by the UI's JavaScript.
+# - `/talosctl/*`, `/secureboot/*`, `/oci/*` — anonymous artifact/key downloads.
+#
+# **Protected path:** `/` (catch-all) routes to oauth2-proxy:4180, which
+# authenticates against dex before upstreaming to the factory. This covers
+# the UI HTML, static assets, and the oauth2-proxy's own /oauth2/* endpoints.
+# Longest-prefix precedence makes the open rules take priority over the /
+# catch-all.
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
@@ -15,10 +33,54 @@ spec:
     - name: cluster0-gateway
       namespace: networking
   rules:
-    - matches:
+    # Build API — the only path that triggers CPU-heavy on-demand builds.
+    # Gets the tightest rate limit (AgentgatewayPolicy: image-factory-ratelimit-build).
+    - name: api-build
+      matches:
+        - path:
+            type: PathPrefix
+            value: /schematics
+      backendRefs:
+        - name: image-factory
+          port: 8080
+    # Artifact and catalog API — anonymous, high-volume paths.
+    # Gets a generous rate limit backstop (AgentgatewayPolicy: image-factory-ratelimit-artifacts).
+    - name: api-artifacts
+      matches:
+        - path:
+            type: PathPrefix
+            value: /v2
+        - path:
+            type: PathPrefix
+            value: /image
+        - path:
+            type: PathPrefix
+            value: /pxe
+        - path:
+            type: PathPrefix
+            value: /versions
+        - path:
+            type: PathPrefix
+            value: /version
+        - path:
+            type: PathPrefix
+            value: /talosctl
+        - path:
+            type: PathPrefix
+            value: /secureboot
+        - path:
+            type: PathPrefix
+            value: /oci
+      backendRefs:
+        - name: image-factory
+          port: 8080
+    # Web UI — gated by oauth2-proxy (OIDC via dex).
+    # No rate limit — auth is the throttle.
+    - name: ui
+      matches:
         - path:
             type: PathPrefix
             value: /
       backendRefs:
-        - name: image-factory
-          port: 8080
+        - name: image-factory-oauth2
+          port: 4180

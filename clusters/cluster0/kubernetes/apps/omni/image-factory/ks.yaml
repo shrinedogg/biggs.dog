@@ -20,3 +20,4 @@ spec:
     - name: secretstore
     - name: issuers
     - name: agentgateway
+    - name: dex

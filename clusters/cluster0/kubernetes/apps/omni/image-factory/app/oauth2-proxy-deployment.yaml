@@ -1,0 +1,61 @@
+# oauth2-proxy fronts ONLY the Image Factory web UI. The HTTPRoute performs
+# the actual path split: API paths go directly to image-factory:8080, while
+# UI paths (/ and /oauth2/*) are sent here for OIDC authentication.
+#
+# Authentication is against dex (dex.biggs.dog) via OIDC. The proxy upstreams
+# to image-factory.omni.svc.cluster.local:8080 after authenticating the user.
+# Dex reachability is in-cluster → gateway public IP, the same egress path
+# Omni already uses for --auth-oidc-provider-url (known-good).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: image-factory-oauth2
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: image-factory-oauth2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory-oauth2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: image-factory-oauth2
+    spec:
+      containers:
+        - name: oauth2-proxy
+          image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+          args:
+            - --provider=oidc
+            - --provider-display-name=Dex
+            - --oidc-issuer-url=https://dex.biggs.dog
+            - --client-id=image-factory
+            - --redirect-url=https://factory.biggs.dog/oauth2/callback
+            - --upstream=http://image-factory.omni.svc.cluster.local:8080
+            - --http-address=0.0.0.0:4180
+            - --email-domain=*
+            - --skip-provider-button=true
+            - --cookie-secure=true
+          env:
+            - name: OAUTH2_PROXY_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: image-factory-oauth2
+                  key: OAUTH2_PROXY_CLIENT_SECRET
+            - name: OAUTH2_PROXY_COOKIE_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: image-factory-oauth2
+                  key: OAUTH2_PROXY_COOKIE_SECRET
+          ports:
+            - name: http
+              containerPort: 4180
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
