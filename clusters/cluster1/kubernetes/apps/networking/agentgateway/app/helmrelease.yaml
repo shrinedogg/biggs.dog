@@ -13,27 +13,18 @@ spec:
     controller:
       extraEnv:
         KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
-      # The controller is not hardened by default. We apply the user-agnostic
-      # hardening (drop ALL capabilities, no privilege escalation, RuntimeDefault
-      # seccomp). runAsNonRoot and readOnlyRootFilesystem are omitted because the
-      # controller image's default user and rootfs write paths are not verified.
-      podSecurityContext:
-        seccompProfile:
-          type: RuntimeDefault
-      securityContext:
-        allowPrivilegeEscalation: false
-        capabilities:
-          drop:
-            - ALL
-        seccompProfile:
-          type: RuntimeDefault
-    horizontalPodAutoscaler:
-      minReplicas: 1
-      maxReplicas: 5
-      metrics:
-        - type: Resource
-          resource:
-            name: cpu
-            target:
-              type: Utilization
-              averageUtilization: 80
+    # v2.2.1 schema: podSecurityContext/securityContext are top-level keys, and
+    # unlike the alpha this chart ships NO default container securityContext and
+    # no HPA template (controller.horizontalPodAutoscaler is vestigial here), so
+    # the hardening must be set explicitly. runAsNonRoot/readOnlyRootFilesystem
+    # are omitted pending verification of the controller image's UID/write paths.
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault
