@@ -1,14 +1,20 @@
 # Image Factory configuration.
-# Connected mode: base images/extensions pull from ghcr.io with the
-# DEFAULT cosign keyless verification (no containerSignature override).
-# Only schematics, built installer images, and the boot-asset cache are
-# stored in the in-cluster registry (plain HTTP, cluster-internal only ->
-# insecure: true).
+# Custom-registry mode: all images (core Talos, extensions, schematics,
+# installer images, boot-asset cache) are pulled from the in-cluster
+# Docker registry. Every image is verified against our cosign key pair.
+#
+# Registry: image-factory-registry.omni.svc.cluster.local:5000 (insecure,
+# cluster-internal only).
+#
+# Mirroring: before enabling this config, mirror the Talos bundle + our
+# custom extensions into the registry, then sign everything with cosign.
+# See .omni/self-hosted-factory.md for the mirror/sign/catalog procedure.
+#
+# Catalog: the factory auto-discovers extensions:<version> from the
+# core registry. Push the catalog image there via `make catalog PUSH=true`.
 #
 # Note: cache.oci defaults to ghcr.io/siderolabs/image-factory/cache which
-# we cannot push to. It MUST be overridden to the internal registry even
-# though the quick-start docs omit it. Symptom if missed: push errors in
-# factory logs on every build.
+# we cannot push to. It MUST be overridden to the internal registry.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -19,6 +25,9 @@ metadata:
 data:
   image-factory.yaml: |
     artifacts:
+      core:
+        registry: image-factory-registry.omni.svc.cluster.local:5000
+        insecure: true
       schematic:
         registry: image-factory-registry.omni.svc.cluster.local:5000
         insecure: true
@@ -26,7 +35,7 @@ data:
         internal:
           registry: image-factory-registry.omni.svc.cluster.local:5000
           insecure: true
-        # external: unset ON PURPOSE -- the factory then proxies installer
+        # external: unset ON PURPOSE -- the factory proxies installer
         # image pulls through itself (factory.biggs.dog), so Talos machines
         # never need to reach the internal registry.
     cache:
@@ -34,6 +43,9 @@ data:
         registry: image-factory-registry.omni.svc.cluster.local:5000
         insecure: true
       signingKeyPath: /keys/signing-key.key
+    containerSignature:
+      publicKeyFile: /cosign.pub
+      subjectRegExp: ""
     http:
       httpListenAddr: ":8080"
       externalURL: https://factory.biggs.dog/

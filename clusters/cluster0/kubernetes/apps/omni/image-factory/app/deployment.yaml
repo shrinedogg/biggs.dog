@@ -27,6 +27,9 @@ spec:
         - name: signing-key
           secret:
             secretName: image-factory-signing-key
+        - name: cosign-pub
+          secret:
+            secretName: image-factory-cosign-pub
         - name: tmp
           emptyDir: {}
       containers:
@@ -56,6 +59,10 @@ spec:
               readOnly: true
             - name: signing-key
               mountPath: /keys
+              readOnly: true
+            - name: cosign-pub
+              mountPath: /cosign.pub
+              subPath: cosign.pub
               readOnly: true
             - name: tmp
               mountPath: /tmp
