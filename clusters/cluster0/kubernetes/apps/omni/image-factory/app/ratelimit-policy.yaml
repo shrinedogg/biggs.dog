@@ -26,19 +26,13 @@ spec:
       sectionName: api-build
   traffic:
     rateLimit:
-      # Tight bucket for build-triggering POSTs only.
-      conditional:
-        - condition: request.method == 'POST'
-          policy:
-            local:
-              - requests: 10
-                burst: 5
-                unit: Minutes
-      # Loose bucket for everything on /schematics (incl. the POSTs above;
-      # buckets stack — a request must pass both).
+      # Tight local bucket for /schematics. GETs on /schematics are rare
+      # enough that 60/min comfortably covers legitimate use while capping
+      # build-spam loops. (Method-conditional limits are not supported —
+      # `conditional` cannot be combined with `local` in the CRD schema.)
       local:
-        - requests: 120
-          burst: 30
+        - requests: 60
+          burst: 15
           unit: Minutes
 ---
 apiVersion: agentgateway.dev/v1alpha1
