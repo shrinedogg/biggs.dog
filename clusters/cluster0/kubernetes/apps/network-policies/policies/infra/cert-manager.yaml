@@ -85,8 +85,9 @@ spec:
 ---
 # kube-apiserver -> cert-manager webhook (ValidatingWebhookConfiguration).
 # Without this, every API request that needs validation blocks for the webhook
-# timeout (10s) before failing — same class of latency bug as cluster1's
-# VM-operator webhook. cert-manager webhook listens on :443.
+# timeout (10s) before failing. The webhook Service maps :443 -> container
+# port :10250 (named "https"), and Cilium's kube-proxy replacement delivers
+# traffic to the pod on :10250, so the policy must allow :10250, not :443.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -103,7 +104,7 @@ spec:
         - cluster
       toPorts:
         - ports:
-            - port: "443"
+            - port: "10250"
               protocol: TCP
 ---
 # Intra-namespace: cainjector -> controller -> webhook.
