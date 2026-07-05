@@ -6,5 +6,6 @@ resources:
   - ui-service.yaml
   - siderolink-service.yaml
   - httproute.yaml
+  - backendtlspolicy.yaml
   - external-secret.yaml
   - pvcs.yaml

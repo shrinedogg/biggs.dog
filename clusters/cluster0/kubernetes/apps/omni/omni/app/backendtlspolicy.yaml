@@ -1,0 +1,32 @@
+# BackendTLSPolicy for the omni-ui backend.
+#
+# Omni serves its OWN HTTPS (the omni binary runs with --cert/--key on :443,
+# cert omni/omni-biggs-dog-tls, a Let's Encrypt cert for omni.biggs.dog). The
+# cluster0-gateway terminates client TLS at the omni-https listener, then must
+# re-encrypt to omni-ui over HTTPS. The HTTPRoute annotation
+# agentgateway.dev/backend-protocol: "HTTPS" declares that intent, but
+# agentgateway only actually speaks TLS to the backend when a BackendTLSPolicy
+# tells it what hostname/SNI to use and what CA to trust.
+#
+# Without this policy, agentgateway sent plain HTTP to omni-ui:443 -> omni's TLS
+# server rejected it ("Client sent an HTTP request to an HTTPS server") and
+# https://omni.biggs.dog/ failed. (Previously masked because a host-less
+# HTTPRoute bug routed omni.biggs.dog to the dex HTTP backend instead.)
+#
+# wellKnownCACertificates: System trusts the public CA that signed omni's
+# Let's Encrypt cert (ISRG Root X1) -- no CA Secret ref needed.
+apiVersion: gateway.networking.k8s.io/v1
+kind: BackendTLSPolicy
+metadata:
+  name: omni-ui-tls
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: omni
+spec:
+  targetRefs:
+    - group: ""
+      kind: Service
+      name: omni-ui
+  validation:
+    hostname: omni.biggs.dog
+    wellKnownCACertificates: System
