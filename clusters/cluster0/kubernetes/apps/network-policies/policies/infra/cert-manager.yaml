@@ -1,0 +1,136 @@
+# Namespace: cert-manager  (cert-manager controller, webhook, cainjector)
+#
+# cert-manager does ACME DNS-01 against Cloudflare and exposes a
+# ValidatingWebhookConfiguration. The HelmRelease configures
+# dns01RecursiveNameservers (1.1.1.1, 1.0.0.1 DoH) and
+# dns01RecursiveNameserversOnly: true, so DNS-01 challenges bypass
+# coredns and go directly to the configured DoH endpoint.
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+# DNS for all cert-manager pods — normal resolution + L7 proxy to fix
+# Go-resolver UDP conntrack reply-drop behind default-deny ingress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# cert-manager is configured with
+#   dns01RecursiveNameservers: https://1.1.1.1:443/dns-query,https://1.0.0.1:443/dns-query
+# and dns01RecursiveNameserversOnly: true, so DNS-01 challenges bypass coredns
+# and go directly to Cloudflare's DoH endpoint. Allow the exact IPs.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-doh
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDRs:
+        - "1.1.1.1/32"
+        - "1.0.0.1/32"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# ACME DNS-01 solver patches TXT records via the Cloudflare API.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-cloudflare-api
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: api.cloudflare.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# cert-manager controller reconciles status via the API server.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-kube-apiserver
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+---
+# kube-apiserver -> cert-manager webhook (ValidatingWebhookConfiguration).
+# Without this, every API request that needs validation blocks for the webhook
+# timeout (10s) before failing — same class of latency bug as cluster1's
+# VM-operator webhook. cert-manager webhook listens on :443.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-webhook-from-apiserver
+  namespace: cert-manager
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/instance: cert-manager
+      app.kubernetes.io/component: webhook
+  ingress:
+    - fromEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Intra-namespace: cainjector -> controller -> webhook.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cert-manager
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cert-manager
+---
+# kubelet health/readiness probes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: cert-manager
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node

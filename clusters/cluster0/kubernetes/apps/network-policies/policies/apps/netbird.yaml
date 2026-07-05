@@ -1,0 +1,167 @@
+# Namespace: netbird  (netbird-server + netbird-dashboard)
+#
+# netbird-server: combined mgmt/signal/relay/IdP/STUN multiplexed on :80.
+# STUN UDP 3478 via node externalIP (87.58.147.51).
+# netbird-dashboard: embedded nginx serving the web UI on :80.
+# Both are HTTPRoute-backed at netbird.biggs.dog.
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+# DNS for all netbird pods. L7 proxy avoids the Go-resolver UDP conntrack
+# reply-drop behind default-deny ingress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: netbird
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# netbird-server + dashboard serve at netbird.biggs.dog via the gateway.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: netbird
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+---
+# Intra-namespace: dashboard may healthcheck server.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: netbird
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: netbird
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "9090"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: netbird
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "9090"
+              protocol: TCP
+---
+# STUN UDP 3478 arrives via node externalIP (87.58.147.51). Under
+# kube-proxy-replacement the source identity is host (node) for the
+# translated path. Allow host + world to be safe (scoped to UDP 3478 only).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-stun-from-world
+  namespace: netbird
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: netbird
+      app.kubernetes.io/component: server
+  ingress:
+    - fromEntities:
+        - host
+        - world
+      toPorts:
+        - ports:
+            - port: "3478"
+              protocol: UDP
+---
+# netbird-server IdP upstream is dex (https://dex.biggs.dog via gateway).
+# Allow egress to the auth namespace and world:443 for relay/relay URLs.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-oidc-and-relay
+  namespace: netbird
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: netbird
+      app.kubernetes.io/component: server
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+            app.kubernetes.io/name: dex
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "5556"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# kubelet health/readiness probes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: netbird
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "9090"
+              protocol: TCP

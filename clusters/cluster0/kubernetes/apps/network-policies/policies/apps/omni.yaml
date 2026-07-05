@@ -1,0 +1,285 @@
+# Namespace: omni  (omni + image-factory + image-factory-oauth2 + image-factory-registry)
+#
+# omni: HTTPS (:443), machine-api (:8090), event-sink (:8091), k8s-proxy (:8100),
+#   WireGuard UDP (:50180). SideroLink via node externalIP 87.58.147.51.
+# image-factory: HTTP (:8080), metrics (:2122).
+# image-factory-oauth2: oauth2-proxy (:4180) fronting the factory UI.
+# image-factory-registry: internal Docker registry (:5000), never external.
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+# DNS for all omni pods. L7 proxy avoids the Go-resolver UDP conntrack
+# reply-drop behind default-deny ingress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: omni
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# Gateway ingress: omni-ui (:443 HTTPS backend), image-factory (:8080),
+# image-factory-oauth2 (:4180).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: omni
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway-image-factory
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway-oauth2
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory-oauth2
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "4180"
+              protocol: TCP
+---
+# Intra-namespace flows:
+#   oauth2-proxy -> image-factory :8080 (upstream after OIDC)
+#   image-factory -> registry :5000 (internal registry pulls)
+#   omni -> image-factory :8080 (--image-factory-address config)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: omni
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: omni
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+            - port: "5000"
+              protocol: TCP
+            - port: "4180"
+              protocol: TCP
+            - port: "2122"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: omni
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+            - port: "5000"
+              protocol: TCP
+            - port: "4180"
+              protocol: TCP
+            - port: "2122"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+---
+# omni + image-factory-oauth2 reach dex for OIDC. omni uses the public URL
+# (--auth-oidc-provider-url=https://dex.biggs.dog) which hits the gateway,
+# and may also reach dex directly via in-cluster svc. Allow both paths.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-dex
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: omni
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+            app.kubernetes.io/name: dex
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "5556"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-dex-oauth2
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory-oauth2
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+            app.kubernetes.io/name: dex
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "5556"
+              protocol: TCP
+    # Also reach dex via the gateway public IP (oauth2-proxy configured with
+    # --oidc-issuer-url=https://dex.biggs.dog). The gateway path is the
+    # known-good path; allow it.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# SideroLink + WireGuard: omni-siderolink Service uses
+# externalIPs: [87.58.147.51] TCP 8090/8091/8100 + UDP 50180.
+# Machines dial in from the world; under kube-proxy-replacement the source
+# identity is host (node) for the translated path. Allow host + world.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-siderolink-from-world
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: omni
+  ingress:
+    - fromEntities:
+        - host
+        - world
+      toPorts:
+        - ports:
+            - port: "8090"
+              protocol: TCP
+            - port: "8091"
+              protocol: TCP
+            - port: "8100"
+              protocol: TCP
+            - port: "50180"
+              protocol: UDP
+---
+# omni + image-factory need world :443 for Talos version metadata, Sidero
+# image registries, cosign signing (Sigstore Rekor TLog, ghcr.io), etc.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-https
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: omni
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-https-image-factory
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: image-factory
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# kubelet health/readiness probes + node-externalIP reverse path for
+# SideroLink/WG.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: omni
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node

@@ -27,8 +27,8 @@ spec:
     # which drops UDP DNS replies from kube-dns and breaks flux-operator's
     # name resolution intermittently (conntrack race on the reply path).
     # Network policy for flux-system is owned by CiliumNetworkPolicies (see
-    # network-policies in cluster1; cluster0 equivalents TBD), which carry the
-    # L7 DNS proxy rule that avoids the reply-drop.
+    # kubernetes/apps/network-policies/), which carry the L7 DNS proxy rule
+    # that avoids the reply-drop.
     web:
       networkPolicy:
         create: false
