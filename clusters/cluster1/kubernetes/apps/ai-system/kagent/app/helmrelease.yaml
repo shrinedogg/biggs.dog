@@ -172,6 +172,9 @@ spec:
         vectorEnabled: true
         urlFile: /etc/kagent-db/url
     controller:
+      resources:
+        limits:
+          memory: "1024Mi"
       volumes:
         - name: database-url
           secret:
