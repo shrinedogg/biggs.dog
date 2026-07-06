@@ -8,16 +8,27 @@
     ":semanticCommits",
     ":automergeBranch"
   ],
-  "dependencyDashboardTitle": "Renovate Dashboard 🤖",
-  "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
+  "dependencyDashboardTitle": "Renovate Dashboard \ud83e\udd16",
+  "suppressNotifications": [
+    "prEditedNotification",
+    "prIgnoreNotification"
+  ],
   "rebaseWhen": "conflicted",
-  "schedule": ["every weekend"],
-  "ignorePaths": ["**/apps.yaml"],
+  "schedule": [
+    "every weekend"
+  ],
+  "ignorePaths": [
+    "**/apps.yaml"
+  ],
   "flux": {
-    "managerFilePatterns": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": [
+      "(^|/)clusters/.+\\.ya?ml$"
+    ]
   },
   "helm-values": {
-    "managerFilePatterns": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": [
+      "(^|/)clusters/.+\\.ya?ml$"
+    ]
   },
   "kubernetes": {
     "managerFilePatterns": [
@@ -29,18 +40,35 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Process OCIRepository tags",
-      "managerFilePatterns": ["(^|/)clusters/.+-oci\\.ya?ml$"],
+      "description": "Flux OCIRepository sources (chartRef chart version) \u2014 tracks the tag in the source file, which is where Flux Operator HelmReleases get their version from",
+      "managerFilePatterns": [
+        "(^|/)clusters/.+-oci\\.ya?ml$"
+      ],
       "matchStrings": [
-        "url:\\s*oci://(?<depName>[^\\s]+)\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?"
+        "url:\\s*oci://(?<depName>[^\\s]+)\\n\\s*ref:\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?",
+        "ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?\\s*\\n\\s*url:\\s*oci://(?<depName>[^\\s]+)"
       ],
       "datasourceTemplate": "docker",
       "versioningTemplate": "docker"
     },
     {
       "customType": "regex",
+      "description": "Flux GitRepository sources with ref.tag (chartRef chart version) \u2014 tracks GitHub release tags for Git-sourced Helm charts",
+      "managerFilePatterns": [
+        "(^|/)clusters/.+-git\\.ya?ml$"
+      ],
+      "matchStrings": [
+        "url:\\s*https://github.com/(?<depName>[^/]+/[^/]+?)(?:\\.git)?\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"\\']?(?<currentValue>[^\"\\'\\s]+)[\"\\']?"
+      ],
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "semver"
+    },
+    {
+      "customType": "regex",
       "description": "CNPG ClusterImageCatalog extension images (reference: field, which the kubernetes manager ignores)",
-      "managerFilePatterns": ["(^|/)clusters/.+catalog\\.ya?ml$"],
+      "managerFilePatterns": [
+        "(^|/)clusters/.+catalog\\.ya?ml$"
+      ],
       "matchStrings": [
         "reference:\\s*(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
@@ -51,63 +79,116 @@
   "packageRules": [
     {
       "description": "Flux HelmRelease dependencies",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
       "commitMessageTopic": "chart {{depName}}"
     },
     {
       "description": "Auto-merge non-major Helm chart updates",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
-      "matchUpdateTypes": ["minor", "patch"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
       "automerge": true
     },
     {
       "description": "Group Rook Ceph charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
       "groupName": "rook-ceph",
-      "matchPackageNames": ["/^rook-ceph/"]
+      "matchPackageNames": [
+        "/^rook-ceph/"
+      ]
     },
     {
       "description": "Group VictoriaMetrics charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
       "groupName": "victoria-metrics",
-      "matchPackageNames": ["/^victoria/"]
+      "matchPackageNames": [
+        "/^victoria/"
+      ]
     },
     {
       "description": "Group external-secrets charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
       "groupName": "external-secrets",
-      "matchPackageNames": ["/external-secrets/", "/connect/"]
+      "matchPackageNames": [
+        "/external-secrets/",
+        "/connect/"
+      ]
     },
     {
       "description": "Group observability charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
       "groupName": "observability",
-      "matchPackageNames": ["/grafana/", "/prometheus/"]
+      "matchPackageNames": [
+        "/grafana/",
+        "/prometheus/"
+      ]
     },
     {
       "description": "Semantic versioning for Cilium",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
-      "matchPackageNames": ["cilium"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchPackageNames": [
+        "cilium"
+      ],
       "separateMajorMinor": true
     },
     {
       "description": "Semantic versioning for cert-manager",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
-      "matchPackageNames": ["cert-manager"],
+      "matchManagers": [
+        "flux"
+      ],
+      "matchDatasources": [
+        "helm"
+      ],
+      "matchPackageNames": [
+        "cert-manager"
+      ],
       "separateMajorMinor": true
     },
     {
       "description": "Track plugin-barman-cloud chart and flag the TLS cert workaround",
-      "matchManagers": ["custom.regex"],
-      "matchDatasources": ["docker"],
+      "matchManagers": [
+        "custom.regex"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
       "matchPackageNames": [
         "ghcr.io/cloudnative-pg/charts/plugin-barman-cloud"
       ],
@@ -120,7 +201,9 @@
     },
     {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
-      "matchDatasources": ["docker"],
+      "matchDatasources": [
+        "docker"
+      ],
       "matchPackageNames": [
         "ghcr.io/continuwuity/continuwuity",
         "ghcr.io/games-on-whales/firefox",
@@ -136,23 +219,41 @@
     },
     {
       "description": "Group CNPG operand + extension catalog images so the catalog updates as one set",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["/^ghcr\\.io/cloudnative-pg//"],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchPackageNames": [
+        "/^ghcr\\.io/cloudnative-pg//"
+      ],
       "groupName": "cnpg-images"
     },
     {
       "description": "Group media app container images",
-      "matchManagers": ["kubernetes"],
-      "matchDatasources": ["docker"],
-      "matchFileNames": ["clusters/**/media/**"],
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "clusters/**/media/**"
+      ],
       "groupName": "media-apps"
     },
     {
       "description": "Auto-merge patch updates for media apps",
-      "matchManagers": ["kubernetes"],
-      "matchDatasources": ["docker"],
-      "matchFileNames": ["clusters/**/media/**"],
-      "matchUpdateTypes": ["patch"],
+      "matchManagers": [
+        "kubernetes"
+      ],
+      "matchDatasources": [
+        "docker"
+      ],
+      "matchFileNames": [
+        "clusters/**/media/**"
+      ],
+      "matchUpdateTypes": [
+        "patch"
+      ],
       "automerge": true
     }
   ]
