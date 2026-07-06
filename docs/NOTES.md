@@ -2,7 +2,7 @@
 
 This document contains detailed architectural decisions, engineering notes, and historical context that is less critical for operators but helpful for maintainers and contributors.
 
-> **Two clusters (migration in progress).** The homelab is split across `cluster0` — a single-node **UpCloud cloud** edge/mgmt cluster (public WAN `87.58.147.51`, Cilium L2 announcement) running Dex, NetBird, Omni, cert-manager, and external-secrets — and `cluster1` — the **on-prem 6-node bare-metal** workload cluster (Cilium BGP → UDM, `192.168.6.0/24` VIPs) running all applications, storage, GPU/AI, and observability. Flux pruning is disabled on both during the cutover. Most sections below describe `cluster1` workloads; cluster-specific notes are called out inline.
+> **Two clusters (migration in progress).** The homelab is split across `cluster0` — a single-node **UpCloud cloud** edge/mgmt cluster (public WAN `87.58.147.51`, Cilium L2 announcement) running Dex, NetBird, Omni, Talos Image Factory, cert-manager, external-secrets, and CiliumNetworkPolicies (two-tier: apps + infra) — and `cluster1` — the **on-prem 6-node bare-metal** workload cluster (Cilium BGP → UDM, `192.168.6.0/24` VIPs) running all applications, storage, GPU/AI, and observability. Flux pruning is disabled on both during the cutover. Most sections below describe `cluster1` workloads; cluster-specific notes are called out inline.
 >
 > **Note**: `cluster1` node specs (Talos Linux version, Kubernetes version, OS versions) in `README.md` are managed via Omni and reflect state at time of documentation. For live cluster versions, use `kubectl version` and check the Omni console (now run in-cluster on `cluster0` — see [System & Hardware](#system--hardware)). This Git repo drives desired state for workloads, not node OS versions.
 
@@ -91,6 +91,12 @@ Both clusters run **Cilium** as the CNI (replaces kube-proxy) and **Gateway API*
 
 `cluster0` public ingress is the `cluster0-gateway` (`networking` ns) with HTTPS listeners for `omni`/`dex`/`netbird.biggs.dog`, each backed by a per-host cert issued **in the `networking` namespace** (Gateway API resolves name-only `certificateRefs` to the gateway's own namespace) via the `letsencrypt-prod` ClusterIssuer (DNS-01/Cloudflare).
 
+**k8s-gateway fallthrough:** `cluster1`'s k8s-gateway has **fallthrough enabled** with NextDNS resolvers (`45.90.28.232` / `45.90.30.232`) so unknown `biggs.dog` names resolve to public DNS — this is how LAN/VPN clients reach cluster0 services (omni/netbird/dex at `87.58.147.51`). The chart's default `forward . /etc/resolv.conf` plugin was replaced because it loops: k8s-gateway → `/etc/resolv.conf` → in-cluster CoreDNS → k8s-gateway again (CoreDNS conditionally forwards `biggs.dog` to k8s-gateway's ClusterIP), resulting in SERVFAIL. The fix replicates the full chart default plugin list with only the forward parameters changed to NextDNS IPs. The `ready`/`health`/`prometheus` plugins must stay for liveness/readiness probes and ServiceMonitor.
+
+**NetBird gRPC** — NetBird multiplexes gRPC over HTTP/2 on port 80; the gateway must speak HTTP/2 to the backend, not HTTP/1.1. AgentGateway ignores the `agentgateway.dev/backend-protocol: h2c` annotation on HTTPRoute, so an `AgentgatewayPolicy` (`netbird-grpc`) is used instead, targeting the `netbird-grpc` HTTPRoute and setting `backend.http.version: HTTP2`.
+
+**Omni BackendTLSPolicy** — Omni serves its own HTTPS (the omni binary runs with `--cert/--key` on `:443` with a Let's Encrypt cert for `omni.biggs.dog`). The cluster0-gateway terminates client TLS at the omni-https listener, then must re-encrypt to omni-ui over HTTPS. The HTTPRoute annotation `agentgateway.dev/backend-protocol: "HTTPS"` declares that intent, but agentgateway only actually speaks TLS to the backend when a `BackendTLSPolicy` tells it what hostname/SNI to use and what CA to trust. Without this policy, agentgateway sent plain HTTP to omni-ui:443 → omni's TLS server rejected it (`Client sent an HTTP request to an HTTPS server`). The policy uses `wellKnownCACertificates: System` (trusts the public CA that signed omni's Let's Encrypt cert — ISRG Root X1) and `hostname: omni.biggs.dog`.
+
 ### Storage Layers
 
 - **Rook-Ceph** — distributed block/object storage backed by 3 nodes.
@@ -117,8 +123,8 @@ Secrets follow a three-tier model:
 
 The cluster enforces least-privilege **CiliumNetworkPolicy** across all namespaces. Policies are split into two independent Flux Kustomizations:
 
-- **`network-policies-apps`** — lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate). Can be updated with confidence.
-- **`network-policies-infra`** — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, kube-system). Can be suspended independently with `flux suspend kustomization network-policies-infra` if edge or control plane regresses.
+- **`network-policies-apps`** — lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate on cluster1; auth, netbird, omni on cluster0). Can be updated with confidence.
+- **`network-policies-infra`** — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, kube-system on cluster1; networking, cert-manager, external-secrets, flux-system on cluster0). Can be suspended independently with `flux suspend kustomization network-policies-infra` if edge or control plane regresses.
 
 This two-tier approach allows staged rollouts and rapid rollback without affecting application policies.
 
@@ -137,7 +143,9 @@ The two clusters run **different identity stacks** (a deliberate split: the edge
 **Dex** (`cluster0`, `dex.biggs.dog`) — the root OIDC IdP for the edge plane:
 - `ghcr.io/dexidp/dex:v2.45.1`, stateless (`storage.type: memory`, single replica; tokens don't survive restarts, fine for interactive logins).
 - `enablePasswordDB: true` with a static admin user; clients/secrets templated into the config from 1Password.
-- Static clients: `omni` (Omni OIDC login), `netbird` (NetBird's embedded IdP upstream connector).
+- Static clients: `omni` (Omni OIDC login), `netbird` (NetBird's embedded IdP upstream connector), `image-factory` (Image Factory UI).
+- **Omni's OIDC callback** — the actual callback path is `/oidc/consume` (not the previously-guessed `/Callback` or `/callback`). The earlier mismatch caused Dex `bad request` errors.
+- **Image Factory** — the Image Factory UI at `factory.biggs.dog` uses an `oauth2-proxy` (v7.6.0) authenticated against Dex. The proxy upstreams to `image-factory.omni.svc.cluster.local:8080`. The HTTPRoute path-splits: API paths go directly to image-factory, UI paths (`/` and `/oauth2/*`) go through the proxy.
 - `connectors: []` — Dex is the root IdP here, not a federator in front of Pocket ID.
 
 **Pocket ID** (`cluster1`, `id.biggs.dog`) — passkey-first OIDC for workload apps:
@@ -172,7 +180,8 @@ The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-
 - **NFD** (Node Feature Discovery) — detects hardware capabilities (GPU models, CPU flags, etc.) and labels nodes.
 - **Intel GPU Plugin** — enables Intel iGPU device plugin for media transcoding on worker nodes.
 - **NVIDIA GPU Operator** — device plugin with time-slicing (driver/toolkit provided by Talos system extensions, not by the operator).
-- **Omni (Sidero)** — now run **in-cluster on `cluster0`** (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.9.1`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `87.58.147.51:50180`). It manages the on-prem `cluster1` nodes, which phone home over Siderolink. Runs privileged with `/dev/net/tun`; double-TLS (gateway terminates, re-encrypts to the pod's own Let's Encrypt cert). Backed by embedded etcd + SQLite PVCs; OIDC login via Dex.
+- **Omni (Sidero)** — now run **in-cluster on `cluster0`** (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.9.1`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `87.58.147.51:50180`). It manages the on-prem `cluster1` nodes, which phone home over Siderolink. Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy` (see below). Backed by embedded etcd + SQLite PVCs; OIDC login via Dex.
+- **Talos Image Factory** — builds and signs custom Talos Linux images with cosign (`ghcr.io/siderolabs/image-factory:v1.3.3`). Stateless HTTP service on `:8080` behind an `oauth2-proxy` (v7.6.0) authenticated against Dex at `factory.biggs.dog`. Durable state lives in a registry PVC. cosign signing key and public key are mounted as Secrets. Rate-limit policy and an embedded OCI registry (`registry-deployment`) are also deployed.
 - **Per-machine Omni `ConfigPatch`es** — node-level config still lives in Omni as per-machine `ConfigPatch`es (each node carries a `10-<machine-id>` user patch: hostname, NIC rings, node-specific tweaks). Local copies live under `omni/` (git-ignored, outside `clusters/` so Flux never reconciles them). Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). Nodes imported from existing Talos clusters got this auto-generated on import; machines scaled directly from Omni did not, so their equivalent settings must be authored by hand. CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
 
 ### Automation
@@ -344,6 +353,9 @@ On a match, Renovate opens a PR with updated versions. CI validates the changes,
 
 - **CoreDNS patching for split-horizon DNS** — hairpinning traffic out through the external gateway wastes bandwidth. Patching CoreDNS to forward `biggs.dog` queries to k8s-gateway keeps pods in-cluster.
 - **CiliumNetworkPolicy learning curve** — start with permissive policies and tighten incrementally. Two-tier (apps + infra) allows staged rollouts.
+- **Talos CoreDNS label is `coredns`, not `kube-dns`** — all `allow-egress-dns` policies initially targeted `k8s:k8s-app: kube-dns`, but Talos deploys CoreDNS with `k8s-app=coredns`. This dropped every namespace's DNS under default-deny. Fix: use `k8s-app: coredns` in policy selectors.
+- **Cilium webhook ports** — cert-manager and external-secrets webhook Services map `:443` to container port `:10250`. Cilium's kube-proxy replacement delivers traffic on the container port, so CNP ingress rules must allow `:10250`, not `:443`. Diagnosed via `cilium service list`.
+- **External-secrets cert-controller** — the cert-controller pod (`app.kubernetes.io/name=external-secrets-cert-controller`) manages ValidatingWebhookConfigurations and needs API server access. A narrow endpointSelector only matched the main controller pod, leaving the cert-controller blocked and crash-looping. Use `{}` endpointSelector to cover all external-secrets pods.
 
 ### Observability
 

@@ -19,12 +19,10 @@ Each cluster runs its own [Flux Operator](https://fluxcd.controlplane.io/operato
 
 | Cluster  | Sync path            | Flux distribution | Contents                                                                 |
 | -------- | -------------------- | ----------------- | ------------------------------------------------------------------------ |
-| `cluster0` | `clusters/cluster0`  | Flux `2.9.0`      | Edge/mgmt: Dex, NetBird, Omni, cert-manager, external-secrets, Cilium    |
+| `cluster0` | `clusters/cluster0`  | Flux `2.9.0`      | Edge/mgmt: Dex, NetBird, Omni, Image Factory, cert-manager, external-secrets, Cilium, network policies |
 | `cluster1` | `clusters/cluster1`  | Flux `2.9.0`      | All workloads: apps, storage, database, AI/agents, observability, etc.   |
 
 Flux components on each cluster: Source Controller, Kustomize Controller, Helm Controller, Notification Controller.
-
-> **Migration note:** The workload tree was recently split out of `cluster0` into a new on-prem `cluster1`, and `cluster0` was rebuilt as a single-node cloud edge cluster. As a safety measure during the cutover, **Flux pruning is disabled** on the root sync Kustomization of *both* clusters (`spec.prune: false` patched onto the operator-generated `flux-system` Kustomization) so tree churn can't garbage-collect directly-applied objects (namespaces cascade-delete everything beneath them). This will be re-enabled once the migration settles.
 
 ### Repository Structure
 
@@ -38,8 +36,11 @@ clusters/
 │       ├── external-secrets/      # External Secrets + 1Password Connect
 │       ├── kube-system/cilium/    # Cilium CNI (L2 announcement, single WAN IP)
 │       ├── netbird/               # NetBird WireGuard VPN (road-warrior access)
+│       ├── network-policies/      # CiliumNetworkPolicies (two-tier: apps + infra)
 │       ├── networking/            # agentgateway (public ingress) + Cilium LB/L2
-│       └── omni/                  # Sidero Omni (in-cluster Talos management plane)
+│       └── omni/
+│           ├── omni/              # Sidero Omni (in-cluster Talos management plane)
+│           └── image-factory/     # Talos image factory
 └── cluster1/                      # 🏠 On-prem bare-metal workload cluster (6 nodes)
     ├── flux-system/               # FluxInstance + sources
     └── kubernetes/apps/
@@ -133,23 +134,23 @@ A single-node cluster hosted on UpCloud, exposed on the public WAN IP `87.58.147
 | [1Password Connect](https://developer.1password.com/docs/connect/) | Secret backend for External Secrets. The `connect` chart (`v2.4.1`) is deployed on **both** clusters, with its `1password-credentials.json` and API `token` shipped as **SOPS-encrypted Secrets in Git** (decrypted in-cluster by Flux's `sops-age` key), not inline chart values. |
 | [SOPS](https://github.com/getsops/sops)                            | Encrypted secrets (age key). The repo-wide age key was rotated on 2026-07-04; `sops.yaml` now lists the deployed key plus a pre-staged next key. |
 
-### Network Policies  (`cluster1`)
+### Network Policies  (`cluster1` and `cluster0`)
 
-The cluster runs a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
+Both clusters run a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
 
-- **`network-policies-apps`** (`policies/apps/`) — lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate).
-- **`network-policies-infra`** (`policies/infra/`) — higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering only the Hubble relay/UI pods). Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
+- **`cluster1`** — `network-policies-apps` (`policies/apps/`) covers lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate). `network-policies-infra` (`policies/infra/`) covers higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering only the Hubble relay/UI pods).
+- **`cluster0`** — `network-policies-apps` covers auth (Dex), netbird, and omni. `network-policies-infra` covers networking (agentgateway), cert-manager, external-secrets, flux-system, and Cilium L2 announcement. Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
 
 ### Identity & SSO
 
 The two clusters run **different identity stacks**:
 
 **`cluster0` (edge) — Dex** (`dex.biggs.dog`):
-[Dex](https://dexidp.io/) (`v2.45.1`) is the root OIDC identity provider for the edge plane, backing Omni and NetBird. It runs stateless (`storage.type: memory`) with `enablePasswordDB: true` and a static admin user; clients/secrets are templated into the config from 1Password. Config lives in `apps/auth/dex/`.
+[Dex](https://dexidp.io/) (`v2.45.1`) is the root OIDC identity provider for the edge plane, backing Omni. It runs stateless (`storage.type: memory`) with `enablePasswordDB: true` and a static admin user; clients/secrets are templated into the config from 1Password. Config lives in `apps/auth/dex/`.
 
 | Component                                       | Description                                                                                       |
 | ----------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [Dex](https://dexidp.io/) (`cluster0`)          | Root OIDC IdP for edge apps (Omni, NetBird). Stateless, static admin user.                        |
+| [Dex](https://dexidp.io/) (`cluster0`)          | Root OIDC IdP for edge apps (Omni, Image Factory). Stateless, static admin user. |
 | [Pocket ID](https://github.com/pocket-id/pocket-id) (`cluster1`) | Passkey-based OIDC provider at `id.biggs.dog` (Postgres via CNPG, uploads stored in the database) |
 | [OAuth2 Proxy](https://github.com/oauth2-proxy/oauth2-proxy) (`cluster1`) | OIDC client at `auth.biggs.dog`; forward-auth for apps with a shared `.biggs.dog` session cookie  |
 
@@ -180,8 +181,9 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 
 | Component                                       | Description                                                                                          |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| [NetBird](https://netbird.io/)                  | Zero-config WireGuard VPN for road-warrior access to the homelab. Combined server (mgmt + signal + relay + STUN + embedded IdP) at `netbird.biggs.dog` (`0.74.2`) plus a dashboard. SQLite store on a 1Gi PVC (`Recreate`). STUN/UDP 3478 exposed via `externalIPs` (`87.58.147.51`) because the UpCloud Managed LB has no UDP mode. |
-| [Omni](https://omni.siderolabs.io/) (Sidero)    | In-cluster Talos management plane at `omni.biggs.dog` (`v1.9.1`): UI, machine API, Siderolink (WireGuard `:50180`), and Kubernetes-in-Kubernetes proxy. Manages the on-prem `cluster1` nodes (which phone home over Siderolink). Runs privileged with `/dev/net/tun`; double-TLS (gateway terminates, re-encrypts to the pod's own cert). |
+| [NetBird](https://netbird.io/)                  | Zero-config WireGuard VPN for road-warrior access to the homelab. Combined server (mgmt + signal + relay + STUN + embedded IdP) at `netbird.biggs.dog` (`0.74.2`) plus a dashboard. SQLite store on a 1Gi PVC (`Recreate`). STUN/UDP 3478 exposed via `externalIPs` (`87.58.147.51`) because the UpCloud Managed LB has no UDP mode. gRPC routes use an `AgentgatewayPolicy` to force HTTP/2 backend protocol. |
+| [Omni](https://omni.siderolabs.io/) (Sidero)    | In-cluster Talos management plane at `omni.biggs.dog` (`v1.9.1`): UI, machine API, Siderolink (WireGuard `:50180`), and Kubernetes-in-Kubernetes proxy. Manages the on-prem `cluster1` nodes (which phone home over Siderolink). Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy` (gateway re-encrypts to the pod's own Let's Encrypt cert using System CA trust). |
+| [Talos Image Factory](https://www.talos.dev/latest/learnmore/image-factory/) | Builds and signs custom Talos Linux images with cosign. Stateless HTTP service (`ghcr.io/siderolabs/image-factory:v1.3.3`) behind an `oauth2-proxy` authenticated against Dex at `factory.biggs.dog`. |
 | [Dex](https://dexidp.io/)                       | See [Identity & SSO](#identity--sso).                                                                |
 
 ### Automation
@@ -267,7 +269,7 @@ See [`.rules`](.rules) for agent selection by task domain and the live invocabil
 
 ### BGP Peering  (`cluster1`)
 
-`cluster1` uses Cilium BGP to peer with the UDM router (ASN 64563, `192.168.1.1`) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254` (deliberately off-subnet from the nodes on `192.168.2.0/24`, so VIPs route via the UDM). This allows in-cluster services to advertise VIPs to the LAN. See [NOTES.md](docs/NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
+`cluster1` uses Cilium BGP to peer with the UDM router (ASN 64563, `192.168.1.1`) from Cilium's ASN 64564, advertising LoadBalancer IPs from the pool `192.168.6.6–254` (deliberately off-subnet from the nodes on `192.168.2.0/24`, so VIPs route via the UDM). This allows in-cluster services to advertise VIPs to the LAN. k8s-gateway has **fallthrough enabled** with NextDNS resolvers (`45.90.28.232` / `45.90.30.232`) so unknown `biggs.dog` names resolve to public DNS — this is how LAN/VPN clients reach cluster0 services (omni/netbird/dex at `87.58.147.51`). The default k8s-gateway forward plugin (`/etc/resolv.conf`) was replaced to avoid a DNS loop with in-cluster CoreDNS. See [NOTES.md](docs/NOTES.md#networking-stack) for details on the full networking stack (Cilium, k8s-gateway, CoreDNS, Gateway API).
 
 ### Edge Ingress  (`cluster0`)
 
