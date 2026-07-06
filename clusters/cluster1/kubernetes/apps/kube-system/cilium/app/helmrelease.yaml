@@ -61,6 +61,7 @@ spec:
     dashboards:
       enabled: true
     devices: "eth+ enp+ enx+ eno+ ens+ bond+"
+    directRoutingDevice: "enp*"
     endpointRoutes:
       enabled: true
     endpointSlicePolicy: true
