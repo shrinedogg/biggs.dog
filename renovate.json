@@ -11,7 +11,7 @@
   "dependencyDashboardTitle": "Renovate Dashboard \ud83e\udd16",
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "rebaseWhen": "conflicted",
-  "schedule": ["every day"],
+  "schedule": ["0 10 * * *"],
   "ignorePaths": ["**/apps.yaml"],
   "flux": {
     "managerFilePatterns": ["(^|/)clusters/.+\\.ya?ml$"]
