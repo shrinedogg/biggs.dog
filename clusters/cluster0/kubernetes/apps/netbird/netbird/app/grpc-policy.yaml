@@ -1,0 +1,21 @@
+# Force HTTP/2 (h2c) to the netbird-server backend for gRPC routes.
+# agentgateway ignores the annotation `agentgateway.dev/backend-protocol: h2c`
+# on HTTPRoute, so we use an AgentgatewayPolicy instead.
+# NetBird multiplexes gRPC over HTTP/2 on port 80 — the gateway must speak
+# HTTP/2 to the backend, not HTTP/1.1.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: netbird-grpc
+  namespace: netbird
+  labels:
+    app.kubernetes.io/name: netbird
+    app.kubernetes.io/component: grpc
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: netbird-grpc
+  backend:
+    http:
+      version: HTTP2
