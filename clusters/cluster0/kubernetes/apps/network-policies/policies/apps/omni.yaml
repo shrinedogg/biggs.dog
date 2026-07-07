@@ -150,6 +150,17 @@ spec:
 # omni + image-factory-oauth2 reach dex for OIDC. omni uses the public URL
 # (--auth-oidc-provider-url=https://dex.biggs.dog) which hits the gateway,
 # and may also reach dex directly via in-cluster svc. Allow both paths.
+#
+# The gateway egress is required, not optional: dex.biggs.dog resolves (via
+# CoreDNS -> upstream -> Cloudflare) to the WAN IP 87.58.147.51, which is the
+# cluster0-gateway LoadBalancer's external IP. Cilium kube-proxy-replacement
+# recognizes that IP as a local LoadBalancer and DNATs pod traffic to the
+# agentgateway data-plane endpoint -- so it is classified as a CLUSTER
+# endpoint, NOT 'world'. allow-egress-https (world:443) therefore does NOT
+# cover it, and the OIDC token-exchange call (omni -> https://dex.biggs.dog/token)
+# is silently dropped -> the omni auth flow hangs/times out. This same egress
+# also fixes omni -> https://factory.biggs.dog/versions (Talos version reconcile),
+# which fails the same way (cluster endpoint reached via public hostname).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -160,6 +171,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: omni
   egress:
+    # Direct in-cluster path (dex Service 80 -> pod 5556).
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: auth
@@ -169,6 +181,20 @@ spec:
             - port: "80"
               protocol: TCP
             - port: "5556"
+              protocol: TCP
+    # Public-hostname path via the gateway (the path omni actually uses for
+    # OIDC token exchange + userinfo, and for factory.biggs.dog). Mirrors
+    # allow-egress-to-dex-oauth2.
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "443"
               protocol: TCP
 ---
 apiVersion: cilium.io/v2
