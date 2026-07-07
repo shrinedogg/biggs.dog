@@ -83,11 +83,18 @@ spec:
             k8s:io.kubernetes.pod.namespace: cnpg-system
             cnpg.io/cluster: cnpg-bookboss
 ---
-# BookBoss's native OIDC SSO discovers the Pocket ID provider via HTTPS.
-# id.biggs.dog is served by the wildcard Gateway (networking/agentgateway)
-# which terminates TLS and routes to pocket-id.auth.svc.cluster.local:1411.
-# toFQDNs won't work here since id.biggs.dog resolves to a ClusterIP,
-# so we allow egress to the Gateway pods by label selector.
+# Native OIDC SSO against Pocket ID (via the wildcard Gateway) for media apps
+# that act as direct OIDC clients. id.biggs.dog is served by the wildcard
+# Gateway (networking/agentgateway), which terminates TLS and routes to
+# pocket-id.auth.svc.cluster.local:1411. toFQDNs won't work here since
+# id.biggs.dog resolves to a ClusterIP, so we allow egress to the Gateway pods
+# by label selector.
+#
+# Clients today:
+#   - bookboss  (its own OIDC SSO)
+#   - ersatz    (ErsatzTV native OIDC; gates the web UI only — /iptv/* and the
+#                HDHR/IPTV endpoints are carved out of auth by ErsatzTV itself,
+#                so media players are unaffected)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -95,8 +102,12 @@ metadata:
   namespace: media
 spec:
   endpointSelector:
-    matchLabels:
-      app: bookboss
+    matchExpressions:
+      - key: app
+        operator: In
+        values:
+          - bookboss
+          - ersatz
   egress:
     - toEndpoints:
         - matchLabels:

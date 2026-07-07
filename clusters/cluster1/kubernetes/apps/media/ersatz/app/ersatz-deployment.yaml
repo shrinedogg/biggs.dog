@@ -44,6 +44,21 @@ spec:
           env:
             - name: TZ
               value: "Europe/Helsinki"
+            # Native OIDC login via Pocket ID. Enabling this gates the entire
+            # Blazor web UI behind an OIDC login (Startup.cs AuthorizeFolder("/"))
+            # but deliberately exempts the IPTV/streaming paths (/iptv/*,
+            # /discover.json, /device.xml, /lineup*.json) so media players that
+            # can't do OIDC keep working. Callback is /callback (not /signin-oidc).
+            # OIDC__ClientSecret comes from the ersatz-oidc ExternalSecret below.
+            - name: OIDC__Authority
+              value: "https://id.biggs.dog"
+            - name: OIDC__ClientId
+              value: "ersatz"
+            - name: OIDC__LogoutUri
+              value: "https://id.biggs.dog/logout"
+          envFrom:
+            - secretRef:
+                name: ersatz-oidc
           ports:
             - name: ersatz-port
               containerPort: 8409
