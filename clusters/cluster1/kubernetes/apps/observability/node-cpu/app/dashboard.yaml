@@ -1,0 +1,189 @@
+---
+# "Nodes — CPU" overview dashboard. All nodes at a glance (utilization, load,
+# iowait, context switches, per-core breakdown), sourced from
+# prometheus-node-exporter (job=node-exporter). Complements the bundled
+# node-exporter-full (gnetId 1860), which is a single-node drill-down.
+#
+# Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
+# label: grafana-dashboard). Datasource follows the repo convention: a
+# `datasource` template variable of type prometheus (default VictoriaMetrics).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: node-cpu-dashboard
+  namespace: observability
+  labels:
+    grafana-dashboard: "1"
+  annotations:
+    grafana-folder: "Nodes"
+data:
+  node-cpu.json: |
+    {
+      "annotations": { "list": [] },
+      "description": "Host CPU across all nodes -- utilization, load average, iowait, context switches and per-core breakdown from prometheus-node-exporter.",
+      "editable": true,
+      "graphTooltip": 1,
+      "links": [],
+      "panels": [
+        {
+          "id": 1,
+          "type": "stat",
+          "title": "CPU Utilization by Node (now)",
+          "description": "1 - idle fraction, 5m rate. 90%+ sustained = NodeCpuHighUsage fires.",
+          "gridPos": { "h": 5, "w": 24, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "avg by (instance) (1 - rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[5m]))", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "max": 1, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.75 }, { "color": "orange", "value": 0.9 }, { "color": "red", "value": 0.95 } ] } }
+          },
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value", "orientation": "horizontal" }
+        },
+        {
+          "id": 2,
+          "type": "timeseries",
+          "title": "CPU Utilization (all nodes)",
+          "description": "1 - idle fraction, 5m rate, per node.",
+          "gridPos": { "h": 9, "w": 24, "x": 0, "y": 5 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "avg by (instance) (1 - rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"}[5m]))", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "max": 1, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "stacking": { "mode": "none" }, "thresholdsStyle": { "mode": "line" } }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0.9 } ] } }
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+        },
+        {
+          "id": 3,
+          "type": "stat",
+          "title": "Load Average (1m) per core",
+          "description": "node_load1 / core count. >1.0/core means runnable tasks are queueing (NodeLoadHigh fires).",
+          "gridPos": { "h": 5, "w": 8, "x": 0, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "node_load1{job=\"node-exporter\"} / count by (instance) (node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"})", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.7 }, { "color": "red", "value": 1 } ] } }
+          },
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value", "orientation": "horizontal" }
+        },
+        {
+          "id": 4,
+          "type": "stat",
+          "title": "iowait % by Node (now)",
+          "description": "CPU time waiting on I/O, 5m rate. Sustained >20% = storage bottleneck (NodeCpuIowaitHigh).",
+          "gridPos": { "h": 5, "w": 8, "x": 8, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"iowait\"}[5m]))", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 0.05 }, { "color": "red", "value": 0.2 } ] } }
+          },
+          "options": { "colorMode": "background", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value", "orientation": "horizontal" }
+        },
+        {
+          "id": 5,
+          "type": "stat",
+          "title": "Core Count by Node",
+          "gridPos": { "h": 5, "w": 8, "x": 16, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "count by (instance) (node_cpu_seconds_total{job=\"node-exporter\", mode=\"idle\"})", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 0 } ] } }
+          },
+          "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value", "orientation": "horizontal" }
+        },
+        {
+          "id": 6,
+          "type": "timeseries",
+          "title": "iowait % (all nodes)",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 19 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "avg by (instance) (rate(node_cpu_seconds_total{job=\"node-exporter\", mode=\"iowait\"}[5m]))", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percentunit", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10, "stacking": { "mode": "none" } } }
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+        },
+        {
+          "id": 7,
+          "type": "timeseries",
+          "title": "Load Average (1/5/15) per node",
+          "description": "Use the instance filter to focus a node.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 19 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "node_load1{job=\"node-exporter\", instance=\"$instance\"}", "legendFormat": "load1 {{instance}}", "refId": "A" },
+            { "expr": "node_load5{job=\"node-exporter\", instance=\"$instance\"}", "legendFormat": "load5 {{instance}}", "refId": "B" },
+            { "expr": "node_load15{job=\"node-exporter\", instance=\"$instance\"}", "legendFormat": "load15 {{instance}}", "refId": "C" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 0, "stacking": { "mode": "none" } } }
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "bottom", "calcs": ["lastNotNull"] }, "tooltip": { "mode": "multi" } }
+        },
+        {
+          "id": 8,
+          "type": "timeseries",
+          "title": "Context switches / sec (all nodes)",
+          "description": "rate(node_context_switch_total). Spikes alongside high CPU = scheduler pressure.",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 27 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (instance) (rate(node_context_switch_total{job=\"node-exporter\"}[5m]))", "legendFormat": "{{instance}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ops", "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 5, "stacking": { "mode": "none" } } }
+          },
+          "options": { "legend": { "displayMode": "table", "placement": "right", "calcs": ["mean", "max"] }, "tooltip": { "mode": "multi" } }
+        }
+      ],
+      "refresh": "30s",
+      "schemaVersion": 39,
+      "tags": ["nodes", "cpu", "node-exporter", "infrastructure"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "VictoriaMetrics", "value": "VictoriaMetrics" },
+            "hide": 0,
+            "includeAll": false,
+            "multi": false,
+            "name": "datasource",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          },
+          {
+            "current": { "selected": true, "text": "All", "value": "$__all" },
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "definition": "label_values(node_cpu_seconds_total{job=\"node-exporter\"}, instance)",
+            "hide": 0,
+            "includeAll": true,
+            "multi": false,
+            "name": "instance",
+            "options": [],
+            "query": { "query": "label_values(node_cpu_seconds_total{job=\"node-exporter\"}, instance)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+            "refresh": 1,
+            "regex": "",
+            "sort": 1,
+            "type": "query"
+          }
+        ]
+      },
+      "time": { "from": "now-6h", "to": "now" },
+      "timepicker": {},
+      "timezone": "browser",
+      "title": "Nodes - CPU",
+      "uid": "node-cpu-overview",
+      "version": 1,
+      "weekStart": ""
+    }

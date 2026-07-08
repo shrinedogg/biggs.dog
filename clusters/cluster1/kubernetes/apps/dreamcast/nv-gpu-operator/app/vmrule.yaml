@@ -9,11 +9,14 @@
 # NV_ERR_NO_MEMORY before the lockup. These rules surface the two precursors
 # that were invisible at the time: VRAM exhaustion and thermal stress.
 #
-# Metric availability (verified against VictoriaMetrics): the gpu-operator's
-# DCGM exporter currently emits FB_FREE/USED/RESERVED, GPU_TEMP, POWER_USAGE,
-# SM_CLOCK. It does NOT emit DCGM_FI_DEV_XID_ERRORS, so the suspected Xid 109
-# CTX_SWITCH_TIMEOUT freeze still cannot be alerted on -- enable XID collection
-# in the dcgm-exporter csv/config to add an XID alert (highest-value follow-up).
+# Metric availability (verified against VictoriaMetrics 2026-07-07): the
+# gpu-operator's DCGM exporter emits FB_FREE/USED/RESERVED, GPU_TEMP,
+# POWER_USAGE, SM_CLOCK, AND DCGM_FI_DEV_XID_ERRORS. The XID field emits one
+# series per err_code that has occurred, carrying err_code + err_msg labels
+# (e.g. err_code="109", err_msg="Context Switch Timeout Error"), so Xid 109 --
+# the recurring nv-01 hard-freeze trigger -- CAN now be alerted on directly
+# (see nvidia-gpu-xid below). (Earlier notes saying XID was NOT_SUPPORTED on
+# the consumer RTX 5090 are outdated; it emits as of driver 595.71.05.)
 #
 # Labels available on every series: Hostname, gpu, UUID, modelName, pci_bus_id.
 apiVersion: operator.victoriametrics.com/v1beta1
@@ -34,7 +37,7 @@ spec:
         # reserve -- the immediate precondition for the NV_ERR_NO_MEMORY
         # cascade that preceded the nv-01 freeze.
         - alert: GpuVramFreeLow
-          expr: 'min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 750'
+          expr: "min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 750"
           for: 10m
           labels:
             severity: warning
@@ -43,7 +46,7 @@ spec:
             description: "Only {{ $value | humanize }}MiB free on {{ $labels.Hostname }} gpu {{ $labels.gpu }} for 10m (threshold 750MiB). Co-scheduled GPU consumers are starving the reserve; expect NVRM NV_ERR_NO_MEMORY. Check what landed on the node and consider lowering vLLM gpu-memory-utilization or reducing GPU time-slice replicas."
         # Near-zero free VRAM: allocations are actively failing now.
         - alert: GpuVramFreeCritical
-          expr: 'min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 500'
+          expr: "min by (Hostname, gpu) (DCGM_FI_DEV_FB_FREE) < 500"
           for: 5m
           labels:
             severity: critical
@@ -56,7 +59,7 @@ spec:
         # mitigations=off / pcie_aspm=off profile is a plausible contributor to
         # a hard lockup, so surface it early.
         - alert: GpuTempHigh
-          expr: 'max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 84'
+          expr: "max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 84"
           for: 5m
           labels:
             severity: warning
@@ -64,10 +67,35 @@ spec:
             summary: "GPU temperature high on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
             description: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} has been above 84C for 5m ({{ $value }}C). Approaching the thermal-throttle threshold; check airflow and sustained load."
         - alert: GpuTempCritical
-          expr: 'max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 90'
+          expr: "max by (Hostname, gpu) (DCGM_FI_DEV_GPU_TEMP) > 90"
           for: 2m
           labels:
             severity: critical
           annotations:
             summary: "GPU temperature critical on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
             description: "GPU {{ $labels.gpu }} on {{ $labels.Hostname }} has been above 90C for 2m ({{ $value }}C). Thermal-throttle/instability risk -- reduce load or check cooling."
+    - name: nvidia-gpu-xid
+      rules:
+        # NVIDIA Xid errors surfaced directly from DCGM -- the authoritative,
+        # low-latency signal for GPU/driver faults. On nv-01's RTX 5090
+        # (Blackwell) running the open GPU kernel modules (driver 595.71.05),
+        # Xid 109 (CTX_SWITCH_TIMEOUT) has repeatedly preceded a full node
+        # hard-freeze: the GPU faults -> the driver wedges (SM_CLOCK drops to
+        # ~195MHz, util 0) -> the kernel locks up and the node drops off the
+        # network. Verified live 2026-07-07: DCGM_FI_DEV_XID_ERRORS reported
+        # err_code=109 continuously for hours on nv-01 while temp/power were
+        # nominal (33C / 8.7W), confirming this is NOT a thermal/power event.
+        #
+        # DCGM_FI_DEV_XID_ERRORS is a gauge holding the last Xid code; it emits
+        # one series per err_code that has occurred (value = the code, > 0), so
+        # any non-zero reading is actionable. This supersedes the log-based
+        # GpuXidKernelLog rule (talos-kernel-logs), which depends on the kernel
+        # kmsg relay that is currently ingesting nothing.
+        - alert: GpuXidError
+          expr: "max by (Hostname, gpu, modelName, err_code, err_msg) (DCGM_FI_DEV_XID_ERRORS) > 0"
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "NVIDIA Xid {{ $labels.err_code }} on {{ $labels.Hostname }} (gpu {{ $labels.gpu }})"
+            description: "GPU {{ $labels.modelName }} on {{ $labels.Hostname }} reported Xid {{ $labels.err_code }} ({{ $labels.err_msg }}) for 1m. Xid 109 (Context Switch Timeout) on this RTX 5090 has repeatedly preceded a node hard-freeze. Inspect: talosctl -n {{ $labels.Hostname }} dmesg | grep -iE 'nvrm|xid'; check DCGM temp/power; prepare to drain/reset the node."

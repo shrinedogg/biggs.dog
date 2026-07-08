@@ -1,0 +1,68 @@
+---
+# Node-level CPU alerts for all nodes, sourced from prometheus-node-exporter
+# (job=node-exporter; node identity is the `instance` label = <node-ip>:9100).
+#
+# Scope: HOST cpu (all nodes), not per-container. Container CPU throttling is
+# covered separately by the VM stack's default CPUThrottlingHigh rule
+# (cAdvisor; disabled by default -- enable via defaultRules.rules if wanted).
+# These rules complement the kubernetes-mixin defaults, which ship node CPU
+# *recording* rules but no sustained-CPU-utilisation *alert*.
+#
+# Metric notes (verified against VictoriaMetrics 2026-07-07):
+#   node_cpu_seconds_total{mode="idle"|"iowait"|"user"|"system"|"steal",...}
+#   node_load1 / node_load5 / node_load15
+# Each physical core contributes one series per mode, so
+# count by (instance) (node_cpu_seconds_total{mode="idle"}) == core count.
+apiVersion: operator.victoriametrics.com/v1beta1
+kind: VMRule
+metadata:
+  name: node-cpu
+  namespace: observability
+  labels:
+    app.kubernetes.io/name: node-cpu
+spec:
+  groups:
+    - name: node-cpu
+      interval: 30s
+      rules:
+        # Sustained high CPU. 90% for 15m is busy-but-survivable (warning);
+        # 95% for 10m means the node is saturated and pods are likely being
+        # starved/throttled (critical). 5m rate smooths short spikes.
+        - alert: NodeCpuHighUsage
+          expr: 'avg by (instance) (1 - rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m])) > 0.90'
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CPU usage high on {{ $labels.instance }}"
+            description: "CPU utilization on {{ $labels.instance }} has been above 90% for 15m ({{ $value | humanizePercentage }}). Check top containers: kubectl top pods --sort-by=cpu or the node-exporter-full dashboard."
+        - alert: NodeCpuCriticalUsage
+          expr: 'avg by (instance) (1 - rate(node_cpu_seconds_total{job="node-exporter", mode="idle"}[5m])) > 0.95'
+          for: 10m
+          labels:
+            severity: critical
+          annotations:
+            summary: "CPU usage critical on {{ $labels.instance }}"
+            description: "CPU utilization on {{ $labels.instance }} has been above 95% for 10m ({{ $value | humanizePercentage }}). The node is saturated; expect pod CPU starvation and latency regressions."
+        # High iowait: CPU time spent waiting on I/O. Sustained >20% means a disk
+        # or storage path is the bottleneck (e.g. the Rook/Ceph or NFS backing
+        # store), not the CPUs themselves.
+        - alert: NodeCpuIowaitHigh
+          expr: 'avg by (instance) (rate(node_cpu_seconds_total{job="node-exporter", mode="iowait"}[5m])) > 0.20'
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High iowait on {{ $labels.instance }}"
+            description: "iowait on {{ $labels.instance }} has been above 20% of CPU for 10m ({{ $value | humanizePercentage }}). A storage path is the bottleneck -- check disk utilisation and the Ceph/NFS backends."
+        # Load average relative to core count. load1 > 1.0 per core for 10m means
+        # runnable tasks are consistently queueing (sustained contention, not a
+        # momentary burst). >2.0/core is heavy oversubscription.
+        - alert: NodeLoadHigh
+          expr: 'node_load1{job="node-exporter"} / count by (instance) (node_cpu_seconds_total{job="node-exporter", mode="idle"}) > 1'
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Load average high on {{ $labels.instance }}"
+            description: "1-minute load average on {{ $labels.instance }} has exceeded its core count for 10m ({{ $value | humanize }} runnable tasks/core). Sustained CPU contention."

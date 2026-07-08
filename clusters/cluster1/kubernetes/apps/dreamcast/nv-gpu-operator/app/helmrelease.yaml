@@ -49,20 +49,18 @@ spec:
     # dcgm-metrics.csv) and the gpu-operator mounts it, pointing
     # DCGM_EXPORTER_COLLECTORS at it.
     #
-    # IMPORTANT (verified 2026-06-25): DCGM_FI_DEV_XID_ERRORS and the
-    # remapped-rows fields are listed below but DO NOT emit on this hardware --
-    # DCGM reports them NOT_SUPPORTED on the consumer GeForce RTX 5090 (the
-    # exporter logs "init ... result=11" at startup and the metrics never
-    # appear). So XID errors -- the key signal for the nv-01 hard-freeze
-    # (suspected Xid 109 / CTX_SWITCH_TIMEOUT) -- CANNOT be alerted on via DCGM
-    # here. The kernel emits NVRM:Xid to dmesg, but Talos ships that only to
-    # Omni's kmsg sink, not to VictoriaLogs. Until kernel logs are routed into
-    # VictoriaLogs (Talos machine.logging destination -> vlogs syslog), the
-    # freeze is covered indirectly by the bundled kubernetes-mixin
-    # KubeNodeNotReady/KubeNodeUnreachable alerts (~15m) and the GPU
-    # VRAM/thermal alerts (nv-gpu-operator VMRule). The
-    # XID/remapped-rows lines are kept for forward-compat with datacenter GPUs.
-    # ECC stays commented (consumer RTX 5090 has no ECC).
+    # IMPORTANT (re-verified 2026-07-07 against VictoriaMetrics): the
+    # DCGM_FI_DEV_XID_ERRORS field below DOES emit on this hardware now (driver
+    # 595.71.05) -- it reports one series per err_code with err_code/err_msg
+    # labels (observed err_code="109", err_msg="Context Switch Timeout Error"
+    # continuously on nv-01). So Xid errors -- the key signal for the nv-01
+    # hard-freeze (Xid 109 / CTX_SWITCH_TIMEOUT) -- CAN and ARE alerted on via
+    # DCGM (see the nvidia-gpu-xid group in app/vmrule.yaml: alert GpuXidError).
+    # The earlier "NOT_SUPPORTED / result=11" note (verified 2026-06-25) is
+    # outdated. The remapped-rows fields still do NOT emit on the consumer RTX
+    # 5090 (no ECC); kept for forward-compat with datacenter GPUs. The kernel
+    # NVRM:Xid line (talos-kernel-logs relay) remains valuable as a forensic
+    # complement, but alerting no longer depends on it.
     dcgmExporter:
       env:
         # Disable Kubernetes label enrichment. When enabled, DCGM attaches

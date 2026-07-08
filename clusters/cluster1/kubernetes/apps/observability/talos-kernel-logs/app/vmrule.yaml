@@ -1,10 +1,18 @@
 ---
-# GPU Xid error alert, evaluated by the vlogs VMAlert against Talos kernel logs.
+# GPU Xid error alert from kernel logs, evaluated by the vlogs VMAlert against
+# Talos kernel logs relayed into VictoriaLogs.
 #
-# Xid errors are the authoritative signal for the GPU faults suspected behind
-# the 2026-06-25 nv-01 hard-freeze (Xid 109 / CTX_SWITCH_TIMEOUT). They cannot
-# be sourced from DCGM on this consumer RTX 5090 (NOT_SUPPORTED), so this rule
-# matches the kernel "NVRM: Xid" messages relayed into VictoriaLogs.
+# This is the FORENSIC / secondary Xid signal: it fires off the actual kernel
+# "NVRM: Xid" dmesg line (which DCGM does not capture verbatim), so it's useful
+# for post-incident root-causing. For ALERTING, prefer GpuXidError in
+# apps/dreamcast/nv-gpu-operator/app/vmrule.yaml, which fires off the
+# DCGM_FI_DEV_XID_ERRORS metric directly (low-latency, and works today).
+#
+# Caveat (2026-07-07): this rule currently cannot fire -- the talos-kernel-log
+# relay ingests nothing from nv-01 (sender-side gap; see
+# apps/observability/talos-kernel-logs), and the vlogs VMAlert also cannot
+# reach VictoriaLogs (connection timeouts). Renamed from GpuXidError to
+# GpuXidKernelLog to avoid colliding with the metric-based alert.
 #
 # The log_source:talos-kernel filter is essential: it prevents false positives
 # from container logs that merely mention "Xid" (e.g. an agent discussing it).
@@ -21,12 +29,12 @@ spec:
       type: vlogs
       interval: 1m
       rules:
-        - alert: GpuXidError
+        - alert: GpuXidKernelLog
           # Looks back 10m so the alert stays visible after a transient Xid.
           expr: '_time:10m log_source:talos-kernel "NVRM" "Xid" | stats by (node) count() as value | filter value:>0'
           for: 0m
           labels:
             severity: critical
           annotations:
-            summary: "NVIDIA Xid error on {{ $labels.node }}"
-            description: "{{ $value }} kernel NVRM:Xid message(s) on {{ $labels.node }} in the last 10m. Xid errors indicate a GPU/driver fault and are the suspected cause of the 2026-06-25 nv-01 hard-freeze. Inspect: talosctl -n {{ $labels.node }} dmesg | grep -iE 'nvrm|xid', and check dcgm/temps. Consider draining the node if it recurs."
+            summary: "NVIDIA Xid (kernel log) on {{ $labels.node }}"
+            description: "{{ $value }} kernel NVRM:Xid message(s) on {{ $labels.node }} in the last 10m. Corroborates the DCGM-based GpuXidError alert with the verbatim dmesg line. Inspect: talosctl -n {{ $labels.node }} dmesg | grep -iE 'nvrm|xid'."

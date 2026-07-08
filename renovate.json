@@ -14,23 +14,23 @@
   "schedule": ["* 10 * * *"],
   "ignorePaths": ["**/apps.yaml"],
   "flux": {
-    "managerFilePatterns": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "helm-values": {
-    "managerFilePatterns": ["(^|/)clusters/.+\\.ya?ml$"]
+    "managerFilePatterns": ["/(^|/)clusters/.+\\.ya?ml$/"]
   },
   "kubernetes": {
     "managerFilePatterns": [
-      "(^|/)clusters/.+\\.ya?ml$",
-      "(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\\.ya?ml$",
-      "(^|/)clusters/.+-deployment\\.ya?$"
+      "/(^|/)clusters/.+\\.ya?ml$/",
+      "/(^|/)clusters/.+/(deployment|job|cronjob|daemonset|statefulset)\\.ya?ml$/",
+      "/(^|/)clusters/.+-deployment\\.ya?ml$/"
     ]
   },
   "customManagers": [
     {
       "customType": "regex",
       "description": "Flux OCIRepository sources (chartRef chart version) \u2014 tracks the tag in the source file, which is where Flux Operator HelmReleases get their version from",
-      "managerFilePatterns": ["(^|/)clusters/.+-oci\\.ya?ml$"],
+      "managerFilePatterns": ["/(^|/)clusters/.+-oci\\.ya?ml$/"],
       "matchStrings": [
         "url:\\s*oci://(?<depName>[^\\s]+)\\n\\s*ref:\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?",
         "ref:\\s*\\n\\s*tag:\\s*[\"']?(?<currentValue>[^\"'\\s]+)[\"']?\\s*\\n\\s*url:\\s*oci://(?<depName>[^\\s]+)"
@@ -41,7 +41,7 @@
     {
       "customType": "regex",
       "description": "Flux GitRepository sources with ref.tag (chartRef chart version) \u2014 tracks GitHub release tags for Git-sourced Helm charts",
-      "managerFilePatterns": ["(^|/)clusters/.+-git\\.ya?ml$"],
+      "managerFilePatterns": ["/(^|/)clusters/.+-git\\.ya?ml$/"],
       "matchStrings": [
         "url:\\s*https://github.com/(?<depName>[^/]+/[^/]+?)(?:\\.git)?\\s*\\n\\s*ref:\\s*\\n\\s*tag:\\s*[\"\\']?(?<currentValue>[^\"\\'\\s]+)[\"\\']?"
       ],
@@ -51,7 +51,7 @@
     {
       "customType": "regex",
       "description": "CNPG ClusterImageCatalog extension images (reference: field, which the kubernetes manager ignores)",
-      "managerFilePatterns": ["(^|/)clusters/.+catalog\\.ya?ml$"],
+      "managerFilePatterns": ["/(^|/)clusters/.+catalog\\.ya?ml$/"],
       "matchStrings": [
         "reference:\\s*(?<depName>[^\\s:@]+):(?<currentValue>[^\\s@]+)@(?<currentDigest>sha256:[a-f0-9]+)"
       ],
