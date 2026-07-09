@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds
   ref:
-    tag: "0.9.10"
+    tag: "0.9.11"
