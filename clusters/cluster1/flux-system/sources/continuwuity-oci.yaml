@@ -9,3 +9,4 @@ spec:
   url: oci://ghcr.io/continuwuity/continuwuity
   ref:
     tag: "v1.1.1"
+    digest: sha256:cd35c0dee4fe469f0712a4deb133a1264f69241c95664906e5cf889746a2a550
