@@ -52,8 +52,11 @@ spec:
             # OIDC__ClientSecret comes from the ersatz-oidc ExternalSecret below.
             - name: OIDC__Authority
               value: "https://id.biggs.dog"
+            # OIDC__ClientId must be the Pocket ID client UUID, not the
+            # client name ("ersatz"). Pocket ID looks up clients by UUID;
+            # using the name returns "Client not found" (404).
             - name: OIDC__ClientId
-              value: "ersatz"
+              value: "07e77c2a-bbca-4096-9e0e-704366d0a8f0"
             - name: OIDC__LogoutUri
               value: "https://id.biggs.dog/logout"
           envFrom:
@@ -75,6 +78,12 @@ spec:
             requests:
               gpu.intel.com/i915: "1"
               memory: 8Gi
+              # Guarantee CPU for FFmpeg's single-threaded transcode pipeline
+              # (-threads 1 + loudnorm audio filter is CPU-bound). Without a
+              # request the pod is BestEffort QoS and gets starved under node
+              # pressure from Ceph OSDs, CNPG, etc. on worker-01. No CPU limit
+              # is set so the pod can burst when multiple streams transcode.
+              cpu: "2"
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
