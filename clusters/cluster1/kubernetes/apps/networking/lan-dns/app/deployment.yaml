@@ -43,7 +43,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: coredns
-          image: docker.io/coredns/coredns:1.14.4
+          image: docker.io/coredns/coredns:1.14.6
           args: ["-conf", "/etc/coredns/Corefile"]
           securityContext:
             allowPrivilegeEscalation: false
