@@ -13,7 +13,22 @@ spec:
   sourceRef:
     kind: GitRepository
     name: flux-system
-  wait: true
+  # wait: false + explicit healthChecks below (instead of wait: true). With
+  # wait: true, Flux implicitly health-checked EVERY resource in this path,
+  # including the standalone VMRule/vmservicescrape. Flux's generic CRD health
+  # check does not recognize VictoriaMetrics' non-standard condition type
+  # (stack.observability.vmalert.victoriametrics.com/Applied) as "ready", so the
+  # healthy VMRule nvidia-gpu was perpetually reported as 'InProgress' -- a
+  # false negative that gated every dependent kustomization (vllm, fenrir,
+  # nvidia-gpu-tuning, intel-gpu-plugin). Limiting the health check to the
+  # HelmRelease avoids that while still blocking dependents until the GPU
+  # operator chart is reconciled.
+  wait: false
+  healthChecks:
+    - apiVersion: helm.toolkit.fluxcd.io/v2
+      kind: HelmRelease
+      name: nv-gpu-operator
+      namespace: dreamcast
   interval: 3m
   retryInterval: 1m
   timeout: 2m
