@@ -68,9 +68,10 @@ spec:
           resources:
             requests:
               memory: 32Mi
-              cpu: 100m
+              cpu: 150m
             limits:
-              memory: 12Mi
+              cpu: 150m
+              memory: 32Mi
       dnsPolicy: ClusterFirst
       restartPolicy: Always
       volumes:
