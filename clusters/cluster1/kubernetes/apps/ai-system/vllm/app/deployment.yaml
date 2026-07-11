@@ -44,32 +44,31 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.24.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: an NVFP4 (compressed-tensors) quant of Alibaba's dense
-            # Qwen3.6-27B, built for Blackwell + vLLM:
-            #   https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
+            # MODEL: unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
+            # dense Qwen3.6-27B:
+            #   https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4
             # A 27B DENSE model (all params active -> slower per-token than the
             # old 35B-A3B MoE, but strong agentic-coding quality), with a
             # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
             # paged KV, so long context stays cheap) and 262K native context.
             # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
-            # We previously ran unsloth/Qwen3.6-27B-NVFP4, but it keeps the
-            # vision tower + 248K-vocab embeddings/lm_head in BF16 -> ~26GB on
-            # disk / ~23GiB RESIDENT, leaving only ~3GiB for KV and forcing an
-            # 80K context cap. This quant compresses those too (~20GB disk /
-            # ~18GiB resident), freeing ~5GiB so we restore the full 131K window
-            # AND regain real concurrency for agent fan-out. We still serve
-            # TEXT-ONLY via --language-model-only (the vision tower's weights
-            # load but are never used by kagent).
+            # NOTE: this quant keeps the vision tower + 248K-vocab
+            # embeddings/lm_head in BF16 -> ~26GB on disk / ~23GiB RESIDENT,
+            # leaving only ~3GiB for the fp8 KV pool. That forces an ~80K context
+            # cap (see --max-model-len) and very low concurrency
+            # (--max-num-seqs=4). We serve TEXT-ONLY via --language-model-only
+            # (the vision tower's weights load but are never used by kagent).
+            # This is a RE-BENCHMARK of the unsloth quant vs the
+            # rdtand/...PrismaSCOUT...NVFP4-BF16-vllm quant we normally run,
+            # which compresses the vision tower + embeddings too (~20GB disk /
+            # ~18GiB resident) and so supports 192K context + 16-way concurrency.
+            # For production agent traffic, prefer the rdtand quant; this unsloth
+            # config is primarily for an apples-to-apples benchmark comparison.
             # Quantization is compressed-tensors and AUTO-DETECTED from the
-            # checkpoint's quantization_config -- do NOT pass --quantization
-            # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
-            # here).
-            # NOTE: if v0.23.0 lacks the dense Qwen3_5ForConditionalGeneration
-            # arch or the qwen3_coder tool parser, bump the image tag (or use
-            # :nightly).
+            # checkpoint's quantization_config -- do NOT pass --quantization.
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
+            - --model=unsloth/Qwen3.6-27B-NVFP4
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (unsloth/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
@@ -81,19 +80,18 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 192K context (raised from 131K). exa-agent's web searches return
-            # very large results (~38KB each); a multi-search session hit ~164K
-            # tokens of tool-result history and overflowed the old 131K cap
-            # (HTTP 400 input_tokens=131073). 192K gives ~28K margin over the
-            # largest observed exa session while staying safely under the fp8 KV
-            # pool (~243K-token capacity at util 0.95; ~6.4GiB for one 192K
-            # sequence vs ~8GiB pool). The model's native max is 262K, but the
-            # ~8GiB fp8 KV pool can't hold a full 262K sequence, so 262K would
-            # fail vLLM startup. To go higher, raise --gpu-memory-utilization
-            # (do NOT exceed ~0.96; 0.97 caused a full node lockup on 2026-06-25)
-            # or add VRAM. Raising max-model-len requires dropping max-num-seqs
-            # (longer sequences consume more KV) -- see below.
-            - --max-model-len=196608
+            # 80K context. The unsloth quant keeps the vision tower + embeddings
+            # in BF16 (~23GiB resident), leaving only ~3GiB for the fp8 KV pool.
+            # One 80K sequence needs ~2.67GiB, so ~80K is the practical ceiling
+            # for this quant. (The model's native max is 262K, but the ~3GiB KV
+            # pool can't hold anywhere near that.) This is LOWER than exa-agent
+            # multi-search sessions need (~164K tokens observed), so long
+            # web-search tool contexts will 400 here -- acceptable for a
+            # benchmark run; restore the rdtand quant (~18GiB resident, 192K
+            # window) for production agent traffic. To raise this, switch quants
+            # or add VRAM (do NOT exceed --gpu-memory-utilization ~0.96; 0.97
+            # caused a full node lockup on 2026-06-25).
+            - --max-model-len=81920
             # nv-01's GPU is time-sliced (replicas=4) and shared with
             # GPU-operator validators and the DRA plugin. (The embeddings server
             # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
@@ -110,21 +108,17 @@ spec:
             # are unaffected (they complete in one step). Long prompts benefit
             # from fewer scheduling rounds.
             - --max-num-batched-tokens=8192
-            # Concurrency cap. Bumped from 64 to 32 after a vLLM stall/restart
-            # under parallel kagent fan-out (6-9 agents firing long-context tool-
-            # schema prompts simultaneously). At 64-way the GPU compute saturated
-            # during prefill of multiple long prompts, stalling the async event
-            # loop for 3+ min -- past even the generous 10s×6 liveness headroom --
-            # and the pod restarted (exit 0, "Completed"). 32-way still matches or
-            # exceeds realistic concurrent agent count, lets vLLM QUEUE excess
-            # requests instead of compute-locking, and keeps /health responsive.
-            # Keep capture-size == max-num-seqs. Dropped 32 -> 16 alongside the
-            # max-model-len raise (131K -> 192K): longer sequences consume more
-            # KV, so concurrency is halved to keep the ~8GiB fp8 KV pool from
-            # oversubscribing. 16-way still exceeds realistic concurrent agent
-            # count on this cluster.
-            - --max-num-seqs=16
-            - --max-cudagraph-capture-size=16
+            # Concurrency cap, lowered to 4 for the unsloth quant. Its ~23GiB
+            # resident weights leave only ~3GiB for the fp8 KV pool, so realistic
+            # concurrent-sequence capacity is tiny (a few mid-length sequences at
+            # most). 4 matches the benchmark's concurrency=4. Keep capture-size
+            # == max-num-seqs. (The rdtand quant at ~18GiB resident runs 16-way
+            # comfortably; this low cap is unsloth-specific. Under the rdtand
+            # quant, 64-way once saturated GPU prefill and stalled vLLM's async
+            # event loop for 3+ min, past the 10s×6 liveness headroom, causing a
+            # restart storm; 16-way was the sweet spot there.)
+            - --max-num-seqs=4
+            - --max-cudagraph-capture-size=4
             - --enable-prefix-caching
             # Qwen3.6's hybrid (Gated-DeltaNet) arch may ship custom modeling
             # code; the model card sets trust-remote-code. NOTE: executes repo
