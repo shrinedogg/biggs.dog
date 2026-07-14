@@ -1,0 +1,27 @@
+# API-key auth in front of the MCP endpoint (kagent-mcp HTTPRoute).
+# Validates bearer tokens against the kagent-mcp-api-keys Secret
+# (materialized by ExternalSecret from a Pocket-ID API token).
+#
+# Machine clients (editor MCP configs) send:
+#   Authorization: Bearer <pocket-id-api-token>
+#
+# Token rotation: when the Pocket-ID API token expires, replace it in
+# 1Password (kagent-mcp-api-key.token) — the ExternalSecret refreshes
+# the Kubernetes Secret and agentgateway picks up the new key without
+# a policy redeploy.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: kagent-mcp-api-key
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: kagent-mcp
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      # location omitted — defaults to Authorization header with "Bearer " prefix
+      secretRef:
+        name: kagent-mcp-api-keys

@@ -1,0 +1,16 @@
+# kagent app — HelmRelease + standalone manifests (routes, policies, secrets).
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  # HelmRelease (renders the kagent controller + chart-managed Agents)
+  - ./helmrelease.yaml
+  # Standalone resources (not Helm-managed)
+  - ./grafana-mcp-token-secret.yaml
+  - ./kagent-database-url.yaml
+  - ./kagent-mcp-route.yaml
+  - ./kagent-route.yaml
+  - ./kagent-ui-auth-policy.yaml
+  # MCP authentication
+  - ./external-secret.yaml
+  - ./kagent-mcp-auth-policy.yaml
