@@ -1,6 +1,7 @@
 # biggs.dog — agent routing rules
 
-This is a Flux GitOps repo for a Kubernetes homelab (`clusters/cluster0`).
+This is a Flux GitOps repo for a Kubernetes homelab with 2 clusters 
+(`clusters/cluster0` & `clusters/cluster1`).
 The kagent MCP server (`https://mcp.biggs.dog/mcp`) exposes specialized
 agents via two tools: `list_agents` (what's actually invocable right now) and
 `invoke_agent` (run a task on `ai-system/<name>`). When a task matches one of
