@@ -10,4 +10,4 @@ spec:
   ref:
     branch: main
     # Pinned for reproducibility; bump deliberately to pick up CRD changes.
-    commit: a99bbf6bcc93e99177794fdda6fe53c4fe9510ff
+    commit: ec6c640596aca12a1942dacb034790bcc96eb863
