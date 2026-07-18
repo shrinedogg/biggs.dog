@@ -116,7 +116,7 @@ data:
           "id": 5,
           "type": "timeseries",
           "title": "Power Draw",
-          "description": "Power draw (W). RTX 5090 stock TDP is 600 W (power limit left at stock by nvidia-gpu-tuning; only the graphics clock is capped at 2800 MHz). Sustained at ceiling + thermal climb = throttling risk.",
+          "description": "Power draw (W). RTX 5090 stock TDP is 600 W; nvidia-gpu-tuning caps the power limit at 450 W (and the graphics clock at 2800 MHz). Sustained at ceiling + thermal climb = throttling risk.",
           "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
