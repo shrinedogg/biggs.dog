@@ -51,7 +51,7 @@ spec:
             - name: GPU_CLOCK_MAX_MHZ
               value: "2600"
             # --- Tunable: power cap ---
-            # Max board power draw (nvidia-smi -pl). Stock TDP is 600W; 450W
+            # Max board power draw (nvidia-smi -pl). Stock TDP is 600W; 550W
             # (75%) costs little real-world perf while cutting heat/noise/PSU
             # load. This is a power/thermal lever, NOT an Xid 109 mitigation
             # (it was ruled out above). Valid range: see
