@@ -55,6 +55,7 @@ clusters/
         ├── games/                 # Dedicated game servers (Windrose)
         ├── jitsi/                 # Video conferencing
         ├── kube-system/           # Cilium (BGP), CoreDNS, NFD, GPU plugins, storage
+        ├── liquidctl/             # NZXT Kraken Elite AIO fan/pump control (nv-01)
         ├── manticore/             # Full-text search
         ├── matrix/                # Continuwuity (Matrix)
         ├── media/                 # Emby, Bookboss, Ersatz, Nsyncd
@@ -203,6 +204,7 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | **Productivity** | AFFiNE, Manticore Search | Collaborative workspace + full-text search |
 | **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast](#-dreamcast-game-streaming-stack)) |
 | **Game Servers** | Windrose Online | Persistent MMO on Wine backend |
+| **Hardware** | liquidctl | NZXT Kraken Elite AIO fan/pump curves on `nv-01` (privileged, raw USB HID) |
 | **Other** | biggs | Tribute |
 
 Detailed app deployment configs are in `clusters/cluster1/kubernetes/apps/<namespace>/`.

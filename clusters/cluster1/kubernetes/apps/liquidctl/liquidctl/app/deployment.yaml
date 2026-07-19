@@ -1,0 +1,66 @@
+---
+# liquidctl fan/pump controller for the NZXT Kraken Elite AIO on nv-01.
+# Container: https://github.com/avpnusr/liquidctl-docker (avpnusr/liquidctl)
+#
+# USB device detection (talosctl dmesg on nv-01, 2026-07-19):
+#   NZXT Kraken Elite    1e71:300c  usb 3-9   (hidraw2)  <- the AIO we control
+#   NZXT RGB Controller  1e71:2021  usb 3-12  (hidraw3)  <- untouched: MATCH=kraken
+#     does not match "NZXT RGB Controller", so fan/pump commands only hit the AIO.
+#
+# The container's run.sh does: initialize all -> list -> set pump/fan speed ->
+# optional COLORSPEC -> status every 15s. MATCH must be a single word (the
+# script expands $MATCH unquoted).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: liquidctl
+  namespace: liquidctl
+  labels:
+    app: liquidctl
+spec:
+  replicas: 1
+  # Single instance only: two pods would fight over the same HID device.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: liquidctl
+  template:
+    metadata:
+      labels:
+        app: liquidctl
+    spec:
+      # The Kraken Elite is internal USB on nv-01's motherboard header; pin to
+      # the GPU node by capability label, matching the rest of the stack.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      terminationGracePeriodSeconds: 5
+      containers:
+        - name: liquidctl
+          # Weekly multiarch build; upstream only publishes :latest.
+          image: docker.io/avpnusr/liquidctl:latest
+          env:
+            - name: MATCH
+              value: "kraken"
+            # Fan curve (liquid temp C -> duty %): quiet 40% at idle, ramps
+            # from 30C, full speed at 45C (liquid, not CPU core, temp).
+            - name: FANSPEED
+              value: "20 40 30 55 35 70 40 85 45 100"
+            # Pump curve: 60% floor keeps coolant moving at idle, full at 45C.
+            - name: PUMPSPEED
+              value: "20 60 30 70 35 80 40 90 45 100"
+            # Optional RGB override, e.g.:
+            # - name: COLORSPEC
+            #   value: "--match kraken set sync color fixed ffffff"
+          securityContext:
+            # Raw /dev/hidrawN access to the AIO. Privileged (rather than a
+            # device-plugin or static hidraw number) because hidraw numbering
+            # is not stable across reboots/re-enumeration.
+            privileged: true
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 128Mi
