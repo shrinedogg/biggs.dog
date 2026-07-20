@@ -1,0 +1,44 @@
+# HTTPS routes for mindwtr.biggs.dog, LAN-only via the internal-biggs-dog
+# gateway (TLS terminates there with the *.biggs.dog wildcard cert):
+#   /health, /v1  -> mindwtr-cloud (sync endpoint + bearer-token REST API)
+#   /             -> mindwtr-app (PWA, catch-all)
+# k8s-gateway picks up this HTTPRoute's hostname and answers mindwtr.biggs.dog
+# with 192.168.6.15 for LAN/VPN clients (split-horizon); public DNS still
+# resolves to the public gateway, which has no such route (404). Clients sync
+# to https://mindwtr.biggs.dog and Mindwtr auto-appends /v1/data.
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mindwtr
+  namespace: mindwtr
+  labels:
+    app.kubernetes.io/name: mindwtr
+spec:
+  hostnames:
+    - mindwtr.biggs.dog
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /health
+      backendRefs:
+        - name: mindwtr-cloud
+          port: 8787
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /v1
+      backendRefs:
+        - name: mindwtr-cloud
+          port: 8787
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: mindwtr-app
+          port: 5173

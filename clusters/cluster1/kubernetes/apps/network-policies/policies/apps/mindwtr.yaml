@@ -1,0 +1,78 @@
+# Namespace: mindwtr  (mindwtr-app PWA + mindwtr-cloud sync server)
+#
+# mindwtr-app: nginx serving the offline-capable PWA on :5173 (stateless).
+# mindwtr-cloud: bun sync/REST API on :8787, data on RWO PVC.
+# Both are HTTPRoute-backed at mindwtr.biggs.dog (path split at the
+# internal-biggs-dog gateway, LAN-only).
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: mindwtr
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          # L7 DNS proxy — Cilium injects replies directly to the pod, avoiding
+          # the conntrack reply-drop that breaks Go resolvers behind default-deny
+          # ingress, and enables toFQDNs.
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# mindwtr-app + mindwtr-cloud serve at mindwtr.biggs.dog via the gateway.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: mindwtr
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "5173"
+              protocol: TCP
+            - port: "8787"
+              protocol: TCP
+---
+# kubelet health/readiness probes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: mindwtr
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "5173"
+              protocol: TCP
+            - port: "8787"
+              protocol: TCP

@@ -1,0 +1,105 @@
+# Mindwtr cloud sync server (mindwtr-cloud). Serves the self-hosted sync
+# endpoint (/v1/data) and the bearer-token REST API (/v1) on :8787. Data is
+# a single JSON store (+ attachments) on an RWO PVC, hence Recreate + 1
+# replica. The auth token comes from the mindwtr-cloud-auth ExternalSecret;
+# TLS terminates at the internal-biggs-dog gateway (LAN-only).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mindwtr-cloud
+  namespace: mindwtr
+  labels:
+    app.kubernetes.io/name: mindwtr
+    app.kubernetes.io/component: cloud
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # single JSON store on RWO PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: mindwtr
+      app.kubernetes.io/component: cloud
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: mindwtr
+        app.kubernetes.io/component: cloud
+    spec:
+      securityContext:
+        fsGroup: 1000 # bun user; keeps the PVC writable
+      containers:
+        - name: mindwtr-cloud
+          image: ghcr.io/dongdongbh/mindwtr-cloud:1.1.0
+          ports:
+            - containerPort: 8787
+              name: http
+          env:
+            - name: MINDWTR_CLOUD_AUTH_TOKENS
+              valueFrom:
+                secretKeyRef:
+                  name: mindwtr-cloud-auth
+                  key: token
+            # Same-origin with the PWA behind one hostname (the gateway path-
+            # splits /v1 + /health to this Service), so no browser CORS
+            # preflights. CLI/desktop clients ignore CORS anyway.
+            - name: MINDWTR_CLOUD_CORS_ORIGIN
+              value: "https://mindwtr.biggs.dog"
+          volumeMounts:
+            - name: mindwtr-data
+              mountPath: /app/cloud_data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: mindwtr-data
+          persistentVolumeClaim:
+            claimName: mindwtr-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mindwtr-data-pvc
+  namespace: mindwtr
+  labels:
+    app.kubernetes.io/name: mindwtr
+    app.kubernetes.io/component: cloud
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mindwtr-cloud
+  namespace: mindwtr
+  labels:
+    app.kubernetes.io/name: mindwtr
+    app.kubernetes.io/component: cloud
+spec:
+  selector:
+    app.kubernetes.io/name: mindwtr
+    app.kubernetes.io/component: cloud
+  ports:
+    - name: http
+      port: 8787
+      targetPort: http
