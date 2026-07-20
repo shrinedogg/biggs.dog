@@ -1,0 +1,43 @@
+---
+# Forward-auth (SSO) in front of the Mindwtr PWA via oauth2-proxy (Pocket ID).
+# See the rook-ceph policy for a description of the /oauth2/auth ext-authz flow.
+#
+# This guards the BROWSER path only: it targets the HTTPRoute's "pwa" rule
+# (mindwtr-app) by sectionName, so the /v1 sync + REST API rules stay
+# bearer-token-only for mobile/desktop/CLI clients — upstream explicitly warns
+# that Mindwtr clients cannot complete an interactive SSO login in front of
+# /v1/data. The shared .biggs.dog oauth2-proxy cookie means users already
+# signed in elsewhere (grafana, bookboss, ...) get no extra prompt.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: mindwtr-forward-auth
+  namespace: mindwtr
+  labels:
+    app.kubernetes.io/name: mindwtr
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mindwtr
+      sectionName: pwa
+  traffic:
+    extAuth:
+      backendRef:
+        group: ""
+        kind: Service
+        name: oauth2-proxy
+        namespace: auth
+        port: 80
+      http:
+        path: '"/oauth2/auth"'
+        allowedRequestHeaders:
+          - cookie
+          - authorization
+        allowedResponseHeaders:
+          - authorization
+          - x-auth-request-user
+          - x-auth-request-email
+          - x-auth-request-groups
+          - x-auth-request-preferred-username
+        redirect: '"https://auth.biggs.dog/oauth2/start?rd=https://mindwtr.biggs.dog" + request.path'

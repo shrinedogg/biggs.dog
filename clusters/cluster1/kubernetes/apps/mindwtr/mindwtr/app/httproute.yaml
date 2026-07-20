@@ -28,6 +28,9 @@ spec:
       backendRefs:
         - name: mindwtr-cloud
           port: 8787
+    # Machine clients only (sync /v1/data + REST API). Bearer-token auth is
+    # enforced by mindwtr-cloud itself; do NOT front this rule with SSO —
+    # mobile/desktop clients can't complete an interactive OIDC login.
     - matches:
         - path:
             type: PathPrefix
@@ -35,7 +38,10 @@ spec:
       backendRefs:
         - name: mindwtr-cloud
           port: 8787
-    - matches:
+    # Browser PWA. Guarded by Pocket-ID SSO via the mindwtr-forward-auth
+    # AgentgatewayPolicy, which targets this rule by sectionName.
+    - name: pwa
+      matches:
         - path:
             type: PathPrefix
             value: /
