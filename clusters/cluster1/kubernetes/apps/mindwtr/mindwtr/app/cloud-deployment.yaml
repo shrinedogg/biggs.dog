@@ -44,6 +44,22 @@ spec:
             # preflights. CLI/desktop clients ignore CORS anyway.
             - name: MINDWTR_CLOUD_CORS_ORIGIN
               value: "https://mindwtr.biggs.dog"
+            # agentgateway is the only ingress path (Cilium default-deny), so
+            # trusting X-Forwarded-For from pod-CIDR peers is safe and gives
+            # the auth-failure rate limiter real client IPs instead of
+            # bucketing everything against the gateway address.
+            - name: MINDWTR_CLOUD_TRUST_PROXY_HEADERS
+              value: "true"
+            - name: MINDWTR_CLOUD_TRUSTED_PROXY_IPS
+              value: "10.244.0.0/16"
+            # Production baseline rate limits (upstream defaults are 120/60s;
+            # explicit per the cloud-deployment docs).
+            - name: MINDWTR_CLOUD_RATE_WINDOW_MS
+              value: "60000"
+            - name: MINDWTR_CLOUD_RATE_MAX
+              value: "120"
+            - name: MINDWTR_CLOUD_ATTACHMENT_RATE_MAX
+              value: "120"
           volumeMounts:
             - name: mindwtr-data
               mountPath: /app/cloud_data
