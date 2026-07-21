@@ -1,0 +1,162 @@
+# Osync API (osync-api): REST + WebSocket sync coordinator on :3000. The
+# Obsidian Osync plugin talks to this for auth, vault metadata, and real-time
+# sync; encrypted blobs go directly to Ceph RGW (S3) via presigned URLs
+# (2.1.7+), so S3_PUBLIC_ENDPOINT must be the public RGW hostname
+# (objects.biggs.dog) — the same host clients resolve through the gateway —
+# or presigned signatures break with SignatureDoesNotMatch.
+#
+# Server is zero-knowledge: blobs are AES-256-GCM encrypted on-device; Postgres
+# holds only accounts + vault metadata. Coordinator state (real-time sync) is
+# on an RWO PVC, hence Recreate + 1 replica.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: osync-api
+  namespace: osync
+  labels:
+    app.kubernetes.io/name: osync
+    app.kubernetes.io/component: api
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # coordinator state on RWO PVC
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: osync
+      app.kubernetes.io/component: api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: osync
+        app.kubernetes.io/component: api
+    spec:
+      # Kubernetes 1.36 user namespaces: in-container root maps to an
+      # unprivileged host UID range (same hardening as pocket-id/affine).
+      hostUsers: false
+      securityContext:
+        fsGroup: 1000 # keeps the coordinator PVC writable
+      containers:
+        - name: osync-api
+          image: thomasjeong/osync:2.3.0
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PORT
+              value: "3000"
+            - name: PUBLIC_URL
+              value: "https://osync.biggs.dog"
+            - name: CORS_ORIGIN
+              value: "https://osync.biggs.dog"
+            - name: SELF_HOSTED
+              value: "true"
+            - name: SYNC_TOKEN_TTL_SECONDS
+              value: "120"
+            # In-cluster RGW service (osync CephObjectStore, rook-ceph ns)
+            # for API-side S3 operations (bucket checks, metadata).
+            # Presigned URLs handed to clients use S3_PUBLIC_ENDPOINT below.
+            - name: S3_ENDPOINT
+              value: "http://rook-ceph-rgw-osync.rook-ceph.svc:80"
+            - name: S3_PUBLIC_ENDPOINT
+              value: "https://objects.biggs.dog"
+            - name: S3_BUCKET
+              value: "osync-bucket"
+            - name: S3_REGION
+              value: "us-east-1"
+            - name: COORDINATOR_DATA_DIR
+              value: /data/coordinators
+            # S3 credentials provisioned by the ObjectBucketClaim (bucket.yaml).
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: osync-bucket
+                  key: AWS_ACCESS_KEY_ID
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: osync-bucket
+                  key: AWS_SECRET_ACCESS_KEY
+          # DATABASE_URL, BETTER_AUTH_SECRET, SYNC_TOKEN_SECRET, ADMIN_EMAIL,
+          # ADMIN_PASSWORD from the osync ExternalSecret.
+          envFrom:
+            - secretRef:
+                name: osync
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+          # runAsNonRoot / readOnlyRootFilesystem intentionally NOT set: the
+          # image's runtime user and write paths aren't documented (same call
+          # as the Infinity deployment). The user namespace plus these
+          # user-independent controls still apply.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: coordinator-data
+              mountPath: /data/coordinators
+      volumes:
+        - name: coordinator-data
+          persistentVolumeClaim:
+            claimName: osync-coordinator-data-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: osync-coordinator-data-pvc
+  namespace: osync
+  labels:
+    app.kubernetes.io/name: osync
+    app.kubernetes.io/component: api
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: osync-api
+  namespace: osync
+  labels:
+    app.kubernetes.io/name: osync
+    app.kubernetes.io/component: api
+spec:
+  selector:
+    app.kubernetes.io/name: osync
+    app.kubernetes.io/component: api
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

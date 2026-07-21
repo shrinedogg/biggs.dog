@@ -44,6 +44,8 @@ spec:
             k8s:io.kubernetes.pod.namespace: ai-system
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: media
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: osync
       toPorts:
         - ports:
             - port: "5432"
