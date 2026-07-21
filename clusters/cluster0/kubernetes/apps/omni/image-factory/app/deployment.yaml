@@ -34,7 +34,7 @@ spec:
           emptyDir: {}
       containers:
         - name: image-factory
-          image: ghcr.io/siderolabs/image-factory:v1.3.3
+          image: ghcr.io/siderolabs/image-factory:v1.4.0
           imagePullPolicy: Always
           args:
             - --config
