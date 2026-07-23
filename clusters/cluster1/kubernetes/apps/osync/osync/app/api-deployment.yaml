@@ -33,8 +33,6 @@ spec:
       # Kubernetes 1.36 user namespaces: in-container root maps to an
       # unprivileged host UID range (same hardening as pocket-id/affine).
       hostUsers: false
-      securityContext:
-        fsGroup: 1000 # keeps the coordinator PVC writable
       containers:
         - name: osync-api
           image: thomasjeong/osync:2.3.0
@@ -124,25 +122,16 @@ spec:
             - name: coordinator-data
               mountPath: /data/coordinators
       volumes:
+        # Coordinator state (real-time sync bookkeeping) is transient and
+        # rebuilt by clients on reconnect, so an emptyDir is sufficient. Using
+        # an RWO PVC here would node-pin this pod, and in this cluster that
+        # forces it onto the same node as a cnpg-osync backend, which hits a
+        # Cilium same-node ClusterIP datapath issue (see the anti-affinity
+        # comment above). emptyDir lets the pod float so the anti-affinity can
+        # place it cross-node from the database.
         - name: coordinator-data
-          persistentVolumeClaim:
-            claimName: osync-coordinator-data-pvc
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: osync-coordinator-data-pvc
-  namespace: osync
-  labels:
-    app.kubernetes.io/name: osync
-    app.kubernetes.io/component: api
-spec:
-  accessModes:
-    - ReadWriteOnce
-  storageClassName: ceph-block
-  resources:
-    requests:
-      storage: 1Gi
+          emptyDir:
+            sizeLimit: 1Gi
 ---
 apiVersion: v1
 kind: Service

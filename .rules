@@ -196,7 +196,7 @@ Pick the single most specific agent for the task. ✅ = invocable now,
 
 ## Repo conventions
 
-- Desired state lives in Git (`clusters/cluster0/**`); Flux reconciles it. Use
+- Desired state lives in Git (`clusters/cluster*/**`); Flux reconciles it. Use
   agents to inspect/diagnose *live* state, but make persistent changes by
   editing the YAML here, not by mutating the cluster directly.
 - Secrets are managed via External Secrets + 1Password; never hardcode
