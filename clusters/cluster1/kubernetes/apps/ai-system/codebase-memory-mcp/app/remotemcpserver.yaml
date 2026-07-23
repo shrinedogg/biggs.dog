@@ -1,0 +1,26 @@
+---
+# Registers the in-cluster codebase-memory-mcp server as a kagent tool source.
+# Mirrors the pattern established by exa-mcp and victoria-metrics-mcp.
+#
+# The URL targets the supergateway bridge (streamable HTTP at /mcp), which
+# wraps the stdio-only codebase-memory-mcp binary.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: codebase-memory-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Codebase memory MCP server — code intelligence over indexed repositories.
+    Builds a persistent tree-sitter knowledge graph (functions, classes, call
+    chains, HTTP routes) plus semantic search from local source checkouts.
+    Exposes graph tools (search_graph, trace_path, query_graph,
+    get_architecture, get_code_snippet), literal search (search_code), and
+    indexing/project management (index_repository, list_projects,
+    index_status, check_index_coverage, manage_adr). Currently indexes the
+    biggs.dog GitOps repo (auto-synced from main); more repos can be added.
+  protocol: STREAMABLE_HTTP
+  url: http://codebase-memory-mcp.ai-system:8080/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 60s

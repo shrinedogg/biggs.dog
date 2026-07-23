@@ -17,3 +17,4 @@ resources:
   - ./flux-mcp/ks.yaml
   - ./exa-mcp/ks.yaml
   - ./embeddings/ks.yaml
+  - ./codebase-memory-mcp/ks.yaml

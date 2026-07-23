@@ -335,3 +335,24 @@ spec:
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
+---
+# codebase-memory-mcp git-sync sidecar clones/pulls biggs.dog from GitHub over
+# HTTPS. DNS is already allowed by allow-egress-dns (endpointSelector: {}).
+# Scoped to the codebase-memory-mcp pods like the vllm/embeddings HF policies.
+# The cbm server itself is 100% local (bundled embeddings, no external calls).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-codebase-memory-github
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: codebase-memory-mcp
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

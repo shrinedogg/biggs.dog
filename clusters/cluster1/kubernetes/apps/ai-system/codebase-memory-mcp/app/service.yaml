@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: codebase-memory-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: codebase-memory-mcp
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: codebase-memory-mcp
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

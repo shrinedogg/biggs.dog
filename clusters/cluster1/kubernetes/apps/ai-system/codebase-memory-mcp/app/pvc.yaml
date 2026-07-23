@@ -1,0 +1,22 @@
+---
+# Persistent store for the codebase-memory-mcp SQLite knowledge graph
+# (WAL-mode index DBs + watcher/ADR state). Without persistence every pod
+# restart re-indexes from scratch and loses ADRs.
+#
+# host-path matches the vllm-models PVC: the pod is pinned to the GPU node
+# (nv-01) via nodeSelector, so host-path is safe and consistent with the rest
+# of the ai-system stack.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: codebase-memory-data
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: codebase-memory-mcp
+spec:
+  storageClassName: host-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
