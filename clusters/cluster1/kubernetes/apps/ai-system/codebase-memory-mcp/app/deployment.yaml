@@ -90,13 +90,20 @@ spec:
             - -ec
             - |
               set -eu
-              LIBDIR="$(ldd /usr/local/bin/codebase-memory-mcp \
-                | awk '/=> \//{print $3}' | xargs -n1 dirname | sort -u | head -1)"
-              echo "lib dir: ${LIBDIR}"
+              # Resolve both the shared-lib dir and the dynamic loader from
+              # ldd output — paths differ by arch (aarch64: /lib/ld-linux-
+              # aarch64.so.1 + /lib/aarch64-linux-gnu; x86_64: /lib64/ld-
+              # linux-x86-64.so.2 + /lib/x86_64-linux-gnu), so never hardcode.
+              LDD="$(ldd /usr/local/bin/codebase-memory-mcp)"
+              LIBDIR="$(echo "$LDD" | awk '/=> \//{print $3}' | xargs -n1 dirname | sort -u | head -1)"
+              LOADER="$(echo "$LDD" | awk '/ld-linux/{print $1; exit}')"
+              echo "lib dir: ${LIBDIR}  loader: ${LOADER}"
               mkdir -p /opt/cbm/bin /opt/cbm/lib
               cp /usr/local/bin/codebase-memory-mcp /opt/cbm/bin/
               cp -a "${LIBDIR}/." /opt/cbm/lib/
-              cp -aL /lib/ld-linux-*.so.1 /opt/cbm/lib/ld-linux.so.1
+              # Stage the loader under a fixed arch-neutral name that the
+              # supergateway --stdio command references.
+              cp -aL "${LOADER}" /opt/cbm/lib/ld-linux.so.1
               chmod -R a+rX /opt/cbm
               echo "staged:"; ls -l /opt/cbm/bin /opt/cbm/lib/ld-linux.so.1
           volumeMounts:
