@@ -27,10 +27,17 @@ metadata:
 #
 #   init  cbm-assets   : copies the glibc-linked binary + its runtime libs
 #                        out of the upstream image into a shared emptyDir.
+#   side  git-sync     : NATIVE SIDECAR (initContainer, restartPolicy: Always)
+#                        keeps a fresh clone of biggs.dog in /repo.
 #   init  wait-for-repo: blocks until git-sync produces the first clone.
-#   side  git-sync     : keeps a fresh clone of biggs.dog in /repo (RO).
 #   main  supergateway : spawns the binary via the copied glibc loader and
 #                        serves it at :8080/mcp.
+#
+# git-sync MUST be a native sidecar, not a regular container: Kubernetes runs
+# every initContainer to completion BEFORE starting any regular container, so
+# a regular-container git-sync would never start while wait-for-repo blocks --
+# a deadlock. As a native sidecar it starts during the init phase (before
+# wait-for-repo) and keeps running for the pod's lifetime.
 #
 # The binary is dynamically linked against glibc (libstdc++/libm/libz), but
 # supergateway's image is Alpine/musl, so the binary can't run there directly.
@@ -118,6 +125,58 @@ spec:
           securityContext:
             runAsNonRoot: false
             runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
+        # NATIVE SIDECAR: keeps a fresh shallow clone of biggs.dog at
+        # /repo/current (symlink). restartPolicy: Always makes it start during
+        # the init phase and run for the pod's lifetime. Placed BEFORE
+        # wait-for-repo so the clone appears while the wait init runs. The
+        # server indexes that path; git-sync atomically retargets the symlink
+        # on each pull, and the server's file watcher refreshes the graph.
+        # Tracks `main` -- the same branch Flux reconciles.
+        - name: git-sync
+          restartPolicy: Always
+          image: registry.k8s.io/git-sync/git-sync:v4.7.1
+          imagePullPolicy: IfNotPresent
+          args:
+            - --repo=https://github.com/shrinedogg/biggs.dog.git
+            - --ref=main
+            - --depth=1
+            - --period=120s
+            - --root=/repo
+            - --link=current
+            - --max-failures=5
+          env:
+            - name: GITSYNC_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: codebase-memory-git
+                  key: username
+            - name: GITSYNC_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: codebase-memory-git
+                  key: password
+          volumeMounts:
+            - name: repo
+              mountPath: /repo
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 25m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65533
+            runAsGroup: 65533
+            readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
             capabilities:
               drop:
@@ -238,54 +297,6 @@ spec:
               mountPath: /data
             - name: tmp
               mountPath: /tmp
-        # Keeps a fresh shallow clone of biggs.dog at /repo/current (symlink).
-        # The server indexes that path; git-sync atomically retargets the
-        # symlink on each pull, and the server's file watcher refreshes the
-        # graph. Tracks `main` — the same branch Flux reconciles.
-        - name: git-sync
-          image: registry.k8s.io/git-sync/git-sync:v4.7.1
-          imagePullPolicy: IfNotPresent
-          args:
-            - --repo=https://github.com/shrinedogg/biggs.dog.git
-            - --ref=main
-            - --depth=1
-            - --period=120s
-            - --root=/repo
-            - --link=current
-            - --max-failures=5
-          env:
-            - name: GITSYNC_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: codebase-memory-git
-                  key: username
-            - name: GITSYNC_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: codebase-memory-git
-                  key: password
-          volumeMounts:
-            - name: repo
-              mountPath: /repo
-            - name: tmp
-              mountPath: /tmp
-          resources:
-            requests:
-              cpu: 25m
-              memory: 64Mi
-            limits:
-              memory: 256Mi
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 65533
-            runAsGroup: 65533
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop:
-                - "ALL"
-            seccompProfile:
-              type: RuntimeDefault
       volumes:
         # Staged binary + glibc runtime, populated by the cbm-assets init.
         - name: cbm-bin
