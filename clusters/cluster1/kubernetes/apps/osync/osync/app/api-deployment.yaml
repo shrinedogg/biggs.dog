@@ -35,7 +35,7 @@ spec:
       hostUsers: false
       containers:
         - name: osync-api
-          image: thomasjeong/osync:2.3.0
+          image: thomasjeong/osync:2.4.0
           imagePullPolicy: IfNotPresent
           env:
             - name: PORT
