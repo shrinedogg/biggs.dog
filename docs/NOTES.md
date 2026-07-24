@@ -245,7 +245,7 @@ The **current** model is [`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-v
 
 ### kagent Agents
 
-The 10 agents split across **two deployment patterns** — classic `kind: Agent` CRs (the python runtime, each its own Deployment) and `kind: SandboxAgent` CRs on the substrate runtime (gVisor-sandboxed actors):
+The 11 agents split across **two deployment patterns** — classic `kind: Agent` CRs (the python runtime, each its own Deployment) and `kind: SandboxAgent` CRs on the substrate runtime (gVisor-sandboxed actors):
 
 **Classic `kind: Agent` CRs** (invocable now via MCP) — the python runtime, each runs as its own Deployment:
 - `flux-agent` (read-only) — Flux GitOps inspection (custom, `apps/ai-system/flux-mcp/`).
@@ -253,6 +253,7 @@ The 10 agents split across **two deployment patterns** — classic `kind: Agent`
 - `exa-agent` — Web search and research (custom, `apps/ai-system/exa-mcp/`).
 - `cilium-debug-agent` — Cilium diagnosis (static, `apps/ai-system/kagent/cilium-agents/`; carries generic `k8s_*` tools).
 - `cilium-policy-agent` — Cilium policy authoring (static, `apps/ai-system/kagent/cilium-agents/`; carries generic `k8s_*` tools).
+- `codebase-agent` — Structural code intelligence over indexed repos (custom, `apps/ai-system/codebase-memory-mcp/`).
 
 **`kind: SandboxAgent` CRs on the substrate runtime** (`apps/ai-system/kagent/substrate-agents/`, `platform: substrate`, `workerPoolRef: kagent-default`):
 - `k8s-agent` — general Kubernetes inspection/troubleshooting.
@@ -310,6 +311,7 @@ kagent is configured with vectorized memory (long-term, cross-session) backed by
 - **Flux Operator MCP** (`flux-agent`) — read-only inspection of `FluxInstance`, sources, Kustomizations, HelmReleases, ResourceSets.
 - **VictoriaMetrics MCP** (`vm-agent`) — PromQL/MetricsQL queries, alerting rules, TSDB cardinality analysis, embedded VM docs.
 - **Exa MCP** (`exa-agent`) — Web search, code discovery, company research.
+- **codebase-memory-mcp** (`codebase-agent`) — code intelligence over indexed repos (tree-sitter → SQLite knowledge graph + bundled `nomic-embed-code` semantic search; 15 tools: `search_graph`, `trace_path`, `query_graph`, `get_architecture`, `search_code`, `detect_changes`, `manage_adr`, …). 100% local, no API keys. The upstream image ([DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) `v0.9.0`) is **stdio-only**, so the pod wraps it in an `mcp-proxy` stdio→streamable-HTTP bridge and runs git-sync as a native sidecar to keep a `main` checkout of biggs.dog at `/repo/current`. Index + watcher state persist on the `codebase-memory-data` host-path PVC. See [Agents & MCP pitfalls](#agents--mcp) for the two non-obvious constraints (musl bridge + native sidecar).
 - **Kubernetes API** (all agents) — native k8s API via controller-runtime client.
 
 ### MCP Exposure & Routing
@@ -372,6 +374,9 @@ On a match, Renovate opens a PR with updated versions. CI validates the changes,
 - **The `SandboxAgent` MCP-listing gap is upstream, not config** — the substrate `kind: SandboxAgent` agents run, build golden actors, and are listed by the kagent REST API (`/agents`), but `MCPHandler.listReadyAgents` lists only `v1alpha2.Agent` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`, so they're excluded from `list_agents` and `invoke_agent` returns "not found". No Service/ingress/Helm value fixes this on kagent 0.9.10 — it needs an upstream kagent change. Verified by probing `/api/a2a/ai-system/<agent>/.well-known/agent-card.json` → "Agent not found" (registry lookup, not network).
 - **The apiserver→webhook netpol is non-obvious but critical** — Cilium's implicit default-deny dropped all apiserver traffic to the controller because the apiserver runs on a *remote* host (control-plane node). Took tracing through the CRD conversion path and the controller's deadlock during cache-sync to diagnose. This rule is now permanent (both for `SandboxAgent` use *and* for classic agents with `executeCodeBlocks`).
 - **Git history is the source of truth for restoration** — when rolling back from a partial deployment state, the backup YAML contains *generated* objects (not the source manifests). Restoring from git history (`git checkout <commit> -- <file>`) is necessary to get the canonical, working manifests. Post-migration cleanup (e.g., kustomization.yaml deletions in custom agent app dirs) don't need to be restored — Flux auto-generates kustomizations for leaf app directories. Only the source manifests and the Flux Kustomization references need recovery.
+- **A stdio-only MCP image needs a spec-strict bridge** — the codebase-memory-mcp image has no HTTP transport, so it's wrapped in a bridge. `supergateway` *appeared* to work (initialize + tools/list succeeded) but kagent's strict MCP client sends `notifications/initialized`, which supergateway rejects (406/400) → `RemoteMCPServer` stuck `Accepted=False (ReconcileFailed)`. `mcp-proxy` (official Python MCP SDK) answers 202 and registers cleanly. Verify a bridge against the *full* handshake (initialize → notifications/initialized → tools/list), not just initialize.
+- **A glibc binary can run in a musl bridge image** — codebase-memory-mcp is glibc-linked (libstdc++/libm/libz); both usable bridges (supergateway, mcp-proxy) are Alpine/musl. Solve it by copying the binary AND its glibc runtime from the upstream image into a shared emptyDir via an initContainer, then spawning through the explicit loader (`ld-linux --library-path …`). Derive the loader/libdir from `ldd` (arch-specific: `/lib64/ld-linux-x86-64.so.2` vs `/lib/ld-linux-aarch64.so.1`), never hardcode.
+- **git-sync must be a native sidecar here, not a regular container** — Kubernetes runs ALL initContainers to completion before starting ANY regular container. A regular-container git-sync never starts while a `wait-for-repo` initContainer blocks → deadlock. Run git-sync as an initContainer with `restartPolicy: Always` (native sidecar, k8s ≥1.29) ordered before the wait init.
 
 ## Future Improvements
 
