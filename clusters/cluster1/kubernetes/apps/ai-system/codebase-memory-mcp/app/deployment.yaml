@@ -13,7 +13,7 @@ metadata:
 # codebase-memory-mcp — code intelligence MCP server.
 #
 # Indexes source code with tree-sitter into a persistent SQLite knowledge
-# graph (functions, classes, call chains, HTTP routes) and exposes 14
+# graph (functions, classes, call chains, HTTP routes) and exposes 15
 # graph/search/query tools with semantic search via a bundled nomic-embed-code
 # embedding model. 100% local: no API keys, no external calls.
 #
@@ -23,14 +23,14 @@ metadata:
 # server: it has NO HTTP/SSE transport compiled in and no listening port, so
 # run directly it would start, hit stdin EOF, and exit (CrashLoopBackOff). To
 # expose it to kagent over streamable HTTP like the other MCP servers, the pod
-# wraps it in a supergateway (stdio -> streamable HTTP) bridge:
+# wraps it in an mcp-proxy (stdio -> streamable HTTP) bridge:
 #
 #   init  cbm-assets   : copies the glibc-linked binary + its runtime libs
 #                        out of the upstream image into a shared emptyDir.
 #   side  git-sync     : NATIVE SIDECAR (initContainer, restartPolicy: Always)
 #                        keeps a fresh clone of biggs.dog in /repo.
 #   init  wait-for-repo: blocks until git-sync produces the first clone.
-#   main  supergateway : spawns the binary via the copied glibc loader and
+#   main  mcp-proxy    : spawns the binary via the copied glibc loader and
 #                        serves it at :8080/mcp.
 #
 # git-sync MUST be a native sidecar, not a regular container: Kubernetes runs
@@ -40,11 +40,21 @@ metadata:
 # wait-for-repo) and keeps running for the pod's lifetime.
 #
 # The binary is dynamically linked against glibc (libstdc++/libm/libz), but
-# supergateway's image is Alpine/musl, so the binary can't run there directly.
+# mcp-proxy's image is Alpine/musl, so the binary can't run there directly.
 # The initContainer therefore also copies the glibc runtime from the upstream
-# image, and supergateway spawns it through the explicit glibc loader
-# (ld-linux + --library-path). Verified end-to-end locally: the bridge serves
-# a full MCP initialize over streamable HTTP.
+# image, and mcp-proxy spawns it through the explicit glibc loader (ld-linux +
+# --library-path). Verified end-to-end locally: initialize +
+# notifications/initialized (202) + tools/list all succeed.
+#
+# ## Why mcp-proxy (not supergateway)
+#
+# The first bridge used supercorp/supergateway, but it rejects the
+# spec-mandated `notifications/initialized` that kagent's strict MCP client
+# sends (406/400), so the RemoteMCPServer stuck at Accepted=False
+# (ReconcileFailed) even though initialize + tools/list worked. mcp-proxy
+# (official Python MCP SDK) answers the notification 202 and its session layer
+# answers initialize without a cold child spawn, so kagent registers tools
+# cleanly.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -221,15 +231,23 @@ spec:
         # copied glibc loader and serves it at /mcp. This is the only network
         # endpoint; the cbm binary itself listens on nothing.
         - name: server
-          image: supercorp/supergateway:3.4.3
+          image: ghcr.io/sparfenyuk/mcp-proxy:v0.12.0
           imagePullPolicy: IfNotPresent
           args:
-            - --stdio=/opt/cbm/lib/ld-linux.so.1 --library-path /opt/cbm/lib /opt/cbm/bin/codebase-memory-mcp
-            - --outputTransport=streamableHttp
+            - --host=0.0.0.0
             - --port=8080
-            - --streamableHttpPath=/mcp
-            - --logLevel=info
+            - --transport=streamablehttp
+            - --pass-environment
+            - --
+            - /opt/cbm/lib/ld-linux.so.1
+            - --library-path
+            - /opt/cbm/lib
+            - /opt/cbm/bin/codebase-memory-mcp
           env:
+            # Don't write .pyc bytecode next to site-packages (root FS is
+            # read-only); Python would otherwise try and fail noisily.
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
             # Point the SQLite graph DBs + config at the PVC.
             - name: CBM_CACHE_DIR
               value: /data
@@ -250,10 +268,9 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
-          # TCP probe: supergateway only registers its HTTP health endpoints
-          # once the stdio child is up, and the child takes a few seconds to
-          # load the vendored tree-sitter grammars + embedding model. A TCP
-          # connect succeeds as soon as the bridge is listening.
+          # TCP probe: mcp-proxy's session layer binds the listener as soon as
+          # it starts; the cbm child is spawned lazily per session. A TCP
+          # connect succeeds the moment the bridge is serving.
           livenessProbe:
             tcpSocket:
               port: http

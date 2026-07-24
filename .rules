@@ -1,208 +1,166 @@
 # biggs.dog — agent routing rules
 
-This is a Flux GitOps repo for a Kubernetes homelab with 2 clusters 
-(`clusters/cluster0` & `clusters/cluster1`).
-The kagent MCP server (`https://mcp.biggs.dog/mcp`) exposes specialized
-agents via two tools: `list_agents` (what's actually invocable right now) and
-`invoke_agent` (run a task on `ai-system/<name>`). When a task matches one of
-the domains below, prefer invoking the matching kagent agent over answering
-from memory or using generic tools.
+Flux GitOps repo for a 2-cluster Kubernetes homelab (`clusters/cluster0` &
+`clusters/cluster1`). The kagent MCP server (`https://mcp.biggs.dog/mcp`)
+exposes specialized agents via `list_agents` (what's invocable now) and
+`invoke_agent` (run a task on `ai-system/<name>`). Prefer the matching agent
+over answering from memory or generic tools.
 
-> ALWAYS call `list_agents` first if you are unsure what is live. The agent set
-> is mid-migration to the substrate runtime and the invocable list changes;
-> the routing table below documents intent, not a guarantee that every agent is
-> ready. See "Current state" before relying on an agent.
+> ALWAYS call `list_agents` first if unsure what's live — the invocable set
+> changes mid-migration. The table below documents intent, not a guarantee.
 
-## MCP endpoint topology
+## MCP endpoint
 
-The MCP endpoint is the `kagent-mcp` HTTPRoute (`ai-system`) on the internal
-LAN-only gateway `internal-biggs-dog` (agentgateway, VIP `192.168.6.15`),
-backed by `Service/kagent-controller:8083`. k8s-gateway split-horizon resolves
-`mcp.biggs.dog` to `.6.15` for LAN/VPN clients; TLS terminates with the
-wildcard cert, no auth. WAN clients hit the public gateway (no such route) and
-404. Read-only inspection of the controller is also possible via
-`kubectl port-forward -n ai-system svc/kagent-controller 8083:8083` (see
-`.scripts/test-agents.py`).
-
-Note: long agent runs (e.g. flux-agent ~70–75s) can exceed short client
-timeouts. If `invoke_agent` times out from the editor, retry or fall back to
-the port-forward path / direct `kubectl`.
+`kagent-mcp` HTTPRoute on the internal LAN-only gateway `internal-biggs-dog`
+(agentgateway, VIP `192.168.6.15`) → `Service/kagent-controller:8083`.
+k8s-gateway split-horizon resolves `mcp.biggs.dog` to `.6.15` for LAN/VPN;
+wildcard TLS, no auth; WAN clients 404. Read-only fallback:
+`kubectl port-forward -n ai-system svc/kagent-controller 8083:8083`
+(see `.scripts/test-agents.py`). Long runs (flux-agent ~70s) can exceed short
+client timeouts — retry or use port-forward / direct `kubectl`.
 
 ## Model backend
 
 All agents share one in-cluster vLLM backend (`vllm.ai-system:8000`,
-OpenAI-compatible), served as `qwen36-local` (weights
-`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`, a dense 27B model)
-on `nv-01`'s RTX 5090. Inference never leaves the cluster. Served at a 131K
-context window (262K native, capped via `--max-model-len=131072` for KV
-concurrency headroom), fp8 KV cache, prefix caching + qwen3 tool/reasoning
-parsers enabled. Throughput is solid with real concurrency for agent fan-out,
-so multi-step agent tasks complete — including heavy ones like flux-agent
-(whose `flux-operator-mcp` tool schemas alone are ~64K tokens). Long-term
-(cross-session) vector memory is enabled (`vectorEnabled: true`); flux-agent
-disables per-agent memory to stay under the window. Prefer terse output.
+OpenAI-compatible), served as `qwen36-local`
+(`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`, dense 27B) on
+`nv-01`'s RTX 5090. Inference never leaves the cluster. 131K context (262K
+native, capped for KV headroom), fp8 KV cache, prefix caching, qwen3
+tool/reasoning parsers. Cross-session vector memory is on (`vectorEnabled:
+true`); flux-agent disables per-agent memory to stay under the window. Prefer
+terse output.
 
-## Architecture: two agent runtimes
+## Two agent runtimes
 
-1. **Declarative agents (python runtime).** Plain `Agent` CRs
-   (`kubectl get agents -n ai-system`). Each runs as its own Deployment and is
-   directly invocable. This is the stable path.
-2. **Substrate SandboxAgents.** The agent substrate (kagent ATE / actor
-   runtime) is deployed in `apps/ai-system/substrate/` (+ `substrate-crds/`),
-   with worker `atelet` pods, `ate-controller`, `ate-api-server`, and
-   `atenet-router`. Five agents have been re-declared as `SandboxAgent` CRs
-   (`kubectl get sandboxagents -n ai-system`) in
-   `apps/ai-system/kagent/substrate-agents/` and disabled in the chart so the
-   chart can't also render them as python Agents. SandboxAgents support
-   sandboxed code execution.
+1. **Declarative (python runtime)** — plain `Agent` CRs
+   (`kubectl get agents -n ai-system`). Each runs its own Deployment, directly
+   invocable. Stable path.
+2. **Substrate SandboxAgents** — the ATE/actor runtime in
+   `apps/ai-system/substrate/` (+ `-crds/`): `atelet` workers, `ate-controller`,
+   `ate-api-server`, `atenet-router`. Five agents re-declared as `SandboxAgent`
+   CRs in `apps/ai-system/kagent/substrate-agents/`, disabled in the chart so it
+   can't also render them as python Agents. Support sandboxed code execution.
 
-## Current state (verify before relying on it)
+## Current state (verify before relying)
 
-- **Invocable now (Declarative, stable):**
-  `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`,
-  `cilium-policy-agent`.
-- **Substrate SandboxAgents: READY=True, but NOT in the MCP `list_agents`
-  output (so `invoke_agent` returns "not found").** `k8s-agent`, `helm-agent`,
-  `promql-agent`, `observability-agent`, `cilium-manager-agent` are
-  `ACCEPTED=True` / `READY=True` (golden actors built; ActorTemplates in
-  `Ready` phase, zero reconcile errors; upserted into the kagent Postgres
-  `agents` table on reconcile). The kagent HTTP REST API (`/agents`, kagent-ui)
-  DOES list them; only the MCP `list_agents` tool omits them. Keep using the
-  fallbacks below / direct `kubectl` until this is fixed.
+- **Invocable now (Declarative, stable):** `flux-agent`, `vm-agent`,
+  `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`.
+- **Substrate SandboxAgents: READY=True, but absent from MCP `list_agents`
+  (invoke returns "not found").** `k8s-agent`, `helm-agent`, `promql-agent`,
+  `observability-agent`, `cilium-manager-agent`. The kagent REST API
+  (`/agents`, kagent-ui) DOES list them; only the MCP tool omits them. Use the
+  fallbacks below / direct `kubectl`.
 
-  Root cause of the MCP listing gap — an **upstream kagent limitation, NOT a
-  cluster config issue**, and NOT fixed on `kagent-dev/kagent@main` as of this
-  writing. `MCPHandler.listReadyAgents` (go/core/internal/mcp/mcp_handler.go)
-  (a) lists only `v1alpha2.AgentList` — it never enumerates `SandboxAgent`
-  CRs at all, and (b) hard-codes `condition.Reason == "DeploymentReady"`.
-  Declarative Agents report Ready with reason `DeploymentReady`; substrate
-  SandboxAgents report Ready with reason `WorkloadReady`. So substrate agents
-  are excluded twice (wrong CR type + wrong reason). Fix needs a kagent change
-  (also list `SandboxAgentList` and accept `WorkloadReady`); track upstream and
-  bump kagent when fixed. (`invoke_agent` is ALSO blocked by the same gap —
-  verified: `invoke_agent ai-system/k8s-agent` returns "agent not found or not
-  ready" — so substrate agents are not usable via the MCP layer in 0.9.10.)
+  Root cause (upstream kagent limitation, not cluster config; unfixed on
+  `kagent-dev/kagent@main`): `MCPHandler.listReadyAgents` lists only
+  `v1alpha2.AgentList` (never `SandboxAgentList`) and hard-codes
+  `condition.Reason == "DeploymentReady"`; substrate agents report Ready with
+  reason `WorkloadReady`. Excluded twice (wrong CR type + wrong reason). Fix
+  needs a kagent change; bump kagent when it lands.
 
-  Root cause of the long-running degradation, and what's fixed (all verified
-  live on `main`). This cluster runs substrate in `ai-system`, but upstream
-  hard-codes the `ate-system` namespace everywhere, so a stack of
-  `ate-system`-vs-`ai-system` bugs gated golden-actor creation, each hidden
-  behind the previous — and the final blocker was a Cilium Network Policy gap,
-  NOT "no pod NAT" as earlier inferred:
-    1. ate-controller dial addr (`--ateapi-conn-spec`, substrate HelmRelease).
-    2. ate-api-server JWT key fetch (`--client-jwt-jwks-url`, forked image
-       `docker.io/shrinedogg/ateapi` — see `.wip/substrate-jwks-url/`).
-    3. ate-api-server atelet discovery (`ATELET_NAMESPACE=ai-system` on the
-       forked image — see `.wip/substrate-atelet-namespace/`).
-    4. kagent env-source RBAC (`controller.substrate.ateApiServer.namespace=`
-       `ai-system` in the kagent HelmRelease — the RoleBinding subject was
-       pointed at the nonexistent `ate-system` SA).
-    5. gVisor `runsc` asset (`SandboxConfig/gvisor-default` + `runsc-cache`
-       DaemonSet; runsc 20260622.0 staged in rustfs `ate-snapshots` and
-       pre-cached per node — the atelet's S3 asset client doesn't honor
-       `AWS_ENDPOINT_URL`).
-    6. **Cilium egress (the real final blocker):** ai-system is in Cilium
-       default-deny, and `allow-egress-internet` selected only
-       `managed-by=kagent` pods. The atelet (`app=atelet`, Helm-managed)
-       pulls sandbox container images in-process (`memorypullcache`, does NOT
-       reuse node containerd) from `cr.kagent.dev` + `gcr.io`, so its pulls
-       were policy-denied (`dial tcp ...:443: i/o timeout`; hostNetwork bypassed
-       it because Cilium enforces on pod identity). Fixed by
-       `allow-egress-atelet-registries` (CNP, `app=atelet` -> `world:443`).
-  Notes: node containerd pulls (for ordinary Deployments) always worked (host
-  network); only the atelet's pod-network in-process pulls were blocked. There
-  IS selective pod-network egress to `world:443` via CNP for labeled pods
-  (kagent agents, vllm, embeddings) — not "no pod NAT".
+  The substrate golden-actor stack was unblocked by a series of
+  `ate-system`-vs-`ai-system` fixes (upstream hard-codes `ate-system`; this
+  cluster runs `ai-system`) plus a Cilium egress gap. See git history and
+  `.wip/substrate-*/` for details; the notable final fix was
+  `allow-egress-atelet-registries` (CNP, `app=atelet` → `world:443`) because the
+  atelet pulls sandbox images in-process over the pod network (does NOT reuse
+  node containerd). ai-system is Cilium default-deny; `world:443` egress is
+  selectively allowed per labeled pod (kagent agents, vllm, embeddings, atelet,
+  codebase-memory git-sync) — not cluster-wide.
 
-To check live: `list_agents`, plus
-`kubectl get agents,sandboxagents -n ai-system`, and
+To check live: `list_agents`, `kubectl get agents,sandboxagents -n ai-system`,
 `kubectl logs -n ai-system deploy/ate-controller | grep -i reconciler`.
 
 ## Where agents are defined
 
-- Declarative chart-managed Agents — kagent `HelmRelease`
+- Chart-managed Agents — kagent `HelmRelease`
   (`apps/ai-system/kagent/app/helmrelease.yaml`), toggled via per-agent
-  `*.enabled` values. Flux owns these CRs; disable there, not via
-  `kubectl delete`. (`argo-rollouts-agent`, `istio-agent`, `kgateway-agent`
-  are disabled and not deployed.)
-- `flux-agent` — `apps/ai-system/flux-mcp/` (custom, read-only Flux).
-- `vm-agent` — `apps/ai-system/victoria-metrics-mcp/` (VictoriaMetrics MCP).
-- `exa-agent` — `apps/ai-system/exa-mcp/` (Exa web search/research).
+  `*.enabled` values. Flux owns these; disable there, not `kubectl delete`.
+  (`argo-rollouts-agent`, `istio-agent`, `kgateway-agent` are disabled.)
+- `flux-agent` — `apps/ai-system/flux-mcp/` (read-only Flux).
+- `vm-agent` — `apps/ai-system/victoria-metrics-mcp/`.
+- `exa-agent` — `apps/ai-system/exa-mcp/`.
 - `cilium-debug-agent`, `cilium-policy-agent` —
-  `apps/ai-system/kagent/cilium-agents/` (chart versions disabled, re-defined
-  statically so they carry generic `k8s_*` tools alongside Cilium tools).
+  `apps/ai-system/kagent/cilium-agents/` (chart versions disabled; re-defined
+  statically to carry generic `k8s_*` tools alongside Cilium tools).
+- `codebase-agent` + `codebase-memory-mcp` server —
+  `apps/ai-system/codebase-memory-mcp/` (see below).
 - `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
   `cilium-manager-agent` — `apps/ai-system/kagent/substrate-agents/`
-  (SandboxAgents; currently degraded — see above).
+  (SandboxAgents; degraded — see above).
 
 Keep this list in sync with the live set.
 
+### codebase-memory-mcp (new)
+
+Code-intelligence MCP server (tree-sitter → SQLite knowledge graph + semantic
+search) indexing the **biggs.dog** repo, plus `codebase-agent`. The upstream
+image is **stdio-only** (no HTTP transport), so the pod wraps it in an
+`mcp-proxy` stdio→streamable-HTTP bridge and runs **git-sync as a native
+sidecar** (`restartPolicy: Always` initContainer) to keep a `main` checkout at
+`/repo/current`. Notes: glibc binary + musl bridge image → binary AND glibc
+runtime are staged via an initContainer and spawned through the copied loader;
+mcp-proxy is used (not supergateway) because supergateway rejects the
+spec-mandated `notifications/initialized` kagent sends (406) → RemoteMCPServer
+ReconcileFailed; git-sync must be a native sidecar (regular containers start
+only after ALL initContainers finish → deadlock with the `wait-for-repo`
+init); git creds come from ExternalSecret `codebase-memory-git` (1Password
+item, fields `username` + `password` = read-only GitHub PAT); egress via CNP
+`allow-egress-codebase-memory-github`.
+
 ## Agent selection
 
-Pick the single most specific agent for the task. ✅ = invocable now,
-⚠️ = substrate, currently degraded (use the fallback).
+Pick the single most specific agent. ✅ = invocable now, ⚠️ = degraded (use
+the fallback).
 
 - ✅ **flux-agent** — Flux CD / GitOps inspection via the Flux Operator MCP:
-  status of `FluxInstance`, sources (`GitRepository`/`OCIRepository`/
-  `HelmRepository`), `Kustomization`s, `HelmRelease`s, `ResourceSet`s, plus
-  end-to-end reconciliation root-cause analysis and Flux docs. Read-only. Use
-  for "why isn't this reconciling / syncing from git". While `helm-agent` is
-  down, this is also the best agent for live `HelmRelease` reconciliation
-  state.
-
-- ✅ **vm-agent** — Direct VictoriaMetrics: execute PromQL/MetricsQL, discover
-  metrics/labels/series, inspect alerting/recording rules, analyze TSDB
-  cardinality, find unused/high-cardinality metrics, diagnose slow queries.
-  Backed by embedded VM docs. Use for raw metric questions and VM diagnostics.
-  While `observability-agent`/`promql-agent` are down, use vm-agent for metric
-  queries and PromQL authoring too.
-
+  `FluxInstance`, sources, `Kustomization`s, `HelmRelease`s, `ResourceSet`s, +
+  reconciliation root-cause and Flux docs. Read-only. Use for "why isn't this
+  reconciling / syncing from git". Best for live `HelmRelease` state while
+  `helm-agent` is down.
+- ✅ **vm-agent** — Direct VictoriaMetrics: PromQL/MetricsQL, metrics/labels/
+  series discovery, alerting/recording rules, TSDB cardinality, unused/high-
+  cardinality metrics, slow queries, embedded VM docs. Also the fallback for
+  metric queries + PromQL authoring while `observability-agent`/`promql-agent`
+  are down.
 - ✅ **exa-agent** — Web search, code discovery, company/competitor research,
   technical-docs discovery, web intelligence. Requires an Exa API key.
-
 - ✅ **cilium-debug-agent** — Diagnosing a broken/degraded Cilium install:
-  connectivity failures, dropped traffic, advanced diagnostics, Hubble flow
-  inspection. Carries generic `k8s_*` tools, so while `k8s-agent` is down it
-  doubles as a general cluster-inspection agent.
-
+  connectivity failures, dropped traffic, Hubble flow inspection. Carries
+  generic `k8s_*` tools → doubles as general cluster-inspection agent while
+  `k8s-agent` is down.
 - ✅ **cilium-policy-agent** — Authoring `CiliumNetworkPolicy` /
-  `CiliumClusterwideNetworkPolicy` from natural-language intent. Use only when
-  the deliverable is a policy manifest. Also carries generic `k8s_*` tools.
-
-- ⚠️ **k8s-agent** — General Kubernetes ops, resource inspection, and
-  troubleshooting (pods, deployments, services, events, nodes). Default for
-  "what's wrong in the cluster". **Fallback while degraded:** use
-  `cilium-debug-agent` (has `k8s_*` tools) or direct `kubectl`.
-
-- ⚠️ **observability-agent** — Monitoring/observability: querying metrics,
-  building/verifying Grafana dashboards (grafana-mcp, ~65 tools), checking
-  alerting, correlating cluster state with metrics. **Fallback while
-  degraded:** `vm-agent` for metrics; Grafana dashboard work must wait for the
-  actor to recover.
-
-- ⚠️ **promql-agent** — Generating a PromQL query from a natural-language
-  description. **Fallback while degraded:** `vm-agent`.
-
-- ⚠️ **helm-agent** — Helm release management/troubleshooting (install,
-  upgrade, rollback, values, failed releases). This repo drives Helm via Flux
-  `HelmRelease`, so edit the `HelmRelease` YAML for desired state regardless.
-  **Fallback while degraded:** `flux-agent` for live release state, plus direct
-  `helm`/`kubectl`.
-
-- ⚠️ **cilium-manager-agent** — Installing, configuring, upgrading, and
-  routine monitoring of Cilium ("set up / change Cilium"). **Fallback while
-  degraded:** `cilium-debug-agent` for inspection; make config changes by
-  editing manifests in the repo.
+  `CiliumClusterwideNetworkPolicy` from natural-language intent. Only when the
+  deliverable is a policy manifest. Also carries `k8s_*` tools.
+- ✅ **codebase-agent** — Structural code intelligence over indexed repos
+  (currently biggs.dog, auto-synced from `main`): find symbols, trace
+  callers/callees & data flow, architecture overviews, blast-radius of a diff,
+  read exact source. Use for "where is X defined / what calls this / what
+  breaks if I change this".
+- ⚠️ **k8s-agent** — General K8s ops/inspection/troubleshooting. Default for
+  "what's wrong in the cluster". **Fallback:** `cilium-debug-agent` or direct
+  `kubectl`.
+- ⚠️ **observability-agent** — Monitoring: metrics, Grafana dashboards
+  (grafana-mcp), alerting, cluster↔metric correlation. **Fallback:** `vm-agent`
+  for metrics; Grafana work waits for the actor.
+- ⚠️ **promql-agent** — Generate a PromQL query from natural language.
+  **Fallback:** `vm-agent`.
+- ⚠️ **helm-agent** — Helm release management/troubleshooting. This repo drives
+  Helm via Flux `HelmRelease`, so edit the `HelmRelease` YAML regardless.
+  **Fallback:** `flux-agent` for live state + direct `helm`/`kubectl`.
+- ⚠️ **cilium-manager-agent** — Installing/configuring/upgrading/monitoring
+  Cilium ("set up / change Cilium"). **Fallback:** `cilium-debug-agent` for
+  inspection; make config changes by editing manifests.
 
 ## Repo conventions
 
 - Desired state lives in Git (`clusters/cluster*/**`); Flux reconciles it. Use
   agents to inspect/diagnose *live* state, but make persistent changes by
-  editing the YAML here, not by mutating the cluster directly.
-- Secrets are managed via External Secrets + 1Password; never hardcode
-  credentials in manifests. (Where 1Password items don't yet exist, a
-  temporary in-cluster Secret + a post-renderer env patch is used — e.g.
-  `kagent-grafana-mcp-token`; replace with an ExternalSecret once the item
-  exists.)
-- The branch Flux tracks is `main`. Pushing fixes to a feature branch will not
-  reconcile — merge to `main`.
+  editing YAML here, not by mutating the cluster.
+- Secrets via External Secrets + 1Password; never hardcode credentials. (Where
+  a 1Password item doesn't exist yet, a temporary in-cluster Secret + a
+  post-renderer env patch is used — e.g. `kagent-grafana-mcp-token`; replace
+  with an ExternalSecret once the item exists.) ExternalSecret `remoteRef`
+  field names must match the 1Password item's field labels exactly.
+- Flux tracks `main`. Pushing to a feature branch won't reconcile — merge to
+  `main`.

@@ -2,8 +2,8 @@
 # Registers the in-cluster codebase-memory-mcp server as a kagent tool source.
 # Mirrors the pattern established by exa-mcp and victoria-metrics-mcp.
 #
-# The URL targets the supergateway bridge (streamable HTTP at /mcp), which
-# wraps the stdio-only codebase-memory-mcp binary.
+# The URL targets the mcp-proxy bridge (streamable HTTP at /mcp), which wraps
+# the stdio-only codebase-memory-mcp binary.
 apiVersion: kagent.dev/v1alpha2
 kind: RemoteMCPServer
 metadata:
