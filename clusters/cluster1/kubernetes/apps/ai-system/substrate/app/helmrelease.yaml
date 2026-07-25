@@ -54,8 +54,9 @@ spec:
           # v0.0.9 UPSTREAMED the fix: AteletInformer now takes the namespace
           # as a parameter and main.go resolves it via
           # installdefaults.NamespaceFromPodEnv(), which reads the standard
-          # POD_NAMESPACE downward-API env var (fallback ate-system). So the
-          # fork patch is dropped and this patch just sets POD_NAMESPACE.
+          # POD_NAMESPACE downward-API env var (fallback ate-system). The
+          # chart already injects POD_NAMESPACE via the downward API, so no
+          # override is needed here.
           # VERSION-SKEW (v0.0.9 bump): the rest of the substrate stack
           # (ate-controller, atenet-router, atelet, ateom) is at v0.0.9,
           # whose ate-controller calls CreateAtespace on the Control service.
@@ -67,8 +68,10 @@ spec:
           # The old ATELET_NAMESPACE patch is GONE: v0.0.9 upstream replaced
           # the hard-coded `ateletNamespace = "ate-system"` const with
           # installdefaults.NamespaceFromPodEnv(), which reads the standard
-          # POD_NAMESPACE downward-API env var (fallback ate-system). So this
-          # patch now sets POD_NAMESPACE=ai-system instead of ATELET_NAMESPACE.
+          # POD_NAMESPACE downward-API env var (fallback ate-system). The
+          # chart already injects POD_NAMESPACE via fieldRef metadata.namespace
+          # (ate-api-server.yaml), so it resolves to ai-system automatically —
+          # NO env override is needed here.
           #
           # The --client-jwt-jwks-url patch is retained (upstream v0.0.9 still
           # does OIDC discovery against the issuer host, which is Omni's
@@ -86,11 +89,6 @@ spec:
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: POD_NAMESPACE
-                  value: ai-system
   install:
     remediation:
       retries: 3
