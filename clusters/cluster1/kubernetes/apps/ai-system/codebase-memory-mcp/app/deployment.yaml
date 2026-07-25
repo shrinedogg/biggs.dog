@@ -277,6 +277,74 @@ spec:
                 - "ALL"
             seccompProfile:
               type: RuntimeDefault
+        # Index (or refresh) the biggs.dog graph with a STABLE project name
+        # before mcp-proxy starts serving, so the very first MCP session sees
+        # an indexed graph. WITHOUT this the server's list_projects is empty
+        # on a fresh PVC: the upstream stdio binary has no auto-index — its
+        # file watcher only refreshes ALREADY-indexed projects, it never
+        # performs the initial index, so the system prompt's "auto-synced /
+        # graph refreshes in the background" claim was effectively unimplemented
+        # for first use. Re-runs on every pod start, which also keeps the graph
+        # fresh despite git-sync rotating the /repo/current symlink to a new
+        # .worktrees/<hash> worktree on each pull (the watcher can't follow
+        # that retarget). Idempotent + ~3s for this repo, so startup cost is
+        # negligible. --name biggs.dog fixes the project identity across
+        # re-indexes; otherwise the server derives the name from the resolved
+        # symlink target (repo-.worktrees-<sha>), orphaning a NEW project per
+        # commit and defeating the watcher entirely. The patched binary (INTERP
+        # -> staged loader, RPATH -> /opt/cbm/lib) execs natively under musl,
+        # same as the server's child workers.
+        - name: cbm-index
+          image: docker.io/shrinedogg/codebase-memory-mcp:v0.9.0
+          imagePullPolicy: IfNotPresent
+          command: ["/bin/sh", "-ec"]
+          args:
+            - >-
+              /opt/cbm/bin/codebase-memory-mcp cli index_repository
+              --repo-path /repo/current --mode full --name biggs.dog
+          env:
+            - name: PYTHONDONTWRITEBYTECODE
+              value: "1"
+            - name: CBM_CACHE_DIR
+              value: /data
+            - name: CBM_ALLOWED_ROOT
+              value: /repo
+            - name: CBM_MEM_BUDGET_MB
+              value: "1024"
+            - name: CBM_WORKERS
+              value: "2"
+            - name: CBM_LOG_LEVEL
+              value: info
+          volumeMounts:
+            - name: cbm-bin
+              mountPath: /opt/cbm
+              readOnly: true
+            - name: repo
+              mountPath: /repo
+              readOnly: true
+            - name: data
+              mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 100m
+              memory: 512Mi
+            limits:
+              memory: 4Gi
+          securityContext:
+            runAsNonRoot: true
+            # Match the server's uid so DB files written here (1000:1000) are
+            # read/write by both; the PVC dir is 0777 either way.
+            runAsUser: 1000
+            runAsGroup: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
       containers:
         # stdio -> streamable HTTP bridge. Spawns the cbm binary through the
         # copied glibc loader and serves it at /mcp. This is the only network

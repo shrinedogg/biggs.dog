@@ -43,40 +43,53 @@ spec:
           # issuer host. We (a) set issuer=ULA below so the `iss` check passes,
           # and (b) run a forked ateapi that adds --client-jwt-jwks-url to fetch
           # the identical keys directly from the reachable in-cluster API instead
-          # of doing unreachable discovery against the ULA. See
-          # .wip/substrate-jwks-url/README.md.
+          # of doing unreachable discovery against the ULA.
           #
-          # !!! Commit ONLY after the ateapi image referenced below is built
-          # !!! and pushed, else the pod won't pull.
+          # STEP 3 (atelet discovery): in v0.0.7, controlapi.AteletInformer()
+          # scoped its SharedInformerFactory to a hard-coded
+          # `ateletNamespace = "ate-system"` const
+          # (cmd/ateapi/internal/controlapi/informer.go) with no flag/override,
+          # so it never saw the atelet DaemonSet pods this chart runs in
+          # ai-system — the fork carried an ATELET_NAMESPACE patch for this.
+          # v0.0.9 UPSTREAMED the fix: AteletInformer now takes the namespace
+          # as a parameter and main.go resolves it via
+          # installdefaults.NamespaceFromPodEnv(), which reads the standard
+          # POD_NAMESPACE downward-API env var (fallback ate-system). So the
+          # fork patch is dropped and this patch just sets POD_NAMESPACE.
+          # VERSION-SKEW (v0.0.9 bump): the rest of the substrate stack
+          # (ate-controller, atenet-router, atelet, ateom) is at v0.0.9,
+          # whose ate-controller calls CreateAtespace on the Control service.
+          # The v0.0.7 fork returned `rpc error: code = Unimplemented desc =
+          # unknown method CreateAtespace`, so golden snapshots couldn't be
+          # rebuilt and SandboxAgents stuck at Ready=ActorTemplateNotReady.
+          # The fork image below is now rebased onto v0.0.9.
           #
-          # STEP 3 (atelet discovery): same ate-system hard-coding bug class as
-          # STEP 1, but in ate-api-server's pod informer instead of
-          # ate-controller's dial address. controlapi.AteletInformer() scopes its
-          # SharedInformerFactory to a hard-coded `ateletNamespace = "ate-system"
-          # const (cmd/ateapi/internal/controlapi/informer.go) with no flag, so it
-          # never sees the atelet DaemonSet pods that this chart runs in ai-system.
-          # Result: AteletDialer.DialForWorker() returns "found 0 atelet pods on
-          # node %q, expected 1", the ResumeActor workflow's CallAteletRestore
-          # step fails, the single WorkerPool replica stays pinned by the retrying
-          # golden-actor restore, and the other 4 SandboxAgents fail at
-          # AssignWorker with "no free workers available" -> all 5 stuck at
-          # ActorTemplateNotReady. The fork adds an ATELET_NAMESPACE env override
-          # (default still ate-system) so the informer watches ai-system here. See
-          # .wip/substrate-atelet-namespace/README.md.
+          # The old ATELET_NAMESPACE patch is GONE: v0.0.9 upstream replaced
+          # the hard-coded `ateletNamespace = "ate-system"` const with
+          # installdefaults.NamespaceFromPodEnv(), which reads the standard
+          # POD_NAMESPACE downward-API env var (fallback ate-system). So this
+          # patch now sets POD_NAMESPACE=ai-system instead of ATELET_NAMESPACE.
+          #
+          # The --client-jwt-jwks-url patch is retained (upstream v0.0.9 still
+          # does OIDC discovery against the issuer host, which is Omni's
+          # IPv6 ULA, unreachable from the IPv4 pod network). Built from the
+          # kagent-dev/substrate v0.0.9 tag + the patches in
+          # .wip/substrate-jwks-url/, image build is out of this repo's scope
+          # (shrinedogg/ateapi fork).
           - target:
               kind: Deployment
               name: ate-api-server-deployment
             patch: |-
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: docker.io/shrinedogg/ateapi:v0.0.7-jwksurl-ateletns
+                value: docker.io/shrinedogg/ateapi:v0.0.9-jwksurl
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
               - op: add
                 path: /spec/template/spec/containers/0/env/-
                 value:
-                  name: ATELET_NAMESPACE
+                  name: POD_NAMESPACE
                   value: ai-system
   install:
     remediation:

@@ -45,23 +45,39 @@ terse output.
 
 - **Invocable now (Declarative, stable):** `flux-agent`, `vm-agent`,
   `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`.
-- **Substrate SandboxAgents: READY=True, but absent from MCP `list_agents`
-  (invoke returns "not found").** `k8s-agent`, `helm-agent`, `promql-agent`,
-  `observability-agent`, `cilium-manager-agent`. The kagent REST API
-  (`/agents`, kagent-ui) DOES list them; only the MCP tool omits them. Use the
-  fallbacks below / direct `kubectl`.
+- **Substrate SandboxAgents: not MCP-invocable.** `k8s-agent`,
+  `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`.
+  Two stacked blockers — use the fallbacks below / direct `kubectl`:
 
-  Root cause (upstream kagent limitation, not cluster config; unfixed on
-  `kagent-dev/kagent@main`): `MCPHandler.listReadyAgents` lists only
-  `v1alpha2.AgentList` (never `SandboxAgentList`) and hard-codes
-  `condition.Reason == "DeploymentReady"`; substrate agents report Ready with
-  reason `WorkloadReady`. Excluded twice (wrong CR type + wrong reason). Fix
-  needs a kagent change; bump kagent when it lands.
+  1. **Version skew (resolved pending commit):** controller/atenet/atelet/ateom
+     are at upstream `v0.0.9`, whose ate-controller calls `CreateAtespace`; the
+     `ate-api-server` fork (`shrinedogg/ateapi`) was still on a `v0.0.7` base,
+     so `CreateAtespace` returned `rpc error: code = Unimplemented` and the
+     SandboxAgents stuck at `Ready=ActorTemplateNotReady`. The fork is now
+     rebased onto v0.0.9 as `shrinedogg/ateapi:v0.0.9-jwksurl` (built+pushed;
+     only the `--client-jwt-jwks-url` patch survives — v0.0.9 upstreamed the
+     atelet-namespace fix as `installdefaults.NamespaceFromPodEnv()` reading
+     `POD_NAMESPACE`). The tag is staged in
+     `apps/ai-system/substrate/app/helmrelease.yaml`; committing it to `main`
+     lets Flux reconcile and rebuild the golden snapshots.
+  2. **Upstream kagent MCP listing bug (blocks MCP invoke even when Ready):**
+     `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` (never
+     `SandboxAgentList`) and hard-codes `condition.Reason == "DeploymentReady"`;
+     substrate agents report Ready with reason `WorkloadReady`. Excluded twice
+     (wrong CR type + wrong reason). The kagent REST API (`/agents`, kagent-ui)
+     DOES list them once Ready is restored; only the MCP tool omits them. Fix
+     needs a kagent change; bump kagent when it lands.
+
+  Also: a stuck `Accepted=False` (`ActorTemplate ... spec: Invalid value:
+  Spec is immutable`) can accumulate when a rendered ActorTemplate spec drifts;
+  `kubectl delete actortemplate.ate.dev <name> -n ai-system` lets the
+  reconciler recreate it (fixes Accepted, but do NOT do this while the version
+  skew is unfixed — it triggers a golden rebuild that can't complete and flips
+  Ready False).
 
   The substrate golden-actor stack was unblocked by a series of
   `ate-system`-vs-`ai-system` fixes (upstream hard-codes `ate-system`; this
-  cluster runs `ai-system`) plus a Cilium egress gap. See git history and
-  `.wip/substrate-*/` for details; the notable final fix was
+  cluster runs `ai-system`) plus a Cilium egress gap. The notable final fix was
   `allow-egress-atelet-registries` (CNP, `app=atelet` → `world:443`) because the
   atelet pulls sandbox images in-process over the pod network (does NOT reuse
   node containerd). ai-system is Cilium default-deny; `world:443` egress is
