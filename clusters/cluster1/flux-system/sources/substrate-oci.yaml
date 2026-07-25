@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://ghcr.io/kagent-dev/substrate/helm/substrate
   ref:
-    tag: "0.0.9"
+    tag: "0.0.10"
