@@ -27,11 +27,15 @@ metadata:
 #
 #   init  cbm-assets   : copies the glibc-linked binary + its runtime libs
 #                        out of the upstream image into a shared emptyDir.
+#   init  cbm-patch    : patchelf's the staged binary's ELF INTERP + RPATH to
+#                        the staged glibc runtime (RPATH -> lib/<triplet>, the
+#                        dir that actually holds the .so files) so it execs
+#                        natively under musl and its `cli` indexing workers
+#                        resolve libs.
 #   side  git-sync     : NATIVE SIDECAR (initContainer, restartPolicy: Always)
 #                        keeps a fresh clone of biggs.dog in /repo.
 #   init  wait-for-repo: blocks until git-sync produces the first clone.
-#   main  mcp-proxy    : spawns the binary via the copied glibc loader and
-#                        serves it at :8080/mcp.
+#   main  mcp-proxy    : spawns the patched binary and serves it at :8080/mcp.
 #
 # git-sync MUST be a native sidecar, not a regular container: Kubernetes runs
 # every initContainer to completion BEFORE starting any regular container, so
@@ -41,10 +45,11 @@ metadata:
 #
 # The binary is dynamically linked against glibc (libstdc++/libm/libz), but
 # mcp-proxy's image is Alpine/musl, so the binary can't run there directly.
-# The initContainer therefore also copies the glibc runtime from the upstream
-# image, and mcp-proxy spawns it through the explicit glibc loader (ld-linux +
-# --library-path). Verified end-to-end locally: initialize +
-# notifications/initialized (202) + tools/list all succeed.
+# The initContainers therefore copy the glibc runtime out of the upstream image
+# and patchelf the binary to use it (INTERP -> staged loader, RPATH -> staged
+# libs), so mcp-proxy can spawn it directly. Verified end-to-end locally:
+# initialize + notifications/initialized (202) + tools/list all succeed, and a
+# patched binary re-execs its `cli` indexing workers without exit 127.
 #
 # ## Why mcp-proxy (not supergateway)
 #
@@ -121,8 +126,14 @@ spec:
               # Stage the loader under a fixed arch-neutral name that the
               # supergateway --stdio command references.
               cp -aL "${LOADER}" /opt/cbm/lib/ld-linux.so.1
+              # Record the triplet dir (aarch64-linux-gnu / x86_64-linux-gnu)
+              # so cbm-patch can point RPATH at the dir that ACTUALLY holds
+              # the .so files. cp -a "LIBDIR/." dumps them into lib/<triplet>,
+              # and RPATH does NOT recurse into subdirs -- pointing it at
+              # /opt/cbm/lib finds nothing.
+              basename "${LIBDIR}" > /opt/cbm/lib/.triplet
               chmod -R a+rX /opt/cbm
-              echo "staged:"; ls -l /opt/cbm/bin /opt/cbm/lib/ld-linux.so.1
+              echo "staged: triplet=$(cat /opt/cbm/lib/.triplet)"; ls -l /opt/cbm/bin /opt/cbm/lib/ld-linux.so.1
           volumeMounts:
             - name: cbm-bin
               mountPath: /opt/cbm
@@ -132,6 +143,50 @@ spec:
               memory: 128Mi
             limits:
               memory: 512Mi
+          securityContext:
+            runAsNonRoot: false
+            runAsUser: 0
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            seccompProfile:
+              type: RuntimeDefault
+        # Make the staged glibc binary self-contained so the indexer can
+        # re-exec it. The cbm server spawns indexing worker subprocesses via
+        # `codebase-memory-mcp cli <tool>`. patchelf rewrites the binary's ELF
+        # INTERP to the staged loader and RPATH to the staged lib dir, so it
+        # execs natively under musl (no explicit-loader wrapper). CRITICAL:
+        # RPATH must point at the triplet dir (lib/<arch>-linux-gnu) that holds
+        # the .so files -- RPATH does NOT recurse into subdirs, so pointing it
+        # at /opt/cbm/lib resolves nothing and the worker dies with exit 127
+        # (`error while loading shared libraries`). patchelf runs in a one-shot
+        # init (apk add) -> needs the HTTPS egress allowed by the CNP below.
+        - name: cbm-patch
+          image: alpine:3.20
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+            - |
+              set -eu
+              apk add --no-cache patchelf >/dev/null
+              TRIPLET="$(cat /opt/cbm/lib/.triplet)"
+              patchelf \
+                --set-interpreter /opt/cbm/lib/ld-linux.so.1 \
+                --set-rpath "/opt/cbm/lib/${TRIPLET}" \
+                /opt/cbm/bin/codebase-memory-mcp
+              echo "patched interp:  $(patchelf --print-interpreter /opt/cbm/bin/codebase-memory-mcp)"
+              echo "patched rpath:   $(patchelf --print-rpath /opt/cbm/bin/codebase-memory-mcp)"
+          volumeMounts:
+            - name: cbm-bin
+              mountPath: /opt/cbm
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
           securityContext:
             runAsNonRoot: false
             runAsUser: 0
@@ -239,9 +294,10 @@ spec:
             - --transport=streamablehttp
             - --pass-environment
             - --
-            - /opt/cbm/lib/ld-linux.so.1
-            - --library-path
-            - /opt/cbm/lib
+            # The binary is patchelf'd (INTERP -> staged loader, RPATH ->
+            # /opt/cbm/lib/<triplet>), so it execs natively under musl and its
+            # `cli` indexing workers resolve libs via RPATH. No explicit loader
+            # wrapper needed.
             - /opt/cbm/bin/codebase-memory-mcp
           env:
             # Don't write .pyc bytecode next to site-packages (root FS is

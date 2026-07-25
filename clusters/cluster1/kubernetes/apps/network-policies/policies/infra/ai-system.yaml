@@ -337,9 +337,11 @@ spec:
             k8s:io.kubernetes.pod.namespace: observability
 ---
 # codebase-memory-mcp git-sync sidecar clones/pulls biggs.dog from GitHub over
-# HTTPS. DNS is already allowed by allow-egress-dns (endpointSelector: {}).
-# Scoped to the codebase-memory-mcp pods like the vllm/embeddings HF policies.
-# The cbm server itself is 100% local (bundled embeddings, no external calls).
+# HTTPS. The cbm-patch initContainer also needs HTTPS egress to apk-install
+# patchelf (dl-cdn.alpinelinux.org). DNS is already allowed by
+# allow-egress-dns (endpointSelector: {}). Scoped to the codebase-memory-mcp
+# pods like the vllm/embeddings HF policies. The cbm server itself is 100%
+# local (bundled embeddings, no external calls).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
