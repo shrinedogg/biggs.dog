@@ -28,10 +28,9 @@ metadata:
 #   init  cbm-assets   : copies the glibc-linked binary + its runtime libs
 #                        out of the upstream image into a shared emptyDir.
 #   init  cbm-patch    : patchelf's the staged binary's ELF INTERP + RPATH to
-#                        the staged glibc runtime (RPATH -> lib/<triplet>, the
-#                        dir that actually holds the .so files) so it execs
-#                        natively under musl and its `cli` indexing workers
-#                        resolve libs.
+#                        the staged glibc runtime (RPATH -> /opt/cbm/lib, where
+#                        the .so files are staged FLAT) so it execs natively
+#                        under musl and its `cli` indexing workers resolve libs.
 #   side  git-sync     : NATIVE SIDECAR (initContainer, restartPolicy: Always)
 #                        keeps a fresh clone of biggs.dog in /repo.
 #   init  wait-for-repo: blocks until git-sync produces the first clone.
@@ -122,18 +121,15 @@ spec:
               echo "lib dir: ${LIBDIR}  loader: ${LOADER}"
               mkdir -p /opt/cbm/bin /opt/cbm/lib
               cp /usr/local/bin/codebase-memory-mcp /opt/cbm/bin/
+              # cp -a "LIBDIR/." copies the CONTENTS of the lib dir FLAT into
+              # /opt/cbm/lib/ (no <triplet> subdir is created). All dependent
+              # .so files therefore live directly at /opt/cbm/lib/*.so*.
               cp -a "${LIBDIR}/." /opt/cbm/lib/
               # Stage the loader under a fixed arch-neutral name that the
-              # supergateway --stdio command references.
+              # patched binary's ELF INTERP references.
               cp -aL "${LOADER}" /opt/cbm/lib/ld-linux.so.1
-              # Record the triplet dir (aarch64-linux-gnu / x86_64-linux-gnu)
-              # so cbm-patch can point RPATH at the dir that ACTUALLY holds
-              # the .so files. cp -a "LIBDIR/." dumps them into lib/<triplet>,
-              # and RPATH does NOT recurse into subdirs -- pointing it at
-              # /opt/cbm/lib finds nothing.
-              basename "${LIBDIR}" > /opt/cbm/lib/.triplet
               chmod -R a+rX /opt/cbm
-              echo "staged: triplet=$(cat /opt/cbm/lib/.triplet)"; ls -l /opt/cbm/bin /opt/cbm/lib/ld-linux.so.1
+              echo "staged libs (flat):"; ls -l /opt/cbm/bin /opt/cbm/lib/ld-linux.so.1
           volumeMounts:
             - name: cbm-bin
               mountPath: /opt/cbm
@@ -157,11 +153,12 @@ spec:
         # `codebase-memory-mcp cli <tool>`. patchelf rewrites the binary's ELF
         # INTERP to the staged loader and RPATH to the staged lib dir, so it
         # execs natively under musl (no explicit-loader wrapper). CRITICAL:
-        # RPATH must point at the triplet dir (lib/<arch>-linux-gnu) that holds
-        # the .so files -- RPATH does NOT recurse into subdirs, so pointing it
-        # at /opt/cbm/lib resolves nothing and the worker dies with exit 127
-        # (`error while loading shared libraries`). patchelf runs in a one-shot
-        # init (apk add) -> needs the HTTPS egress allowed by the CNP below.
+        # cbm-assets copies the libs FLAT into /opt/cbm/lib/ (no triplet
+        # subdir), so RPATH must be /opt/cbm/lib. Pointing it at a nonexistent
+        # /opt/cbm/lib/<triplet> leaves libm/libc/etc. unresolvable and the
+        # binary exits immediately (`error while loading shared libraries`),
+        # which mcp-proxy surfaces as `Connection closed` -> CrashLoopBackOff.
+        # patchelf runs in a one-shot init (apk add) -> needs HTTPS egress.
         - name: cbm-patch
           image: alpine:3.20
           imagePullPolicy: IfNotPresent
@@ -171,10 +168,9 @@ spec:
             - |
               set -eu
               apk add --no-cache patchelf >/dev/null
-              TRIPLET="$(cat /opt/cbm/lib/.triplet)"
               patchelf \
                 --set-interpreter /opt/cbm/lib/ld-linux.so.1 \
-                --set-rpath "/opt/cbm/lib/${TRIPLET}" \
+                --set-rpath /opt/cbm/lib \
                 /opt/cbm/bin/codebase-memory-mcp
               echo "patched interp:  $(patchelf --print-interpreter /opt/cbm/bin/codebase-memory-mcp)"
               echo "patched rpath:   $(patchelf --print-rpath /opt/cbm/bin/codebase-memory-mcp)"
@@ -295,9 +291,9 @@ spec:
             - --pass-environment
             - --
             # The binary is patchelf'd (INTERP -> staged loader, RPATH ->
-            # /opt/cbm/lib/<triplet>), so it execs natively under musl and its
-            # `cli` indexing workers resolve libs via RPATH. No explicit loader
-            # wrapper needed.
+            # /opt/cbm/lib, where the libs are staged FLAT), so it execs
+            # natively under musl and its `cli` indexing workers resolve libs
+            # via RPATH. No explicit loader wrapper needed.
             - /opt/cbm/bin/codebase-memory-mcp
           env:
             # Don't write .pyc bytecode next to site-packages (root FS is
