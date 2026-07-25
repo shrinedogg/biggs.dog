@@ -160,7 +160,7 @@ spec:
         # which mcp-proxy surfaces as `Connection closed` -> CrashLoopBackOff.
         # patchelf runs in a one-shot init (apk add) -> needs HTTPS egress.
         - name: cbm-patch
-          image: alpine:3.20
+          image: alpine:3.24
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
