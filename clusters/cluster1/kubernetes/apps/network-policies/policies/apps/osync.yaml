@@ -120,3 +120,27 @@ spec:
         - ports:
             - port: "5432"
               protocol: TCP
+---
+# CNPG's -rw Service is a ClusterIP. With bpf-LB + default-deny ingress, the
+# Postgres SYN,ACK reply arrives reverse-NAT'd from the service VIP and misses
+# the egress conntrack entry, so Cilium treats it as new ingress to osync and
+# drops it ("Policy denied", cnpg pod identity -> app) -- verified via Hubble:
+# osync-api -> cnpg-osync-1:5432 SYN FORWARDED, then cnpg-osync-rw:5432 ->
+# osync-api SYN,ACK Policy denied DROPPED. Without this, osync-api's DB
+# migrations fail with `write CONNECT_TIMEOUT cnpg-osync-rw:5432` mid-run.
+# Mirrors allow-ingress-from-postgres in infra/ai-system.yaml.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-cnpg
+  namespace: osync
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: osync
+      app.kubernetes.io/component: api
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-osync
