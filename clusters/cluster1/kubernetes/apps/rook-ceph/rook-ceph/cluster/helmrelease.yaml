@@ -137,7 +137,7 @@ spec:
     # ceph fs fail ceph-filesystem && ceph fs rm ceph-filesystem --yes-i-really-mean-it
     cephFileSystems: []
 
-    cephObjectStores:
+    cephObjectStores: []
       # S3 store for Osync (apps/osync): holds the client-side-encrypted
       # Obsidian vault blobs. The Osync API hands Obsidian plugins presigned
       # URLs that point directly at RGW via the public objects.biggs.dog
@@ -147,32 +147,32 @@ spec:
       # stays a Cilium-managed endpoint and namespace CNPs apply. On SDN the
       # RGW container listens on 8080 internally; the Service port is
       # gateway.port (80).
-      - name: osync
-        spec:
-          metadataPool:
-            failureDomain: host
-            replicated:
-              size: 3
-          dataPool:
-            failureDomain: host
-            replicated:
-              size: 3
-          preservePoolsOnDelete: true
-          gateway:
-            port: 80
-            hostNetwork: false
-            instances: 1
-            resources:
-              requests:
-                cpu: 100m
-                memory: 512Mi
-              limits:
-                memory: 1Gi
-        storageClass:
-          enabled: true
-          name: ceph-bucket
-          reclaimPolicy: Delete
-          volumeBindingMode: "Immediate"
+      # - name: osync
+      #   spec:
+      #     metadataPool:
+      #       failureDomain: host
+      #       replicated:
+      #         size: 3
+      #     dataPool:
+      #       failureDomain: host
+      #       replicated:
+      #         size: 3
+      #     preservePoolsOnDelete: true
+      #     gateway:
+      #       port: 80
+      #       hostNetwork: false
+      #       instances: 1
+      #       resources:
+      #         requests:
+      #           cpu: 100m
+      #           memory: 512Mi
+      #         limits:
+      #           memory: 1Gi
+      #   storageClass:
+      #     enabled: true
+      #     name: ceph-bucket
+      #     reclaimPolicy: Delete
+      #     volumeBindingMode: "Immediate"
         route:
           # Public presigned blob endpoint. TLS terminates at the gateway with
           # the *.biggs.dog wildcard cert; RGW sees Host: objects.biggs.dog,

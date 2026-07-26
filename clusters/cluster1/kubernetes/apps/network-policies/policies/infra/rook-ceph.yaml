@@ -82,28 +82,7 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
----
-# osync-api -> ceph-osync RGW (S3 metadata / bucket ops). RGW runs on the pod
-# SDN (hostNetwork:false) listening on container port 8080; gateway-originated
-# presigned traffic is already covered by allow-ingress-from-gateway above.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-ingress-rgw-from-osync
-  namespace: rook-ceph
-spec:
-  endpointSelector:
-    matchLabels:
-      app: rook-ceph-rgw
-      rook_object_store: osync
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: osync
-      toPorts:
-        - ports:
-            - port: "8080"
-              protocol: TCP
+
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
