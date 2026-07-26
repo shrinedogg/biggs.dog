@@ -83,9 +83,15 @@ spec:
               kind: Deployment
               name: ate-api-server-deployment
             patch: |-
+              # Pinned by DIGEST, not tag: the node image cache serves stale
+              # content under the mutable v0.0.9-jwksurl tag (imagePullPolicy is
+              # IfNotPresent), so a tag reference can run an older build even
+              # after the tag is re-pushed. The digest is immutable and forces
+              # the correct build. Update both the tag (above, in docs) and this
+              # digest when the fork image is rebuilt.
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: docker.io/shrinedogg/ateapi:v0.0.9-jwksurl
+                value: docker.io/shrinedogg/ateapi@sha256:f8a1acf58a230c7bbf14f9e81bfabfbb6019d0d0a192f5e64e968ec00f1dfce0
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
