@@ -84,14 +84,20 @@ spec:
               name: ate-api-server-deployment
             patch: |-
               # Pinned by DIGEST, not tag: the node image cache serves stale
-              # content under the mutable v0.0.9-jwksurl tag (imagePullPolicy is
-              # IfNotPresent), so a tag reference can run an older build even
-              # after the tag is re-pushed. The digest is immutable and forces
-              # the correct build. Update both the tag (above, in docs) and this
-              # digest when the fork image is rebuilt.
+              # content under a mutable tag (imagePullPolicy is IfNotPresent),
+              # so a tag reference can run an older build even after the tag is
+              # re-pushed. The digest is immutable and forces the correct build.
+              # IMPORTANT: the fork MUST track the same substrate version as the
+              # ateom/atelet/controller (currently v0.0.10). A v0.0.9 fork against
+              # a v0.0.10 ateom corrupts the ateletpb RunRequest/RestoreRequest on
+              # the wire (the v0.0.10 proto renumbered fields — added actor_uid=4,
+              # shifting spec/sandbox_assets/etc.), which surfaces as
+              # "error unmarshalling request: string field contains invalid UTF-8"
+              # and pins every SandboxAgent at Ready=ActorTemplateNotReady.
+              # Update this digest when the fork image is rebuilt.
               - op: replace
                 path: /spec/template/spec/containers/0/image
-                value: docker.io/shrinedogg/ateapi@sha256:f8a1acf58a230c7bbf14f9e81bfabfbb6019d0d0a192f5e64e968ec00f1dfce0
+                value: docker.io/shrinedogg/ateapi@sha256:78d90103f3054bf6544bf3726fa63800a47b970b3425a3e60f4efbfff9bbdad3
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"

@@ -49,17 +49,22 @@ terse output.
   `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`.
   Two stacked blockers — use the fallbacks below / direct `kubectl`:
 
-  1. **Version skew (resolved pending commit):** controller/atenet/atelet/ateom
-     are at upstream `v0.0.9`, whose ate-controller calls `CreateAtespace`; the
-     `ate-api-server` fork (`shrinedogg/ateapi`) was still on a `v0.0.7` base,
-     so `CreateAtespace` returned `rpc error: code = Unimplemented` and the
-     SandboxAgents stuck at `Ready=ActorTemplateNotReady`. The fork is now
-     rebased onto v0.0.9 as `shrinedogg/ateapi:v0.0.9-jwksurl` (built+pushed;
+  1. **Version skew (resolved pending commit):** the substrate stack is at
+     upstream **`v0.0.10`**, whose ate-controller calls `CreateAtespace`; the
+     `ate-api-server` fork (`shrinedogg/ateapi`) was on older bases (first
+     `v0.0.7` → `CreateAtespace` Unimplemented, then `v0.0.9` → `ateletpb` proto
+     field-number skew vs the v0.0.10 ateom that surfaced as a cryptic
+     `"string field contains invalid UTF-8"` unmarshal error and pinned every
+     SandboxAgent at `Ready=ActorTemplateNotReady`). The fork is now rebased
+     onto **v0.0.10** as `shrinedogg/ateapi:v0.0.10-jwksurl` (built+pushed;
      only the `--client-jwt-jwks-url` patch survives — v0.0.9 upstreamed the
      atelet-namespace fix as `installdefaults.NamespaceFromPodEnv()` reading
-     `POD_NAMESPACE`). The tag is staged in
-     `apps/ai-system/substrate/app/helmrelease.yaml`; committing it to `main`
-     lets Flux reconcile and rebuild the golden snapshots.
+     `POD_NAMESPACE`). Pinned by digest in
+     `apps/ai-system/substrate/app/helmrelease.yaml` (a mutable tag let the
+     node cache serve stale builds). **Caveat:** the fork's base version MUST
+     track the substrate chart version — a version skew silently breaks the
+     golden-actor wire protocol. See
+     `.wip/substrate-utf8-bug-report.md` for the full postmortem.
   2. **Upstream kagent MCP listing bug (blocks MCP invoke even when Ready):**
      `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` (never
      `SandboxAgentList`) and hard-codes `condition.Reason == "DeploymentReady"`;
