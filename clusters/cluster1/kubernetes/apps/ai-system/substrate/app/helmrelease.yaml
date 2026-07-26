@@ -89,6 +89,35 @@ spec:
               - op: add
                 path: /spec/template/spec/containers/0/args/-
                 value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
+          # VALKEY cluster-announce-ip: the chart's valkey.conf has NO
+          # cluster-announce-* and the StatefulSet has no downward-API env, so
+          # each node persists its cluster topology in /data/nodes.conf (PVC)
+          # and, on a pod restart that yields a new podIP, re-adopts the STALE
+          # persisted address. Every client then dials a dead IP -> i/o timeout,
+          # which crashes ate-api-server on startup (eager 'Failed to seed
+          # worker cache') and breaks the whole substrate data layer. Setting
+          # cluster-announce-ip to the current podIP (downward API) makes nodes
+          # always advertise their reachable address, overriding nodes.conf.
+          # NOTE: committing this triggers a rolling restart of all 6 valkey
+          # pods (podManagementPolicy: Parallel) — do it in a window that
+          # tolerates a brief Valkey outage. The one-time operational fix is
+          # `CONFIG SET cluster-announce-ip <podIP>` on each node (no restart).
+          - target:
+              kind: StatefulSet
+              name: valkey-cluster
+            patch: |-
+              - op: add
+                path: /spec/template/spec/containers/0/env
+                value:
+                  - name: POD_IP
+                    valueFrom:
+                      fieldRef:
+                        fieldPath: status.podIP
+              - op: add
+                path: /spec/template/spec/containers/0/args
+                value:
+                  - "--cluster-announce-ip"
+                  - "$(POD_IP)"
   install:
     remediation:
       retries: 3
