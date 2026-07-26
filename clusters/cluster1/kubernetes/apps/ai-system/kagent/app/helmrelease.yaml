@@ -88,6 +88,11 @@ spec:
     remediation:
       retries: 3
   values:
+    # Override registry from chart default (cr.kagent.dev) to ghcr.io.
+    # All kagent images (controller, agent runtime, skills-init) are available
+    # at ghcr.io/kagent-dev/kagent/.* and are mirrored in the cluster's OCI
+    # source. This avoids pulling from the external cr.kagent.dev registry.
+    registry: ghcr.io
     # ------------------------------------------------------------------
     # Built-in agents we don't use. Disabling here (rather than
     # `kubectl delete`) is the durable removal: the Agent CRs are owned by
