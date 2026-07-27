@@ -173,17 +173,17 @@ spec:
       #     name: ceph-bucket
       #     reclaimPolicy: Delete
       #     volumeBindingMode: "Immediate"
-        route:
-          # Public presigned blob endpoint. TLS terminates at the gateway with
-          # the *.biggs.dog wildcard cert; RGW sees Host: objects.biggs.dog,
-          # which is exactly what the Osync API signs against
-          # (S3_PUBLIC_ENDPOINT), so v4 signatures validate. Path-style URLs
-          # only — the wildcard cert cannot cover <bucket>.objects.biggs.dog.
-          enabled: true
-          host:
-            name: objects.biggs.dog
-            path: /
-            pathType: PathPrefix
-          parentRefs:
-            - name: wildcard-biggs-dog
-              namespace: networking
+      #   route:
+      #     # Public presigned blob endpoint. TLS terminates at the gateway with
+      #     # the *.biggs.dog wildcard cert; RGW sees Host: objects.biggs.dog,
+      #     # which is exactly what the Osync API signs against
+      #     # (S3_PUBLIC_ENDPOINT), so v4 signatures validate. Path-style URLs
+      #     # only — the wildcard cert cannot cover <bucket>.objects.biggs.dog.
+      #     enabled: true
+      #     host:
+      #       name: objects.biggs.dog
+      #       path: /
+      #       pathType: PathPrefix
+      #     parentRefs:
+      #       - name: wildcard-biggs-dog
+      #         namespace: networking
