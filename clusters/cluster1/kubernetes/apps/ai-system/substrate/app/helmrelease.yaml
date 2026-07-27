@@ -130,6 +130,16 @@ spec:
                 value:
                   - "--cluster-announce-ip"
                   - "$(POD_IP)"
+  # Drift correction: when the chart/values are unchanged, Flux no-ops the helm
+  # upgrade, so out-of-band changes (a deleted resource, a `kubectl edit`) silently
+  # persist while status stays Ready=True. This is exactly how the valkey-cluster
+  # StatefulSet stayed gone after an out-of-band delete, leaving ate-api-server
+  # with no Valkey backing. `enabled` makes the controller detect AND correct such
+  # drift on every reconcile via a server-side dry-run apply (recreating deleted
+  # resources, reverting edits to git state). Aligns with this repo's rule that
+  # persistent changes are made in YAML here, not by mutating the cluster.
+  driftDetection:
+    mode: enabled
   install:
     remediation:
       retries: 3
