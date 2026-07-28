@@ -83,7 +83,7 @@ data:
           "id": 5,
           "type": "stat",
           "title": "JVB Public IPs",
-          "description": "JVB LB is at 192.168.6.9 (LAN) + 87.92.48.51 (WAN). Coturn TURN at 192.168.6.10.",
+          "description": "JVB LB is at 192.168.6.9 (LAN) + 87.92.82.45 (WAN). Coturn TURN at 192.168.6.10.",
           "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
@@ -93,7 +93,7 @@ data:
             "defaults": { "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null } ] } }
           },
           "options": { "colorMode": "value", "graphMode": "none", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "name" },
-          "description": "JVB: 192.168.6.9 (LAN) / 87.92.48.51 (WAN)\nTURN: 192.168.6.10"
+          "description": "JVB: 192.168.6.9 (LAN) / 87.92.82.45 (WAN)\nTURN: 192.168.6.10"
         },
         {
           "id": 6,

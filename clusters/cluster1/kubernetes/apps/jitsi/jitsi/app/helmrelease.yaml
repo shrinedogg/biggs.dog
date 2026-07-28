@@ -159,7 +159,7 @@ spec:
       useInternalStun: true
       publicIPs:
         # WAN IP — external clients connect directly; requires UDM SE port forward UDP 10000 → 192.168.6.9:10000
-        - 87.92.48.51
+        - 87.92.82.45
         # LAN service IP — used by Coturn as TURN relay peer to avoid hairpin NAT
         - 192.168.6.9
     coturn:
