@@ -850,6 +850,7 @@ spec:
         port: "8429"
         selectAllByDefault: true
         scrapeInterval: 20s
+        scrapeTimeout: "15s"
         externalLabels: {}
           # For multi-cluster setups it is useful to use "cluster" label to identify the metrics source.
           # For example:

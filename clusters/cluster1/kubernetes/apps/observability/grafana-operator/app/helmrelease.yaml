@@ -116,10 +116,12 @@ spec:
             isDefault: false
             access: proxy
             type: victoriametrics-metrics-datasource
+            url: http://vmsingle-stack.observability.svc.cluster.local:8428
           - name: VictoriaLogs
             type: victoriametrics-logs-datasource
             url: http://victoria-logs-single-vls-server.observability.svc:9428
           - name: Alertmanager
+            type: alertmanager
             access: proxy
             jsonData:
               implementation: prometheus
@@ -222,12 +224,16 @@ spec:
           datasource: VictoriaMetrics
         victoriametrics:
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/refs/heads/master/dashboards/victoriametrics.json
+          datasource: VictoriaMetrics
         vmagent:
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/refs/heads/master/dashboards/vmagent.json
+          datasource: VictoriaMetrics
         vmalert:
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/refs/heads/master/dashboards/vmalert.json
+          datasource: VictoriaMetrics
         vmoperator:
           url: https://raw.githubusercontent.com/VictoriaMetrics/VictoriaMetrics/refs/heads/master/dashboards/operator.json
+          datasource: VictoriaMetrics
         nginx:
           url: https://raw.githubusercontent.com/kubernetes/ingress-nginx/master/deploy/grafana/dashboards/nginx.json
           datasource: VictoriaMetrics
