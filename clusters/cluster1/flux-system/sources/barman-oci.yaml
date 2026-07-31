@@ -12,4 +12,4 @@ spec:
   interval: 1h
   url: oci://ghcr.io/cloudnative-pg/charts/plugin-barman-cloud
   ref:
-    tag: 0.7.0
+    tag: 0.7.1
