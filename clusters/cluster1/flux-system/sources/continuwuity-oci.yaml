@@ -8,5 +8,5 @@ spec:
   interval: 1h
   url: oci://ghcr.io/continuwuity/continuwuity
   ref:
-    tag: "v26.6.2"
-    digest: sha256:1075385d4e14eca24897177d9fb03b39b6c2821f94bfc94af0d84c3e0bd3fcfc
+    tag: "v26.7.2"
+    digest: sha256:b5f5d7454a3e8dda041fc82084088409f2c34905ff51274955d52050203a87af
