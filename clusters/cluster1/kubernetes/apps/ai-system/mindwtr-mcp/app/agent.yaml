@@ -1,0 +1,162 @@
+---
+# Custom kagent Agent wired to the Mindwtr MCP server.
+# Provides GTD task management: inbox processing, next actions, project
+# management, Waiting For tracking, and weekly review workflows.
+#
+# Not chart-managed: owned by this Kustomization.
+apiVersion: kagent.dev/v1alpha2
+kind: Agent
+metadata:
+  name: mindwtr-agent
+  namespace: ai-system
+spec:
+  type: Declarative
+  description: >-
+    GTD task management expert with full access to the Mindwtr task system.
+    Creates, lists, updates, and completes tasks; processes inbox items with
+    the 2-minute rule; manages projects with sections and next actions;
+    tracks Waiting For items; and runs weekly review workflows. Connects to
+    a local-first Mindwtr SQLite database — no external API calls.
+  # Sandboxed execution: code the agent writes runs in an isolated env.
+  # No outbound network needed — all tools are cluster-internal.
+  sandbox:
+    network:
+      allowedDomains:
+        - "*.svc.cluster.local"
+  declarative:
+    modelConfig: default-model-config
+    runtime: python
+    executeCodeBlocks: true
+    context:
+      compaction:
+        tokenThreshold: 80000
+        summarizer:
+          modelConfig: default-model-config
+    memory:
+      modelConfig: embedding-model
+      ttlDays: 30
+    deployment:
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      resources:
+        requests:
+          cpu: 50m
+          memory: 256Mi
+        limits:
+          memory: 512Mi
+      podSecurityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      securityContext:
+        privileged: false
+        allowPrivilegeEscalation: false
+        runAsNonRoot: true
+        runAsUser: 1001
+        capabilities:
+          drop:
+            - ALL
+    promptTemplate:
+      dataSources:
+        - alias: builtin
+          kind: ConfigMap
+          name: kagent-builtin-prompts
+    a2aConfig:
+      skills:
+        - id: task-management
+          name: Task Management
+          description: >-
+            Create, list, update, and complete tasks in the Mindwtr system.
+            Process inbox items, schedule tasks, and manage task properties.
+          tags:
+            - tasks
+            - gtd
+            - mindwtr
+            - inbox
+          examples:
+            - What is in my inbox?
+            - Create a task to review the quarterly budget
+            - Complete the task "Update deployment docs"
+        - id: project-management
+          name: Project Management
+          description: >-
+            Manage projects with sections, set next actions, and organize
+            multi-step outcomes.
+          tags:
+            - projects
+            - gtd
+            - mindwtr
+          examples:
+            - Show me all active projects and their next actions
+            - Create a project for the home renovation
+            - What are the next actions for the migration project?
+        - id: review-workflow
+          name: Review & Focus
+          description: >-
+            Run daily focus checks, weekly reviews, and summarize pending
+            Waiting For items.
+          tags:
+            - review
+            - focus
+            - gtd
+            - waiting-for
+          examples:
+            - What should I focus on today?
+            - Run a weekly review of my tasks
+            - What am I waiting on from others?
+    systemMessage: |
+      # Mindwtr GTD Agent
+
+      You are a GTD (Getting Things Done) expert with full access to the
+      Mindwtr task management system via MCP tools. You help users manage
+      their tasks, projects, inbox, and review workflows.
+
+      ## Available Tools
+
+      - Task CRUD: create, list, update, and delete tasks
+      - Inbox: process inbox items, apply the 2-minute rule
+      - Projects: manage projects, sections, and next actions
+      - Focus: show next actions, scheduled items, and today's agenda
+      - Waiting For: track delegated items and follow-ups
+      - Search: find tasks by keyword, context, or filter
+
+      ## GTD Workflow
+
+      1. **Capture** — Tasks go to the Inbox first
+      2. **Clarify** — Process inbox: do it (2-min), delegate, or defer
+      3. **Organize** — Assign to projects, contexts, and schedules
+      4. **Engage** — Focus on next actions, one at a time
+      5. **Reflect** — Weekly review to catch loose ends
+
+      ## Guidelines
+
+      {{include "builtin/tool-usage-best-practices"}}
+
+      - Always cite task IDs and project names in responses
+      - For inbox processing, suggest concrete next actions
+      - For weekly reviews, summarize across all categories
+      - Respect the user's context and project organization
+
+      {{include "builtin/safety-guardrails"}}
+    tools:
+      - type: McpServer
+        mcpServer:
+          apiGroup: kagent.dev
+          kind: RemoteMCPServer
+          name: mindwtr-mcp
+          toolNames:
+            - create_task
+            - list_tasks
+            - update_task
+            - delete_task
+            - list_inbox_tasks
+            - complete_task
+            - list_projects
+            - create_project
+            - list_project_tasks
+            - list_next_actions
+            - list_scheduled_tasks
+            - search_tasks

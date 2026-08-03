@@ -1,0 +1,25 @@
+---
+# Persistent store for the Mindwtr SQLite database. The mindwtr-mcp server
+# reads task data from this DB. Uses host-path matching the vllm-models
+# and codebase-memory-data PVCs: the pod is pinned to the GPU node (nv-01)
+# via nodeSelector, so host-path is safe.
+#
+# Pre-population: Copy an exported Mindwtr database (from Desktop Export or
+# the local SQLite file) to the host-path directory. The pod mounts it
+# read-only — the MCP server reads queries only, it does not write back.
+# To enable write-back, mount the PVC read-write and adjust the deployment
+# volumeMount to allow writes.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mindwtr-data
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: mindwtr-mcp
+spec:
+  storageClassName: host-path
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

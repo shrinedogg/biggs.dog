@@ -1,0 +1,21 @@
+---
+# Registers the in-cluster mindwtr-mcp server as a kagent tool source.
+# Mirrors the pattern established by exa-mcp and victoria-metrics-mcp.
+apiVersion: kagent.dev/v1alpha2
+kind: RemoteMCPServer
+metadata:
+  name: mindwtr-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Mindwtr MCP server — GTD task management. Exposes tools for creating,
+    listing, updating, and deleting tasks; inbox processing with 2-minute
+    rule; project management with sections; focus view for next actions;
+    Waiting For tracking; Someday/Maybe shelving; and weekly review.
+    Connects to a local Mindwtr SQLite database (local-first, no external
+    API calls).
+  protocol: STREAMABLE_HTTP
+  url: http://mindwtr-mcp.ai-system:8080/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s

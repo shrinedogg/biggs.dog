@@ -18,3 +18,4 @@ resources:
   - ./exa-mcp/ks.yaml
   - ./embeddings/ks.yaml
   - ./codebase-memory-mcp/ks.yaml
+  - ./mindwtr-mcp/ks.yaml
