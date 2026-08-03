@@ -48,6 +48,7 @@ clusters/
         ├── ai-system/             # vLLM + kagent agents + substrate runtime + Flux/VM/Exa MCP
         ├── auth/                  # SSO stack (Pocket ID + OAuth2 Proxy)
         ├── biggs/                 # Tribute
+        ├── cert-manager/          # Certificate issuance (ACME + CA issuers)
         ├── cnpg/                  # CloudNativePG databases
         ├── dragonfly/             # Redis-compatible cache
         ├── dreamcast/             # GPU game streaming (Fenrir/Wolf + NVIDIA GPU Operator)
@@ -59,6 +60,7 @@ clusters/
         ├── manticore/             # Full-text search
         ├── matrix/                # Continuwuity (Matrix)
         ├── media/                 # Emby, Bookboss, Ersatz, Nsyncd
+        ├── mindwtr/               # Mindwtr notes PWA + self-hosted sync server
         ├── network-policies/      # Tiered CiliumNetworkPolicies (apps + infra)
         ├── networking/            # k8s-gateway, lan-dns, agentgateway (LAN + public)
         ├── observability/         # VictoriaMetrics/Logs, Grafana Operator
@@ -157,7 +159,7 @@ The two clusters run **different identity stacks**:
 
 On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `traffic.extAuth` that calls OAuth2 Proxy's `/oauth2/auth` endpoint and redirects unauthenticated users to the Pocket ID sign-in. OAuth2 Proxy uses **Dragonfly (Redis) for session storage** so the browser cookie stays a small session ticket (a cookie-based session carrying tokens grows past 4 KB, gets chunked, and didn't survive the ext-authz subrequest — causing a forward-auth redirect loop).
 
-- **Forward-auth (`cluster1`, via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI
+- **Forward-auth (`cluster1`, via OAuth2 Proxy):** Rook-Ceph dashboard, Bookboss, kagent UI, Mindwtr (browser PWA only — its `/v1` sync API stays bearer-token so CLI/mobile clients can still authenticate)
 - **Native OIDC (`cluster1`, direct Pocket ID client):** Grafana
 
 > NetBird (≥ v0.65) authenticates against its **own embedded IdP**; the `cluster0` Dex is attached to that embedded IdP as an upstream OIDC connector at runtime (NetBird dashboard → Settings → Identity Provider). The dashboard never talks to Dex directly.
@@ -201,7 +203,7 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | **Authentication** | Pocket ID, OAuth2 Proxy | Passkey-first OIDC SSO for all apps |
 | **Media** | Emby, Bookboss, Ersatz, Nsyncd | Content & book management |
 | **Communication** | Jitsi Meet, Continuwuity (Matrix) | Video conferencing & messaging |
-| **Productivity** | AFFiNE, Manticore Search | Collaborative workspace + full-text search |
+| **Productivity** | AFFiNE, Manticore Search, Mindwtr | Collaborative workspace, full-text search, notes (offline PWA + self-hosted sync) |
 | **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast](#-dreamcast-game-streaming-stack)) |
 | **Game Servers** | Windrose Online | Persistent MMO on Wine backend |
 | **Hardware** | liquidctl | NZXT Kraken Elite AIO fan/pump curves on `nv-01` (privileged, raw USB HID) |

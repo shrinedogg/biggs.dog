@@ -119,6 +119,15 @@ Secrets follow a three-tier model:
 2. **External Secrets + 1Password** — Runtime secrets synced from 1Password vaults (for API keys, credentials).
 3. **cert-manager** — Automatic certificate issuance and renewal (ACME Let's Encrypt, CA issuer for self-signed).
 
+### Mindwtr (Notes App)
+
+Mindwtr (`mindwtr` namespace) is a self-hosted, offline-capable notes PWA (`mindwtr-app`, static nginx build) paired with a sync/REST server (`mindwtr-cloud`) that stores a single JSON store + attachments on an RWO PVC (`strategy: Recreate`, since only one writer can hold the store). Both are fronted by a single `mindwtr.biggs.dog` HTTPRoute on the LAN-only `internal-biggs-dog` gateway, path-split three ways:
+
+- `/health` and `/v1` route straight to `mindwtr-cloud` and are **bearer-token only** (`MINDWTR_CLOUD_AUTH_TOKENS`, from the `mindwtr-cloud-auth` ExternalSecret) — upstream Mindwtr's mobile/desktop/CLI clients can't complete an interactive OIDC login, so this path deliberately bypasses SSO.
+- `/` (the PWA, named rule `pwa`) is fronted by a Pocket-ID-backed `AgentgatewayPolicy` (`mindwtr-forward-auth`) that targets the HTTPRoute by `sectionName: pwa`, so only the browser path gets the shared `.biggs.dog` oauth2-proxy cookie SSO — the API rules are untouched.
+
+`mindwtr-cloud` trusts `X-Forwarded-For` from the pod CIDR (`MINDWTR_CLOUD_TRUST_PROXY_HEADERS`/`_TRUSTED_PROXY_IPS`) since agentgateway is the only ingress path under Cilium default-deny, so its auth-failure rate limiter sees real client IPs instead of bucketing everything against the gateway address.
+
 ### Network Policies & Cilium Configuration
 
 The cluster enforces least-privilege **CiliumNetworkPolicy** across all namespaces. Policies are split into two independent Flux Kustomizations:
@@ -163,6 +172,7 @@ The two clusters run **different identity stacks** (a deliberate split: the edge
 - Rook-Ceph dashboard
 - Bookboss
 - kagent UI
+- Mindwtr PWA (browser rule only, targeted by `sectionName` — the `/v1` sync + REST API rules stay bearer-token-only; see [Mindwtr](#mindwtr-notes-app))
 
 **Native OIDC apps (`cluster1`):**
 - Grafana (direct Pocket ID client, no forward-auth needed)
@@ -302,6 +312,8 @@ There are **two sandboxing mechanisms** deployed in `ai-system`:
 
 The kagent **substrate** (ATE / actor runtime) is deployed in `apps/ai-system/substrate/` (+ `substrate-crds/`) and backs the 5 `SandboxAgent` agents. Components: `ate-controller`, `ate-api-server` (Deployment `ate-api-server-deployment`, running the forked image `docker.io/shrinedogg/ateapi:v0.0.10-jwksurl`, pinned by digest), `atelet` worker DaemonSet, and `atenet-router`. A `WorkerPool` (`kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.10`) is created by the kagent chart. JWT issuer is the Omni KubeSpan/SideroLink ULA. All substrate Deployments are pinned to the GPU node `nv-01`. gVisor `runsc` (`20260622.0`) is staged in rustfs and pre-cached per node via the `runsc-cache` DaemonSet. The kagent chart wires it in via `controller.substrate.enabled: true`, `ateApiEndpoint: dns:///api.ai-system.svc:443`, `ateApiInsecure: true`, and `substrateWorkerPool.create: true` (`replicas: 1`).
 
+**Drift correction (`driftDetection: {mode: enabled}`)**: the substrate `HelmRelease` now runs Flux's server-side dry-run drift detection on every reconcile. When chart + values are unchanged, a plain Helm upgrade no-ops, so an out-of-band change (a `kubectl delete`/`edit`) silently persists while the `HelmRelease` still reports `Ready=True` — this is exactly how the `valkey-cluster` StatefulSet stayed deleted after an out-of-band removal, leaving `ate-api-server` with no Valkey backing until the next values change forced a real upgrade. `driftDetection` makes Flux detect and revert such drift (recreating deleted resources, reverting edits back to git state) without waiting for an unrelated change, keeping the substrate stack aligned with this repo's "edit YAML in Git, never mutate the cluster" rule.
+
 ### Long-Term Memory
 
 kagent is configured with vectorized memory (long-term, cross-session) backed by CNPG Postgres + pgvector, using the `embeddings` service for embedding generation. Per-agent memory is disabled on `flux-agent` (custom) because its ~64K tool schemas already push the context window toward saturation; all other classic agents (including `exa-agent`) have memory enabled. `exa-agent` additionally sets `context.compaction` at an 80K-token threshold and pairs with the 192K vLLM cap to absorb large web-search result sets without overflow — an earlier attempt to disable exa memory (suspected context overflow) was reverted once it was clear the overflow came from Exa results, not memory (the pgvector `memory` table had 0 rows). The 5 substrate agents declare no per-agent `memory:` block. None of the disabled chart agents are in scope.
@@ -363,6 +375,11 @@ On a match, Renovate opens a PR with updated versions. CI validates the changes,
 
 - **DCGM metrics lag** — free VRAM reports ~30s behind actual consumption. The `gpu-arbiter-operator` gates on vLLM down first, then VRAM as a secondary signal.
 - **Victoria Metrics cardinality** — high cardinality metrics (e.g., per-pod ephemeral metrics) can blow up storage and query times. Use recording rules and aggregation.
+- **VMSingle can't run 2 replicas on one PVC** — `vmsingle`'s local storage takes an exclusive `flock` on its data directory, so a second replica sharing the same PVC fails to start. Pinned `replicaCount: 1`, raised the memory limit to 8Gi, and set `useDefaultResources: false` so the operator stops overriding the custom resource requests/limits.
+
+### Media / Transcoding
+
+- **Co-locate two GPU-transcode pods on one node and one starves** — Emby and Ersatz both use the Intel-iGPU `nodeSelector` (`intel.feature.node.kubernetes.io/gpu: "true"`), so with more than one Intel-GPU-capable node they could land on the same host and contend for the same iGPU. Fixed with a **preferred** (not required) `podAntiAffinity` on each toward the other's `app` label — preferred so a single remaining GPU-capable node doesn't leave one of them `Pending`.
 
 ### Secrets
 
