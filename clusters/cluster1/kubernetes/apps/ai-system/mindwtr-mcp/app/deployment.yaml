@@ -9,30 +9,30 @@ metadata:
   labels:
     app.kubernetes.io/name: mindwtr-mcp
 ---
-# Mindwtr MCP Server — self-hosted GTD task management via mcp-proxy bridge.
+# Mindwtr MCP Server — self-hosted Model Context Protocol server for
+# GTD task management via mcp-proxy bridge (stdio → streamable HTTP).
 #
 # Uses the official mindwtr-mcp npm package (v1.1.3) in stdio mode, wrapped
-# by mcp-proxy (stdio -> streamable HTTP) so kagent can connect over the
-# network. No custom container image required — node:24-alpine init container
-# installs mindwtr-mcp from npm and stages node + node_modules into a shared
-# emptyDir that mcp-proxy reads.
+# by mcp-proxy so kagent can connect over the network. No custom container
+# image — a node:24-alpine init container installs the package from npm and
+# stages it into a shared emptyDir that mcp-proxy reads.
 #
-# The Mindwtr SQLite database is seeded from a Kubernetes Secret (mounted
-# read-only by the db-seed init container) into an emptyDir. No host-path
-# PVC — works on Talos.
+# Data seeding: the Mindwtr SQLite database is provided via a Kubernetes
+# Secret (mindwtr-db). A db-seed init container copies it into an emptyDir.
+# No host-path PVC — fully compatible with Talos.
 #
-# DB seeding process:
-#   1. Export from Mindwtr desktop: Settings → Advanced → Export (.db file)
-#   2. Run: sqlite3 mindwtr.db VACUUM  (compacts free pages)
-#   3. Create secret:
+# To seed the DB:
+#   1. Export mindwtr.db from Mindwtr desktop (Settings → Advanced → Export)
+#   2. Run: sqlite3 mindwtr.db VACUUM
+#   3. Create the secret:
 #        kubectl create secret generic mindwtr-db \
 #          --from-file=mindwtr.db=./mindwtr.db \
 #          -n ai-system --dry-run=client -o yaml | kubectl apply -f -
-#   4. Pod restarts with the new DB automatically.
+#   4. Pod auto-restarts and picks up the new DB
 #
-# For ongoing updates, repeat step 3. The pod will reconcile and pick up
-# the new DB on restart. For a faster update, delete the pod to force
-# immediate restart.
+# To update the DB later, re-apply the secret (kubectl apply) and the pod
+# will restart automatically on secret change (RollingUpdate with
+# podReplacementPolicy=Always is default for Secrets).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -69,9 +69,10 @@ spec:
                     values:
                       - linux
       initContainers:
-        # Install mindwtr-mcp from npm and stage node + node_modules into the
-        # shared emptyDir. mcp-proxy (main container) spawns the child process
-        # via stdio; it needs node and the mindwtr-mcp package in its filesystem.
+        # Stage node + mindwtr-mcp package into shared emptyDir. node:24-alpine
+        # provides the correct musl-linked binary that mcp-proxy (Alpine-based)
+        # can exec natively. better-sqlite3 ships prebuilt binaries for common
+        # platforms; if not available for node:24, compilation tools are installed.
         - name: mindwtr-install
           image: docker.io/library/node:24-alpine
           imagePullPolicy: IfNotPresent
@@ -79,10 +80,11 @@ spec:
           args:
             - |
               set -eu
-              cd /app && npm install --production mindwtr-mcp@1.1.3
-              # Stage the node binary so mcp-proxy can spawn it.
-              cp /usr/local/bin/node /app/node
-              echo "staged: $(ls /app/node /app/node_modules/mindwtr-mcp/dist/index.js)"
+              apk add --no-cache gcc g++ make python3 linux-headers
+              cd /app && npm install mindwtr-mcp@1.1.3 --no-audit --no-fund
+              mkdir -p /app/bin && cp /usr/local/bin/node /app/bin/
+              chmod -R a+rx /app
+              echo "staged: node=$(ls /app/bin/node), mcp=$(ls /app/node_modules/mindwtr-mcp/dist/index.js)"
           volumeMounts:
             - name: mindwtr-bin
               mountPath: /app
@@ -91,20 +93,18 @@ spec:
               cpu: 100m
               memory: 256Mi
             limits:
-              memory: 512Mi
+              memory: 2Gi
           securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsNonRoot: false
+            runAsUser: 0
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
-        # Seed the mindwtr.db SQLite database from the mindwtr-db Secret into
-        # the shared emptyDir. The Secret is created manually (see top comment
-        # for the kubectl command). The init container copies the raw bytes
-        # (Kubernetes decodes the base64 Secret automatically).
+        # Seed the Mindwtr SQLite database from the mindwtr-db Secret into the
+        # shared emptyDir. The Secret is created manually (see top comment).
+        # Kubernetes decodes the base64 Secret automatically when mounted.
         - name: db-seed
           image: docker.io/library/alpine:3.24
           imagePullPolicy: IfNotPresent
@@ -113,6 +113,7 @@ spec:
             - |
               set -eu
               cp /secret/mindwtr.db /data/mindwtr.db
+              chmod 0444 /data/mindwtr.db
               echo "seeded: $(ls -la /data/mindwtr.db)"
           volumeMounts:
             - name: mindwtr-db
@@ -137,9 +138,15 @@ spec:
             seccompProfile:
               type: RuntimeDefault
       containers:
-        # stdio -> streamable HTTP bridge. Spawns node + mindwtr-mcp in stdio
-        # mode and serves it at :8080/mcp. This is the only network endpoint;
-        # the mindwtr-mcp process itself listens on nothing.
+        # stdio → streamable HTTP bridge. Spawns the mindwtr-mcp child process
+        # (node + mindwtr-mcp/dist/index.js) and serves it at :8080/mcp. This is
+        # the only network endpoint; the mindwtr-mcp process itself listens on
+        # nothing (pure stdio).
+        #
+        # Uses mcp-proxy (Python MCP SDK) instead of supergateway: mcp-proxy
+        # answers the notifications/initialized 202 and its session layer
+        # answers initialize without a cold child spawn, so kagent registers
+        # tools cleanly (see codebase-memory-mcp deployment comments).
         - name: server
           image: ghcr.io/sparfenyuk/mcp-proxy:v0.12.0
           imagePullPolicy: IfNotPresent
@@ -149,19 +156,19 @@ spec:
             - --transport=streamablehttp
             - --pass-environment
             - --
-            - /app/node
+            # Spawn: node dist/index.js --db-path=/data/mindwtr.db
+            - /app/bin/node
             - /app/node_modules/mindwtr-mcp/dist/index.js
             - --db-path=/data/mindwtr.db
           env:
             - name: NODE_ENV
               value: "production"
-            # Fallback: mindwtr-mcp may also read the DB path from this env var.
-            - name: MINDWTR_DB_PATH
-              value: "/data/mindwtr.db"
           ports:
             - name: http
               containerPort: 8080
               protocol: TCP
+          # TCP probe: mcp-proxy's session layer binds the listener as soon as
+          # it starts; the mindwtr-mcp child is spawned lazily per session.
           livenessProbe:
             tcpSocket:
               port: http
@@ -205,17 +212,17 @@ spec:
         - name: mindwtr-bin
           emptyDir:
             sizeLimit: 200Mi
-        # Mindwtr SQLite database, seeded by the db-seed init container from
-        # the mindwtr-db Secret. Updated via kubectl create secret.
+        # Mindwtr SQLite database, seeded from the mindwtr-db Secret by the
+        # db-seed init container. Re-seeded on each pod restart.
         - name: data
           emptyDir:
             sizeLimit: 100Mi
         - name: tmp
           emptyDir:
             sizeLimit: 100Mi
-        # The mindwtr.db Secret, mounted read-only for the db-seed init container.
-        # Created manually: kubectl create secret generic mindwtr-db
-        #   --from-file=mindwtr.db=./mindwtr.db -n ai-system
+        # Mindwtr database Secret — created manually via kubectl (see top comment).
+        # The init container reads this once at startup; subsequent updates
+        # require a pod restart (kubectl rollout restart or delete the pod).
         - name: mindwtr-db
           secret:
             secretName: mindwtr-db
