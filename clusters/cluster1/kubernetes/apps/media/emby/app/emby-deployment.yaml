@@ -27,6 +27,18 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
+      # Keep emby and ersatz off the same node: both are GPU/transcode-heavy and
+      # the nodeSelector pins them to the same GPU-capable pool. Preferred (not
+      # required) so a single remaining GPU node doesn't leave a pod Pending.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: ersatz
+                topologyKey: kubernetes.io/hostname
       containers:
         - name: emby
           image: emby/embyserver:4.10.0.21

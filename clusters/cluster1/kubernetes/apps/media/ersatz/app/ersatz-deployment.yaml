@@ -28,6 +28,18 @@ spec:
       automountServiceAccountToken: false
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
+      # Keep ersatz and emby off the same node: both are GPU/transcode-heavy and
+      # the nodeSelector pins them to the same GPU-capable pool. Preferred (not
+      # required) so a single remaining GPU node doesn't leave a pod Pending.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: emby
+                topologyKey: kubernetes.io/hostname
       containers:
         # Tracks the rolling `develop` (nightly) channel. Renovate pins and bumps the
         # digest (see pinDigests rule in renovate.json) so updates land in-place
