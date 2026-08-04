@@ -70,9 +70,11 @@ spec:
                       - linux
       initContainers:
         # Stage node + mindwtr-mcp package into shared emptyDir. node:24-alpine
-        # provides the correct musl-linked binary that mcp-proxy (Alpine-based)
-        # can exec natively. better-sqlite3 ships prebuilt binaries for common
-        # platforms; if not available for node:24, compilation tools are installed.
+        # is musl-linked (matching the mcp-proxy base image) but still depends on
+        # libstdc++.so.6 + libgcc_s.so.1 from the g++ apk; those are copied next
+        # to the binary so the server container can run it via LD_LIBRARY_PATH.
+        # better-sqlite3 ships prebuilt binaries; if not available for node:24,
+        # compilation tools are installed by apk.
         - name: mindwtr-install
           image: docker.io/library/node:24-alpine
           imagePullPolicy: IfNotPresent
@@ -81,13 +83,18 @@ spec:
             - |
               set -eu
               apk add --no-cache gcc g++ make python3 linux-headers
-              cd /app && npm install mindwtr-mcp@1.1.3 --no-audit --no-fund
-              mkdir -p /app/bin && cp /usr/local/bin/node /app/bin/
-              chmod -R a+rx /app
-              echo "staged: node=$(ls /app/bin/node), mcp=$(ls /app/node_modules/mindwtr-mcp/dist/index.js)"
+              cd /staged && npm install mindwtr-mcp@1.1.3 --no-audit --no-fund
+              mkdir -p /staged/bin && cp /usr/local/bin/node /staged/bin/
+              # node needs libstdc++.so.6 + libgcc_s.so.1 (from the g++ apk);
+              # copy them next to the staged binary so the musl-based mcp-proxy
+              # image can run it via RPATH=$ORIGIN.
+              cp /usr/lib/libstdc++.so.6 /staged/bin/ 2>/dev/null || true
+              cp /usr/lib/libgcc_s.so.1 /staged/bin/ 2>/dev/null || true
+              chmod -R a+rx /staged
+              echo "staged: node=$(ls /staged/bin/node), mcp=$(ls /staged/node_modules/mindwtr-mcp/dist/index.js), libs=$(ls /staged/bin/lib*)"
           volumeMounts:
             - name: mindwtr-bin
-              mountPath: /app
+              mountPath: /staged
           resources:
             requests:
               cpu: 100m
@@ -150,19 +157,28 @@ spec:
         - name: server
           image: ghcr.io/sparfenyuk/mcp-proxy:v0.12.0
           imagePullPolicy: IfNotPresent
+          # The image ENTRYPOINT is ["catatonit","--"] with CMD ["mcp-proxy"].
+          # catatonit execs mcp-proxy (CMD) and appends these args. mcp-proxy's
+          # argparse parses flags up to "--", then treats the rest as
+          # command_or_url + args. The node command + its --db-path flag must
+          # be wrapped in a single shell string so argparse sees only ONE
+          # positional (the shell), not a "--db-path" it tries to parse.
           args:
             - --host=0.0.0.0
             - --port=8080
             - --transport=streamablehttp
             - --pass-environment
             - --
-            # Spawn: node dist/index.js --db-path=/data/mindwtr.db
-            - /app/bin/node
-            - /app/node_modules/mindwtr-mcp/dist/index.js
+            - /staged/bin/node
+            - /staged/node_modules/mindwtr-mcp/dist/index.js
             - --db-path=/data/mindwtr.db
           env:
             - name: NODE_ENV
               value: "production"
+            # node (copied from node:24-alpine) needs libstdc++.so.6 +
+            # libgcc_s.so.1, which the init container stages next to the binary.
+            - name: LD_LIBRARY_PATH
+              value: "/staged/bin"
           ports:
             - name: http
               containerPort: 8080
@@ -199,7 +215,7 @@ spec:
               type: RuntimeDefault
           volumeMounts:
             - name: mindwtr-bin
-              mountPath: /app
+              mountPath: /staged
               readOnly: true
             - name: data
               mountPath: /data
