@@ -6,6 +6,7 @@ resources:
   - ./namespace.yaml
   # Flux-Kustomizations
   - ./continuwuity/ks.yaml
+  - ./sable/ks.yaml
   # - ./livekit/ks.yaml
 
   
