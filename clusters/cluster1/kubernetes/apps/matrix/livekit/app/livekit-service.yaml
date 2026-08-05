@@ -9,7 +9,7 @@ metadata:
 spec:
   selector:
     app.kubernetes.io/name: livekit
-  clusterIP: None
+  type: LoadBalancer
   ports:
     - name: http
       port: 7880
