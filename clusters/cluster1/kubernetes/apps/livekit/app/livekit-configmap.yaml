@@ -11,7 +11,8 @@ data:
     port: 7880
     bind_addresses:
       - 0.0.0.0
-    key-file: /etc/livekit/keys
+    keys:
+      "Z7hKgDuff5SvvKhNYG4wQ": "gUqkxxeeE2GG5JpZMtwbkidRzoW0rsxPvI5s8N7y8aw7Awc2SipdQ6URqPpTqWe"
     rtc:
       tcp_port: 7881
       port_range_start: 50100

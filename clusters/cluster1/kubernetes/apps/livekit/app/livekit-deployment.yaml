@@ -73,13 +73,7 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/livekit
-            - name: keys
-              mountPath: /etc/livekit/keys
-              subPath: keys
       volumes:
         - name: config
           configMap:
             name: livekit-config
-        - name: keys
-          secret:
-            secretName: livekit-credentials
