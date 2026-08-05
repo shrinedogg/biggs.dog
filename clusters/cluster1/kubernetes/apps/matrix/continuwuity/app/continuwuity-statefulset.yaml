@@ -91,12 +91,10 @@ spec:
             - name: ALLOW_LEGACY_MEDIA
               value: "true"
             # MatrixRTC / LiveKit — tells clients where to find the SFU backend.
-            # figment's Env provider can't parse TOML/JSON arrays from env values;
-            # sequences must be expressed via indexed keys (foci[0].type, ...).
-            - name: CONTINUWUITY_MATRIX_RTC__FOCI__0__TYPE
-              value: "livekit"
-            - name: CONTINUWUITY_MATRIX_RTC__FOCI__0__LIVEKIT_SERVICE_URL
-              value: "https://livekit.biggs.dog"
+            # Value MUST be TOML syntax (not JSON): figment's Env provider parses
+            # env values as TOML; JSON stays a string and fails sequence coercion.
+            - name: CONTINUWUITY_MATRIX_RTC__FOCI
+              value: '[{ type = "livekit", livekit_service_url = "https://livekit.biggs.dog" }]'
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
