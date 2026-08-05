@@ -27,6 +27,13 @@ spec:
       backendRefs:
         - name: lk-jwt-service
           port: 8081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /healthz
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
     - backendRefs:
         - name: livekit-service
           port: 7880
