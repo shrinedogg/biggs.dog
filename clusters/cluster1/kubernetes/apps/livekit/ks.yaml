@@ -8,8 +8,8 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster1/kubernetes/apps/matrix/livekit/app
-  prune: false
+  path: ./clusters/cluster1/kubernetes/apps/livekit/app
+  prune: true
   sourceRef:
     kind: GitRepository
     name: flux-system

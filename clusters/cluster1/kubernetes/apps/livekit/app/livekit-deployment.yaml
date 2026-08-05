@@ -1,42 +1,40 @@
 ---
-# lk-jwt-service: MatrixRTC authorization service — authenticates Matrix users
-# and issues JWT tokens for LiveKit room access.
+# LiveKit SFU — uses hostNetwork for UDP media relay (ports 50100-50200)
+# and TCP port 7881. HTTP/WS on 7880 is proxied via the gateway.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: lk-jwt-service
-  namespace: matrix
+  name: livekit
+  namespace: livekit
   labels:
-    app.kubernetes.io/name: lk-jwt-service
+    app.kubernetes.io/name: livekit
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
-      app.kubernetes.io/name: lk-jwt-service
+      app.kubernetes.io/name: livekit
   template:
     metadata:
       labels:
-        app.kubernetes.io/name: lk-jwt-service
+        app.kubernetes.io/name: livekit
     spec:
       securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
+      hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       automountServiceAccountToken: false
       enableServiceLinks: false
       containers:
-        - name: lk-jwt-service
-          # v0.5.0 — pinned tag (no latest)
-          image: ghcr.io/element-hq/lk-jwt-service:0.5.0
+        - name: livekit
+          image: livekit/livekit-server:v1.13.5
           imagePullPolicy: IfNotPresent
+          args:
+            - --config
+            - /etc/livekit/livekit.yaml
           env:
-            - name: LIVEKIT_JWT_BIND
-              value: ":8081"
-            - name: LIVEKIT_URL
-              value: "ws://livekit-service.matrix.svc.cluster.local:7880"
-            - name: LIVEKIT_FULL_ACCESS_HOMESERVERS
-              value: "biggs.dog"
             - name: LIVEKIT_KEY
               valueFrom:
                 secretKeyRef:
@@ -55,23 +53,37 @@ spec:
                 - ALL
           ports:
             - name: http
-              containerPort: 8081
+              containerPort: 7880
               protocol: TCP
+            - name: tcp
+              containerPort: 7881
+              protocol: TCP
+            - name: udp
+              containerPort: 50100
+              endPort: 50200
+              protocol: UDP
           readinessProbe:
             httpGet:
               path: /healthz
-              port: 8081
-            initialDelaySeconds: 5
+              port: 7880
+            initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
               path: /healthz
-              port: 8081
-            initialDelaySeconds: 15
+              port: 7880
+            initialDelaySeconds: 30
             periodSeconds: 30
           resources:
             limits:
-              memory: 128Mi
+              memory: 4Gi
             requests:
-              memory: 64Mi
-              cpu: "0.1"
+              memory: 1Gi
+              cpu: "1"
+          volumeMounts:
+            - name: config
+              mountPath: /etc/livekit
+      volumes:
+        - name: config
+          configMap:
+            name: livekit-config

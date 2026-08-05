@@ -1,0 +1,29 @@
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: livekit-route
+  namespace: livekit
+  labels:
+    app.kubernetes.io/name: livekit
+spec:
+  parentRefs:
+    - name: wildcard-biggs-dog
+      namespace: networking
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /sfu/get
+        - path:
+            type: PathPrefix
+            value: /healthz
+        - path:
+            type: PathPrefix
+            value: /get_token
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
+    - backendRefs:
+        - name: livekit-service
+          port: 7880

@@ -64,25 +64,6 @@ spec:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
 ---
-# LiveKit: lk-jwt-service talks to LiveKit via cluster-internal gRPC/HTTP
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-livekit-ingress-from-lk-jwt
-  namespace: matrix
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: livekit
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app.kubernetes.io/name: lk-jwt-service
-      toPorts:
-        - ports:
-            - port: "7880"
-              protocol: TCP
----
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
