@@ -7,6 +7,8 @@ metadata:
   labels:
     app.kubernetes.io/name: livekit
 spec:
+  hostnames:
+    - livekit.biggs.dog
   parentRefs:
     - name: wildcard-biggs-dog
       namespace: networking
@@ -15,9 +17,10 @@ spec:
         - path:
             type: PathPrefix
             value: /sfu/get
-        - path:
-            type: PathPrefix
-            value: /healthz
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
+    - matches:
         - path:
             type: PathPrefix
             value: /get_token
