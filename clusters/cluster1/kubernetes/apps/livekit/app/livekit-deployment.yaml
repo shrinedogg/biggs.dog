@@ -54,13 +54,13 @@ spec:
               protocol: UDP
           readinessProbe:
             httpGet:
-              path: /healthz
+              path: /
               port: 7880
             initialDelaySeconds: 10
             periodSeconds: 10
           livenessProbe:
             httpGet:
-              path: /healthz
+              path: /
               port: 7880
             initialDelaySeconds: 30
             periodSeconds: 30
