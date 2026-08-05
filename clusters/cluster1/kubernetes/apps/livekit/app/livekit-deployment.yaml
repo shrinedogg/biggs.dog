@@ -35,16 +35,12 @@ spec:
             - --config
             - /etc/livekit/livekit.yaml
           env:
-            - name: LIVEKIT_KEY
+            - name: LIVEKIT_KEYS
+              value: "{\"$LIVEKIT_KEY\": \"$LIVEKIT_SECRET\"}"
               valueFrom:
                 secretKeyRef:
                   name: livekit-credentials
                   key: LIVEKIT_KEY
-            - name: LIVEKIT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: livekit-credentials
-                  key: LIVEKIT_SECRET
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
