@@ -1,0 +1,49 @@
+---
+# HTTPRoute for LiveKit on livekit.biggs.dog
+# Path routing:
+#   /sfu/get*, /healthz*, /get_token* → lk-jwt-service (port 8081)
+#   everything else → livekit (port 7880)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: livekit
+  namespace: matrix
+  labels:
+    app.kubernetes.io/name: livekit
+spec:
+  hostnames:
+    - livekit.biggs.dog
+  parentRefs:
+    - name: wildcard-biggs-dog
+      namespace: networking
+  rules:
+    # lk-jwt-service paths
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /sfu/get
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /healthz
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /get_token
+      backendRefs:
+        - name: lk-jwt-service
+          port: 8081
+    # LiveKit SFU — default catch-all for WebSocket media connections
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: livekit-service
+          port: 7880

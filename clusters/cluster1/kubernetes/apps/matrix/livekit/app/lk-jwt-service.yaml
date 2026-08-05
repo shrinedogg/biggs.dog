@@ -1,0 +1,16 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: lk-jwt-service
+  namespace: matrix
+  labels:
+    app.kubernetes.io/name: lk-jwt-service
+spec:
+  selector:
+    app.kubernetes.io/name: lk-jwt-service
+  ports:
+    - name: http
+      port: 8081
+      protocol: TCP
+      targetPort: 8081

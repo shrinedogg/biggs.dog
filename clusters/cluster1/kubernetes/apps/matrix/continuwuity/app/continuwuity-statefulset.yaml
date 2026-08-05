@@ -90,6 +90,10 @@ spec:
               value: ""
             - name: ALLOW_LEGACY_MEDIA
               value: "true"
+            # MatrixRTC / LiveKit — tells clients where to find the SFU backend
+            - name: CONTINUWUITY_GLOBAL__MATRIX_RTC__FOCI
+              value: |
+                [{ type = "livekit", livekit_service_url = "https://livekit.biggs.dog" }]
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
