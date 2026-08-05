@@ -34,12 +34,7 @@ spec:
           args:
             - --config
             - /etc/livekit/livekit.yaml
-          env:
-            - name: LIVEKIT_KEYS
-              valueFrom:
-                secretKeyRef:
-                  name: livekit-credentials
-                  key: LIVEKIT_KEYS
+          env: []
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -78,7 +73,13 @@ spec:
           volumeMounts:
             - name: config
               mountPath: /etc/livekit
+            - name: keys
+              mountPath: /etc/livekit/keys
+              subPath: keys
       volumes:
         - name: config
           configMap:
             name: livekit-config
+        - name: keys
+          secret:
+            secretName: livekit-credentials
