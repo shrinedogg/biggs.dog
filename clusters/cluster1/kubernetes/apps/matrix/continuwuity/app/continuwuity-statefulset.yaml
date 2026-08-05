@@ -92,8 +92,7 @@ spec:
               value: "true"
             # MatrixRTC / LiveKit — tells clients where to find the SFU backend
             - name: CONTINUWUITY_MATRIX_RTC__FOCI
-              value: |
-                [{"type":"livekit","livekit_service_url":"https://livekit.biggs.dog"}]
+              value: '[{ type = "livekit", livekit_service_url = "https://livekit.biggs.dog" }]'
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
