@@ -17,25 +17,6 @@ spec:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
 ---
-# Allow lk-jwt-service to reach LiveKit SFU on port 7880
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-livekit-ingress-from-lk-jwt
-  namespace: livekit
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: livekit
-  ingress:
-    - fromEndpoints:
-        - matchLabels:
-            app.kubernetes.io/name: lk-jwt-service
-      toPorts:
-        - ports:
-            - port: "7880"
-              protocol: TCP
----
 # Allow egress for DNS
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -78,6 +59,10 @@ spec:
 #  - toEndpoints wildcard-biggs-dog: the gateway dataplane pods, in case the
 #    VIP hairpin from the pod network is unreachable and Cilium DNATs to a pod.
 #  - toFQDNs: kept as a fallback if the VIP ever changes.
+#
+# The toCIDR + toEndpoints rules here also carry the lk-jwt -> LiveKit
+# control channel: LIVEKIT_URL is wss://livekit.biggs.dog, which resolves
+# in-cluster to the same VIP:443. See allow-egress-lk-jwt-to-livekit.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -111,14 +96,19 @@ spec:
               protocol: TCP
 ---
 # lk-jwt-service auto-creates LiveKit rooms for full-access users (biggs.dog)
-# by dialing the LiveKit SFU control channel at
-# ws://livekit-service.livekit.svc.cluster.local:7880. The livekit server pod
-# is hostNetwork on nv-01 (podIP == node LAN IP 192.168.2.25), so the
-# ClusterIP backend DNATs to a REMOTE NODE identity, not a pod endpoint — the
-# existing allow-livekit-ingress-from-lk-jwt only covers the ingress side and
-# its app=livekit endpointSelector never matches a hostNetwork pod. Without
-# this egress rule the room-create call is default-denied and /get_token
-# returns 500 "Unable to create room on SFU" after OpenID succeeds.
+# by dialing the LiveKit SFU control channel. LIVEKIT_URL is
+# wss://livekit.biggs.dog — the SAME public URL handed to clients in the
+# /get_token response (lk-jwt-service v0.5.0 uses one LIVEKIT_URL for both).
+# In-cluster, k8s-gateway resolves livekit.biggs.dog to the
+# wildcard-biggs-dog gateway VIP (192.168.6.7), so the room-create call
+# hairpins through the gateway to livekit-service:7880. The deterministic
+# :443 paths (toCIDR 192.168.6.7/32 + toEndpoints wildcard-biggs-dog) are
+# already granted by allow-egress-lk-jwt-to-matrix; this policy adds the
+# toFQDNs fallback for livekit.biggs.dog:443 and keeps the old direct path
+# (ClusterIP -> hostNetwork remote-node:7880) so LIVEKIT_URL can be pointed
+# back at the ClusterIP service without a policy change. (The dead
+# allow-livekit-ingress-from-lk-jwt policy was removed: its app=livekit
+# endpointSelector never matched the hostNetwork pod anyway.)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -129,6 +119,12 @@ spec:
     matchLabels:
       app.kubernetes.io/name: lk-jwt-service
   egress:
+    - toFQDNs:
+        - matchName: livekit.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
     - toEntities:
         - remote-node
         - host

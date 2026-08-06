@@ -2,13 +2,14 @@
 # LoadBalancer for LiveKit WebRTC MEDIA (not signaling — that stays on the
 # wildcard-biggs-dog gateway via HTTPRoute -> livekit-service:7880).
 #
-# Why this exists: the livekit server pod is hostNetwork on nv-01
-# (192.168.2.25) and binds UDP 50100-50200 (RTC) + TCP 7881 (RTC-over-TCP).
-# Clients are all on the LAN/VPN and need a hairpin-safe, stable IP to send
-# media to. This Service pins 192.168.6.17 from the Cilium LB-IPAM pool and
-# LiveKit advertises it via rtc.node_ip (see livekit-configmap.yaml), mirroring
-# the working Jitsi JVB pattern (jvb = 192.168.6.9). Without it LiveKit
-# advertised the unreachable WAN IP and calls had no remote audio/video.
+# STANDBY / rollback path. LiveKit no longer advertises this VIP: with
+# internet clients it advertises the WAN IP (87.92.82.45, UDM-forwarded to
+# nv-01) plus the node LAN IP 192.168.2.25 (see livekit-configmap.yaml —
+# v1.13.5 can't advertise an arbitrary VIP alongside the STUN external IP;
+# nat_1_to_1_ips was removed from the config schema). Kept so reverting to
+# the LAN-only design (use_external_ip: false + node_ip: 192.168.6.17) is a
+# configmap-only change, and so the VIP keeps answering on 50100/7881 for
+# anything still pinned to it.
 apiVersion: v1
 kind: Service
 metadata:
@@ -35,8 +36,8 @@ spec:
       port: 50100
       protocol: UDP
       targetPort: 50100
-      # LiveKit is configured with a single multiplexed RTC UDP port
-      # (port_range_start == port_range_end == 50100, see livekit-configmap),
-      # so this 1:1 Service mapping exposes the entire media path through the
-      # VIP. One multiplexed UDP port serves the few concurrent calls this SFU
-      # handles — same model as the Jitsi JVB (single UDP 10000).
+      # LiveKit is configured with a single multiplexed RTC UDP port shared
+      # by all peer connections (udp_port: 50100 -> pion UDPMux, see
+      # livekit-configmap), so this 1:1 Service mapping exposes the entire
+      # media path through the VIP — same model as the Jitsi JVB (single UDP
+      # 10000).

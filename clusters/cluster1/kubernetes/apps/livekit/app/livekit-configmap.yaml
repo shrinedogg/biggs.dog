@@ -15,23 +15,36 @@ data:
       "Z7hKgDuff5SvvKhNYG4wQ": "gUqkxxeeE2GG5JpZMtwbkidRzoW0rsxPvI5s8N7y8aw7Awc2SipdQ6URqPpTqWe"
     rtc:
       tcp_port: 7881
-      # Single UDP port (multiplexed) rather than a 50100-50200 range: a
-      # LoadBalancer Service maps ports 1:1, so a range can't be exposed through
-      # the livekit-media VIP cleanly. One multiplexed UDP port easily serves
-      # the few concurrent calls this SFU handles, and matches the JVB model
-      # (single UDP 10000). Kept at 50100 so livekit-media Service's rtc-udp
-      # targetPort stays valid.
-      port_range_start: 50100
-      port_range_end: 50100
-      # Advertise the livekit-media LoadBalancer VIP, NOT the WAN IP.
-      # use_external_ip=true made LiveKit STUN-detect the home WAN IP
-      # (87.92.82.45) and advertise it as the ICE candidate, but that IP fails
-      # validation (no NAT hairpin on the router) and its media ports are not
-      # forwarded, so clients joined the room yet no audio/video flowed.
-      # All clients are on the LAN/VPN (livekit.biggs.dog resolves to the
-      # internal gateway VIP even via public DNS), so advertise the internal
-      # hairpin-safe media VIP that livekit-media Service exposes (mirrors the
-      # working Jitsi JVB pattern: jvb advertises 192.168.6.9, not just WAN).
-      use_external_ip: false
-      node_ip: 192.168.6.17
+      # Single UDP port shared by ALL peer connections via pion's UDPMux.
+      # udp_port (mux), NOT port_range_*: a 1-port ephemeral range gives each
+      # PeerConnection its own socket, so the second concurrent participant
+      # fails to bind 50100 and silently drops to ICE-TCP. Matches the JVB
+      # single-UDP-port model and the 1:1 UDM WAN forward below.
+      udp_port: 50100
+      # Dual-advertise for internet + LAN/VPN clients. Cloudflare proxies
+      # livekit.biggs.dog and only forwards HTTP/HTTPS, so media must reach
+      # the WAN IP directly: use_external_ip STUN-detects 87.92.82.45 and
+      # advertises it as a host candidate. REQUIRES UDM forwards UDP 50100 +
+      # TCP 7881 -> nv-01 (192.168.2.25), plus outbound STUN from the host
+      # network at boot (the external IP is resolved once at startup —
+      # restart this pod if the WAN IP changes).
+      use_external_ip: true
+      # Also advertise the node LAN IP alongside the WAN IP (pion address
+      # rewrite Append mode) so LAN/VPN clients connect directly — they
+      # cannot hairpin the WAN IP (no NAT hairpin on the UDM). v1.13.5 has
+      # no nat_1_to_1_ips key, so advertising the media VIP (192.168.6.17)
+      # alongside the WAN IP is not expressible; the VIP is no longer in the
+      # candidate set (livekit-media Service kept as a rollback path).
+      advertise_internal_ip: true
+      # Skip the built-in self-check: it dials external:50100 and expects the
+      # packet back, which needs the very NAT hairpin the UDM lacks. On
+      # failure LiveKit falls back to advertising ONLY the external IP and
+      # LAN clients lose their candidate until restart.
+      skip_external_ip_validation: true
+      # Gather host candidates from the node LAN NIC only — otherwise every
+      # host interface (tailscale0, cilium_*, docker0, ...) is advertised
+      # too, since the pod is hostNetwork.
+      ips:
+        includes:
+          - 192.168.2.0/24
       enable_loopback_candidate: false

@@ -34,7 +34,18 @@ spec:
             - name: LIVEKIT_JWT_BIND
               value: ":8081"
             - name: LIVEKIT_URL
-              value: "ws://livekit-service.livekit.svc.cluster.local:7880"
+              # One URL, two jobs (verified in lk-jwt-service v0.5.0 source):
+              # dialed by lksdk.NewRoomServiceClient to auto-create rooms AND
+              # returned verbatim to clients in the /get_token response
+              # (SFUResponse{url,jwt}) — there is no separate client-URL
+              # setting. Must be the PUBLIC wss URL: a cluster-internal
+              # address is unreachable for real clients and ws:// is
+              # mixed-content-blocked on https pages. In-cluster,
+              # k8s-gateway resolves livekit.biggs.dog to the gateway VIP
+              # 192.168.6.7, so the control channel hairpins through the
+              # wildcard gateway to livekit-service:7880 (egress covered by
+              # the lk-jwt CNPs).
+              value: "wss://livekit.biggs.dog"
             - name: LIVEKIT_FULL_ACCESS_HOMESERVERS
               value: "biggs.dog"
             - name: LIVEKIT_KEY
