@@ -55,3 +55,84 @@ spec:
               protocol: UDP
             - port: "53"
               protocol: TCP
+          # L7 DNS proxy — Cilium injects replies directly to the pod, avoiding
+          # the conntrack reply-drop that breaks Go resolvers behind default-deny
+          # ingress (see auth.yaml), and enables toFQDNs.
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# lk-jwt-service verifies OpenID tokens against the homeserver: it resolves the
+# matrix:// server name via https://biggs.dog/.well-known/matrix/server
+# (delegates to matrix.biggs.dog:443), then fetches
+# /_matrix/federation/v1/openid/userinfo. Both names resolve to the gateway
+# LoadBalancer IP (192.168.6.7). Without this egress the lookup hangs ~20s
+# ("context canceled") and Element Call never gets a LiveKit JWT.
+#
+# Three complementary rules (belt and suspenders):
+#  - toCIDR 192.168.6.7/32: the deterministic path. Both FQDNs resolve to this
+#    stable VIP; allowing it directly removes any dependency on the FQDN DNS
+#    proxy having learned the mapping (the per-agent FQDN cache GCs idle entries
+#    aggressively — tofqdns-idle-connection-grace-period=0s — which made the
+#    toFQDNs-only path flaky and caused "dial tcp: lookup ...: i/o timeout").
+#  - toEndpoints wildcard-biggs-dog: the gateway dataplane pods, in case the
+#    VIP hairpin from the pod network is unreachable and Cilium DNATs to a pod.
+#  - toFQDNs: kept as a fallback if the VIP ever changes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-lk-jwt-to-matrix
+  namespace: livekit
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: lk-jwt-service
+  egress:
+    - toCIDR:
+        - 192.168.6.7/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: biggs.dog
+        - matchName: matrix.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# lk-jwt-service auto-creates LiveKit rooms for full-access users (biggs.dog)
+# by dialing the LiveKit SFU control channel at
+# ws://livekit-service.livekit.svc.cluster.local:7880. The livekit server pod
+# is hostNetwork on nv-01 (podIP == node LAN IP 192.168.2.25), so the
+# ClusterIP backend DNATs to a REMOTE NODE identity, not a pod endpoint — the
+# existing allow-livekit-ingress-from-lk-jwt only covers the ingress side and
+# its app=livekit endpointSelector never matches a hostNetwork pod. Without
+# this egress rule the room-create call is default-denied and /get_token
+# returns 500 "Unable to create room on SFU" after OpenID succeeds.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-lk-jwt-to-livekit
+  namespace: livekit
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: lk-jwt-service
+  egress:
+    - toEntities:
+        - remote-node
+        - host
+      toPorts:
+        - ports:
+            - port: "7880"
+              protocol: TCP
