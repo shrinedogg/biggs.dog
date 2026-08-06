@@ -1,6 +1,8 @@
 ---
-# LiveKit SFU — uses hostNetwork for UDP media relay (ports 50100-50200)
-# and TCP port 7881. HTTP/WS on 7880 is proxied via the gateway.
+# LiveKit SFU — uses hostNetwork for UDP media relay (single multiplexed port
+# 50100) and TCP port 7881. HTTP/WS on 7880 is proxied via the gateway. Media
+# reaches clients through the livekit-media LoadBalancer VIP (192.168.6.17),
+# which LiveKit advertises via rtc.node_ip (see livekit-configmap.yaml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:

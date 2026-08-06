@@ -15,7 +15,23 @@ data:
       "Z7hKgDuff5SvvKhNYG4wQ": "gUqkxxeeE2GG5JpZMtwbkidRzoW0rsxPvI5s8N7y8aw7Awc2SipdQ6URqPpTqWe"
     rtc:
       tcp_port: 7881
+      # Single UDP port (multiplexed) rather than a 50100-50200 range: a
+      # LoadBalancer Service maps ports 1:1, so a range can't be exposed through
+      # the livekit-media VIP cleanly. One multiplexed UDP port easily serves
+      # the few concurrent calls this SFU handles, and matches the JVB model
+      # (single UDP 10000). Kept at 50100 so livekit-media Service's rtc-udp
+      # targetPort stays valid.
       port_range_start: 50100
-      port_range_end: 50200
-      use_external_ip: true
+      port_range_end: 50100
+      # Advertise the livekit-media LoadBalancer VIP, NOT the WAN IP.
+      # use_external_ip=true made LiveKit STUN-detect the home WAN IP
+      # (87.92.82.45) and advertise it as the ICE candidate, but that IP fails
+      # validation (no NAT hairpin on the router) and its media ports are not
+      # forwarded, so clients joined the room yet no audio/video flowed.
+      # All clients are on the LAN/VPN (livekit.biggs.dog resolves to the
+      # internal gateway VIP even via public DNS), so advertise the internal
+      # hairpin-safe media VIP that livekit-media Service exposes (mirrors the
+      # working Jitsi JVB pattern: jvb advertises 192.168.6.9, not just WAN).
+      use_external_ip: false
+      node_ip: 192.168.6.17
       enable_loopback_candidate: false
