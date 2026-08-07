@@ -73,7 +73,6 @@ spec:
         - ports:
             - port: "1411"
               protocol: TCP
----
 # Pocket ID egress: needs DNS already covered by allow-egress-dns, Postgres by
 # allow-egress-to-postgres, and Dragonfly by allow-egress-to-dragonfly.
 # Also needs to reach itself on port 1411 so the Kubernetes ClusterIP service
