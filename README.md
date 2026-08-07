@@ -227,12 +227,12 @@ The `dreamcast` namespace is an on-demand, GPU-accelerated game-streaming platfo
 
 ### GPU Arbiter
 
-The single 32 GB RTX 5090 can't host vLLM and a gaming session at once. The [`gpu-arbiter-operator`](https://github.com/shrinedogg/gpu-arbiter-operator) reconciles a cluster-scoped `GPUArbiter` CR (`cluster0`) and:
+The single 32 GB RTX 5090 can't host vLLM and a gaming session at once. The [`gpu-arbiter-operator`](https://github.com/shrinedogg/gpu-arbiter-operator) reconciles a cluster-scoped `GPUArbiter` CR (`cluster1`) and:
 
 1. **Scales vLLM** to 0 when gaming pods appear, back to 1 when idle.
 2. **Lifts the scheduling gate** (`gpu.biggs.dog/await-vram`) once VRAM is freed.
 
-**Deployment:** `apps/dreamcast/gpu-arbiter-{operator,instance}`. Image: `shrinedogg/gpu-arbiter-operator:v0.1.1`. Query status with `kubectl get gpuarbiter cluster0`.
+**Deployment:** `apps/dreamcast/gpu-arbiter-{operator,instance}`. Image: `shrinedogg/gpu-arbiter-operator:v0.1.1`. Query status with `kubectl get gpuarbiter cluster1`.
 
 ### Defined Apps
 
