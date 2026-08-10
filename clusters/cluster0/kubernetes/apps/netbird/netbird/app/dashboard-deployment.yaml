@@ -25,7 +25,7 @@ spec:
     spec:
       containers:
         - name: netbird-dashboard
-          image: netbirdio/dashboard:v2.90.9
+          image: netbirdio/dashboard:v2.90.10
           env:
             # Endpoints (REST + gRPC share the public host; calls are made
             # from users' browsers, so these must be the external URL).
