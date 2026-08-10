@@ -21,7 +21,6 @@ resources:
   - agentgateway-oci.yaml
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
-  - jitsi-repo.yaml
   - barman-oci.yaml
   - affine-oci.yaml
   - manticore-repo.yaml
