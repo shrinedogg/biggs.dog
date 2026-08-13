@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://quay.io/jetstack/charts/cert-manager-csi-driver
   ref:
-    tag: "v0.12.0"
+    tag: "v0.16.0"
