@@ -1,0 +1,58 @@
+---
+# Patch the kagent-default Deployment (owned by the substrate WorkerPool
+# controller) to add the cert-manager CSI volume for atunnel credential
+# bundles. Kubernetes Pod Certificate projected volumes are unavailable
+# on this cluster (Talos), so we use the cert-manager CSI driver instead
+# with an init container that combines tls.key + tls.crt + ca.crt into
+# credential-bundle.pem.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []
+patches:
+  - target:
+      kind: Deployment
+      name: kagent-default
+      namespace: ai-system
+    patch: |
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: kagent-default
+        namespace: ai-system
+      spec:
+        template:
+          spec:
+            initContainers:
+              - name: credential-bundle
+                image: docker.io/library/busybox:1.37
+                command:
+                  - sh
+                  - -c
+                  - 'cat /run/podidentity.podcert.ate.dev/tls.key /run/podidentity.podcert.ate.dev/tls.crt /run/podidentity.podcert.ate.dev/ca.crt > /run/podidentity.podcert.ate.dev/credential-bundle.pem'
+                volumeMounts:
+                  - name: podidentity
+                    mountPath: /run/podidentity.podcert.ate.dev
+                securityContext:
+                  runAsUser: 0
+                  runAsGroup: 0
+            containers:
+              - name: ateom
+                volumeMounts:
+                  - name: podidentity
+                    mountPath: /run/podidentity.podcert.ate.dev
+            volumes:
+              - name: podidentity
+                csi:
+                  driver: csi.cert-manager.io
+                  readOnly: true
+                  volumeAttributes:
+                    csi.cert-manager.io/issuer-name: substrate-podcert-selfsigned
+                    csi.cert-manager.io/issuer-kind: ClusterIssuer
+                    csi.cert-manager.io/dns-names: "${POD_NAME}.${POD_NAMESPACE}.svc.cluster.local"
+                    csi.cert-manager.io/uri-sans: "spiffe://cluster.local/ns/${POD_NAMESPACE}/pod/${POD_NAME}/${POD_UID}"
+                    csi.cert-manager.io/key-algorithm: ECDSA
+                    csi.cert-manager.io/key-size: "256"
+                    csi.cert-manager.io/key-usages: digital signature,key encipherment
+                    csi.cert-manager.io/certificate-file: tls.crt
+                    csi.cert-manager.io/privatekey-file: tls.key
+                    csi.cert-manager.io/ca-file: ca.crt
