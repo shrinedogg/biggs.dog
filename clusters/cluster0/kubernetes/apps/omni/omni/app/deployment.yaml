@@ -39,7 +39,7 @@ spec:
             secretName: omni-biggs-dog-tls
       containers:
         - name: omni
-          image: ghcr.io/siderolabs/omni:v1.10.0
+          image: ghcr.io/siderolabs/omni:v1.10.1
           imagePullPolicy: Always
           securityContext:
             privileged: true
