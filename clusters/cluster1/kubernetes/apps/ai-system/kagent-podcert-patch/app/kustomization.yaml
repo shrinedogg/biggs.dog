@@ -24,7 +24,7 @@ patches:
           spec:
             initContainers:
               - name: credential-bundle
-                image: docker.io/library/busybox:1.37
+                image: docker.io/library/busybox:1.38
                 command:
                   - sh
                   - -c
