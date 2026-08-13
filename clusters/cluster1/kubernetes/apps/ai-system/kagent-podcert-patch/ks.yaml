@@ -1,0 +1,27 @@
+---
+# Patch the kagent-default Deployment (owned by the substrate WorkerPool
+# controller) to add the cert-manager CSI volume for atunnel credential
+# bundles. k3s lacks podCertificate projected volumes, so we use the
+# cert-manager CSI driver instead with an init container that combines
+# tls.key + tls.crt + ca.crt into credential-bundle.pem.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app kagent-podcert-patch
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/kagent-podcert-patch/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m
+  dependsOn:
+    - name: kagent
+    - name: cert-manager-csi-driver

@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: cert-manager-csi-driver
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://quay.io/jetstack/charts/cert-manager-csi-driver
+  ref:
+    tag: "v0.12.0"
