@@ -9,6 +9,7 @@ resources:
   - ./kagent-crds/ks.yaml
   - ./substrate-crds/ks.yaml
   - ./substrate/ks.yaml
+  - ./csi-driver/ks.yaml
   - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
   - ./kagent/substrate-agents/ks.yaml

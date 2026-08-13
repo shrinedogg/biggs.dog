@@ -212,7 +212,7 @@ spec:
     substrateWorkerPool:
       create: true
       replicas: 1
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.10
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.11
       template:
         spec:
           nodeSelector:

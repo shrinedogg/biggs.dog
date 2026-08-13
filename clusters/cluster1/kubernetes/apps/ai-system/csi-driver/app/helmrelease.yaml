@@ -1,0 +1,33 @@
+---
+# cert-manager-csi-driver — installs the cert-manager CSI driver that dynamically
+# provisions per-pod certificates. Required for substrate atunnel credential bundles
+# on k3s (which lacks native Pod Certificate projected volumes).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: cert-manager-csi-driver
+  namespace: ai-system
+spec:
+  interval: 3m
+  chartRef:
+    kind: OCIRepository
+    name: cert-manager-csi-driver
+    namespace: flux-system
+  postRenderers:
+    - kustomize:
+        patches:
+          # Pin CSI driver DaemonSet to the GPU node (nv-01) where worker pods schedule.
+          - target:
+              kind: DaemonSet
+            patch: |-
+              - op: add
+                path: /spec/template/spec/nodeSelector
+                value:
+                  nvidia.com/gpu.present: "true"
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3

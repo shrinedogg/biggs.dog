@@ -1,0 +1,10 @@
+---
+# Self-signed ClusterIssuer for substrate pod identity certificates.
+# Used by the cert-manager CSI driver to sign per-pod credential bundles
+# for the kagent-default WorkerPool pods.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: substrate-podcert-selfsigned
+spec:
+  selfSigned: {}
