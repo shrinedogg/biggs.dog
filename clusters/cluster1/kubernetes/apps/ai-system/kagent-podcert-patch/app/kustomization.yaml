@@ -1,9 +1,10 @@
 ---
 # Patch the kagent-default Deployment (owned by the substrate WorkerPool
 # controller) to add the cert-manager CSI volume for atunnel credential
-# bundles. k3s lacks podCertificate projected volumes, so we use the
-# cert-manager CSI driver instead with an init container that combines
-# tls.key + tls.crt + ca.crt into credential-bundle.pem.
+# bundles. Kubernetes Pod Certificate projected volumes are unavailable
+# on this cluster (Talos), so we use the cert-manager CSI driver instead
+# with an init container that combines tls.key + tls.crt + ca.crt into
+# credential-bundle.pem.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources: []
