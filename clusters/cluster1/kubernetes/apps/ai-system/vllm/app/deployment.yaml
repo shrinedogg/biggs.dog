@@ -81,29 +81,26 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 192K context (raised from 131K). exa-agent's web searches return
-            # very large results (~38KB each); a multi-search session hit ~164K
-            # tokens of tool-result history and overflowed the old 131K cap
-            # (HTTP 400 input_tokens=131073). 192K gives ~28K margin over the
-            # largest observed exa session while staying safely under the fp8 KV
-            # pool (~243K-token capacity at util 0.95; ~6.4GiB for one 192K
-            # sequence vs ~8GiB pool). The model's native max is 262K, but the
-            # ~8GiB fp8 KV pool can't hold a full 262K sequence, so 262K would
-            # fail vLLM startup. To go higher, raise --gpu-memory-utilization
+            # 131K context. The fp8 KV cache + hybrid attention keep the KV pool
+            # small at this length. The model's native max is 262K, but the fp8
+            # KV pool can't hold a full 262K sequence, so 262K would fail vLLM
+            # startup. NOTE: a prior 192K setting was used to absorb very large
+            # exa-agent tool-result histories (a multi-search session once hit
+            # ~164K tokens and overflowed a 131K cap with HTTP 400
+            # input_tokens=131073); at 131K, watch for that overflow on heavy
+            # multi-search sessions. To go higher, raise --gpu-memory-utilization
             # (do NOT exceed ~0.96; 0.97 caused a full node lockup on 2026-06-25)
-            # or add VRAM. Raising max-model-len requires dropping max-num-seqs
-            # (longer sequences consume more KV) -- see below.
-            - --max-model-len=196608
+            # or add VRAM.
+            - --max-model-len=131072
             # nv-01's GPU is time-sliced (replicas=4) and shared with
             # GPU-operator validators and the DRA plugin. (The embeddings server
             # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
             # reserved ~31.6GB, leaving ~1GB free, which contributed to a full
             # node lockup (2026-06-25) back when embeddings was ALSO on the GPU.
-            # With the lighter ~18GiB-resident NVFP4 quant, 0.95 (~30.4GB
-            # reserved, ~1.6GB free) yields ~8GiB fp8 KV -- ample for 131K plus
-            # concurrency. Could relax to 0.90 for more node headroom if KV ever
-            # proves over-provisioned; do NOT push past ~0.96.
-            - --gpu-memory-utilization=0.95
+            # With the lighter ~18GiB-resident NVFP4 quant, 0.92 leaves extra
+            # node headroom while still yielding an fp8 KV pool sufficient for
+            # the 131K window plus concurrency. Do NOT push past ~0.96.
+            - --gpu-memory-utilization=0.92
             # Per-step token budget for (chunked) prefill + decode. Bumped from
             # 4096 to 8192 to handle medium-length tool-context prompts more
             # efficiently, reducing the number of prefill steps. Short prompts
@@ -118,13 +115,14 @@ spec:
             # and the pod restarted (exit 0, "Completed"). 32-way still matches or
             # exceeds realistic concurrent agent count, lets vLLM QUEUE excess
             # requests instead of compute-locking, and keeps /health responsive.
-            # Keep capture-size == max-num-seqs. Dropped 32 -> 16 alongside the
-            # max-model-len raise (131K -> 192K): longer sequences consume more
-            # KV, so concurrency is halved to keep the ~8GiB fp8 KV pool from
-            # oversubscribing. 16-way still exceeds realistic concurrent agent
-            # count on this cluster.
-            - --max-num-seqs=16
-            - --max-cudagraph-capture-size=16
+            # Keep capture-size == max-num-seqs. Restored 16 -> 32 alongside the
+            # max-model-len revert (192K -> 131K): the earlier halving to 16 only
+            # existed to keep the ~8GiB fp8 KV pool from oversubscribing at 192K.
+            # Back at 131K, sequences are shorter and consume less KV, so 32-way
+            # fits comfortably and gives more headroom for concurrent agent
+            # fan-out.
+            - --max-num-seqs=32
+            - --max-cudagraph-capture-size=32
             - --enable-prefix-caching
             # Qwen3.6's hybrid (Gated-DeltaNet) arch may ship custom modeling
             # code; the model card sets trust-remote-code. NOTE: executes repo
