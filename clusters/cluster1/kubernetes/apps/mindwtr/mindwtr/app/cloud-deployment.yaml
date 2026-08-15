@@ -29,7 +29,7 @@ spec:
         fsGroup: 1000 # bun user; keeps the PVC writable
       containers:
         - name: mindwtr-cloud
-          image: ghcr.io/dongdongbh/mindwtr-cloud:1.1.6
+          image: ghcr.io/dongdongbh/mindwtr-cloud:1.2.0
           ports:
             - containerPort: 8787
               name: http
