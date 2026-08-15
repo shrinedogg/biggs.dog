@@ -212,7 +212,17 @@ spec:
     substrateWorkerPool:
       create: true
       replicas: 1
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.12
+      # PINNED to the substrate control-plane version. The ateom worker image
+      # MUST move in lockstep with ate-controller/atelet/atenet-router and the
+      # digest-pinned ateapi fork above (currently all v0.0.10). v0.0.12+
+      # workers hard-require an atunnel pod-identity credential bundle at
+      # /run/podidentity.podcert.ate.dev/credential-bundle.pem (PodCertificate
+      # projection, mtls mode); the v0.0.10 jwt-mode control plane never
+      # provisions it and Talos lacks the ClusterTrustBundle/PodCertificateRequest
+      # feature gates — the worker CrashLoops with "atunnel: reading credential
+      # bundle: ... no such file or directory". Renovate bumps for the whole
+      # substrate stack are grouped + automerge:false (see renovate.json).
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.10
       template:
         spec:
           nodeSelector:
