@@ -44,22 +44,31 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.27.1
           args:
             # ----------------------------------------------------------------
-            # MODEL: an NVFP4 (compressed-tensors) quant of Alibaba's dense
-            # Qwen3.6-27B, built for Blackwell + vLLM:
-            #   https://huggingface.co/rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
+            # MODEL: unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
+            # dense Qwen3.6-27B:
+            #   https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4
             # A 27B DENSE model (all params active -> slower per-token than the
             # old 35B-A3B MoE, but strong agentic-coding quality), with a
             # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
             # paged KV, so long context stays cheap) and 262K native context.
             # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
-            # We previously ran unsloth/Qwen3.6-27B-NVFP4, but it keeps the
-            # vision tower + 248K-vocab embeddings/lm_head in BF16 -> ~26GB on
-            # disk / ~23GiB RESIDENT, leaving only ~3GiB for KV and forcing an
-            # 80K context cap. This quant compresses those too (~20GB disk /
-            # ~18GiB resident), freeing ~5GiB so we restore the full 131K window
-            # AND regain real concurrency for agent fan-out. We still serve
-            # TEXT-ONLY via --language-model-only (the vision tower's weights
-            # load but are never used by kagent).
+            # We previously ran rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm,
+            # which ALSO compresses the vision tower + 248K-vocab
+            # embeddings/lm_head (~20GB disk / ~18GiB resident). THIS quant
+            # keeps those in BF16 -> ~26GB on disk / ~23GiB RESIDENT, leaving
+            # only ~3GiB for the fp8 KV pool (measured 2026-07-11). We still
+            # serve TEXT-ONLY via --language-model-only (the vision tower's
+            # weights load but are never used by kagent).
+            # WARNING: every tuning number below (224K window, 8-way
+            # concurrency, util 0.96 -> ~8.3GiB KV pool) was sized for the
+            # rdtand quant's ~18GiB resident. With unsloth's ~23GiB resident
+            # the pool shrinks to ~3GiB (~80K tokens was the practical
+            # max-model-len ceiling on 2026-07-11), so the 224K
+            # --max-model-len below will likely FAIL vLLM startup (KV pool
+            # smaller than max-model-len). Args are intentionally IDENTICAL to
+            # the rdtand config per request; if the pod crash-loops on the KV
+            # check, drop --max-model-len toward 81920 and --max-num-seqs /
+            # --max-cudagraph-capture-size toward 4 (the proven unsloth fit).
             # Quantization is compressed-tensors and AUTO-DETECTED from the
             # checkpoint's quantization_config -- do NOT pass --quantization
             # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
@@ -69,7 +78,7 @@ spec:
             # :nightly).
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
+            - --model=unsloth/Qwen3.6-27B-NVFP4
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (unsloth/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
@@ -81,7 +90,10 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 224K context. Sized to sit safely ABOVE the largest observed
+            # 224K context. (Pool math below assumes the rdtand quant; with
+            # unsloth's ~23GiB resident this window likely fails startup, see
+            # the MODEL block WARNING.) Sized to sit safely ABOVE the largest
+            # observed
             # exa-agent tool-result history (~164K tokens; a multi-search
             # session once overflowed a 131K cap with HTTP 400
             # input_tokens=131073) with ~60K of headroom, and just BELOW the fp8
@@ -100,7 +112,7 @@ spec:
             # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
             # reserved ~31.6GB, leaving ~1GB free, which contributed to a full
             # node lockup (2026-06-25) back when embeddings was ALSO on the GPU.
-            # With the lighter ~18GiB-resident NVFP4 quant, 0.96 (~30.7GB
+            # With the lighter ~18GiB-resident rdtand quant, 0.96 (~30.7GB
             # reserved) yields an ~8.3GiB fp8 KV pool (~250K tokens) -- the
             # headroom needed to hold the 224K window above. This is the
             # documented CEILING: 0.97 reserved ~31.6GB (~1GB free) and caused a
