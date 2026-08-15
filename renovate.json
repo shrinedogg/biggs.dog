@@ -130,6 +130,20 @@
       ]
     },
     {
+      "description": "Substrate stack must upgrade in lockstep — never automerge",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": [
+        "ghcr.io/kagent-dev/substrate/ateom-gvisor",
+        "ghcr.io/kagent-dev/substrate/helm/substrate",
+        "ghcr.io/kagent-dev/substrate/helm/substrate-crds"
+      ],
+      "groupName": "substrate-stack",
+      "automerge": false,
+      "prBodyNotes": [
+        ":warning: The substrate stack upgrades only as a whole set: substrate + substrate-crds charts, the digest-pinned ateapi fork (apps/ai-system/substrate/app/helmrelease.yaml), and the ateom worker image (apps/ai-system/kagent/app/helmrelease.yaml). An ateom worker newer than the control plane CrashLoops with `atunnel: reading credential bundle: open /run/podidentity.podcert.ate.dev/credential-bundle.pem: no such file or directory` (worker mTLS needs PodCertificate projection; this cluster runs jwt mode and Talos lacks the feature gates). The 0.0.12 chart also fails server-side apply on a Role hardcoded to the `ate-system` namespace (substrate runs in ai-system here). Before merging: rebase the ateapi fork to the new version, work around the ate-system Role, add spec.pauseImage to apps/ai-system/substrate/app/sandboxconfig.yaml (required by 0.0.12 CRDs), and decide the worker pod-identity story."
+      ]
+    },
+    {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
