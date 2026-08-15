@@ -37,6 +37,12 @@ metadata:
 spec:
   sandboxClass: gvisor
   default: true
+  # Required by the substrate 0.0.12 CRDs (and digest-pinned by CEL rule:
+  # changing the image invalidates actor snapshots). This is the exact image
+  # the live kagent-controller already passes in its substrate config, so
+  # existing snapshots stay restorable — do not "modernize" it to
+  # registry.k8s.io/pause without a snapshot-migration story.
+  pauseImage: gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da
   assets:
     amd64:
       runsc:
