@@ -172,11 +172,22 @@ spec:
                 --set-interpreter /opt/cbm/lib/ld-linux.so.1 \
                 --set-rpath /opt/cbm/lib \
                 /opt/cbm/bin/codebase-memory-mcp
+              # v0.10.4's secure CLI coordination creates its IPC runtime dir
+              # at /tmp/cbm-daemon-<euid> and refuses to start when any
+              # ancestor is world-writable but NOT root-owned+sticky (the
+              # standard /tmp contract). A Kubernetes emptyDir mounts 0777
+              # WITHOUT the sticky bit, so cbm-index/server exit immediately
+              # with "secure CLI coordination could not be created
+              # (endpoint)". Restore the real /tmp contract on the shared
+              # volume before any cbm process runs.
+              chmod 1777 /tmp
               echo "patched interp:  $(patchelf --print-interpreter /opt/cbm/bin/codebase-memory-mcp)"
               echo "patched rpath:   $(patchelf --print-rpath /opt/cbm/bin/codebase-memory-mcp)"
           volumeMounts:
             - name: cbm-bin
               mountPath: /opt/cbm
+            - name: tmp
+              mountPath: /tmp
           resources:
             requests:
               cpu: 50m
