@@ -210,6 +210,11 @@ spec:
             capabilities:
               drop:
                 - "ALL"
+              add:
+                # chown(2) always requires CAP_CHOWN, even for the owner;
+                # needed to hand the root-owned PVC cache root to uid 1000.
+                # (The /tmp chmod above works cap-free because root owns it.)
+                - "CHOWN"
             seccompProfile:
               type: RuntimeDefault
         # NATIVE SIDECAR: keeps a fresh shallow clone of biggs.dog at
