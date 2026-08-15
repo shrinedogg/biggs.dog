@@ -181,6 +181,13 @@ spec:
               # (endpoint)". Restore the real /tmp contract on the shared
               # volume before any cbm process runs.
               chmod 1777 /tmp
+              # The same hardening also requires CBM_CACHE_DIR to be owned by
+              # the process euid (it then chmods 0700 itself), failing with
+              # "(cache-private)" otherwise. The local-path PVC root is
+              # root:root, and fsGroup only fixes the GROUP, which the check
+              # still rejects. Hand the cache root to the cbm uid (1000);
+              # idempotent across pod restarts.
+              chown 1000:1000 /data
               echo "patched interp:  $(patchelf --print-interpreter /opt/cbm/bin/codebase-memory-mcp)"
               echo "patched rpath:   $(patchelf --print-rpath /opt/cbm/bin/codebase-memory-mcp)"
           volumeMounts:
@@ -188,6 +195,8 @@ spec:
               mountPath: /opt/cbm
             - name: tmp
               mountPath: /tmp
+            - name: data
+              mountPath: /data
           resources:
             requests:
               cpu: 50m
