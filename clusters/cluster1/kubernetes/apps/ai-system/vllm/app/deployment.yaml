@@ -59,16 +59,11 @@ spec:
             # only ~3GiB for the fp8 KV pool (measured 2026-07-11). We still
             # serve TEXT-ONLY via --language-model-only (the vision tower's
             # weights load but are never used by kagent).
-            # WARNING: every tuning number below (224K window, 8-way
-            # concurrency, util 0.96 -> ~8.3GiB KV pool) was sized for the
-            # rdtand quant's ~18GiB resident. With unsloth's ~23GiB resident
-            # the pool shrinks to ~3GiB (~80K tokens was the practical
-            # max-model-len ceiling on 2026-07-11), so the 224K
-            # --max-model-len below will likely FAIL vLLM startup (KV pool
-            # smaller than max-model-len). Args are intentionally IDENTICAL to
-            # the rdtand config per request; if the pod crash-loops on the KV
-            # check, drop --max-model-len toward 81920 and --max-num-seqs /
-            # --max-cudagraph-capture-size toward 4 (the proven unsloth fit).
+            # WARNING: the rdtand-tuned 224K window FAILED vLLM startup on this
+            # quant (2026-08-15): vLLM measured 5.71GiB of available KV (7.32GiB
+            # needed for 229376) and computed the ceiling as 177184, which is
+            # what --max-model-len now uses. All other args remain IDENTICAL
+            # to the rdtand config per request.
             # Quantization is compressed-tensors and AUTO-DETECTED from the
             # checkpoint's quantization_config -- do NOT pass --quantization
             # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
@@ -90,33 +85,32 @@ spec:
             # fp8 KV cache + hybrid attention keep the KV pool small even at
             # long context.
             - --kv-cache-dtype=fp8
-            # 224K context. (Pool math below assumes the rdtand quant; with
-            # unsloth's ~23GiB resident this window likely fails startup, see
-            # the MODEL block WARNING.) Sized to sit safely ABOVE the largest
-            # observed
-            # exa-agent tool-result history (~164K tokens; a multi-search
-            # session once overflowed a 131K cap with HTTP 400
-            # input_tokens=131073) with ~60K of headroom, and just BELOW the fp8
-            # KV pool's capacity so vLLM still boots. At util 0.96 the fp8 KV
-            # pool holds ~250K tokens (~8.3GiB); a 224K window leaves ~26K of
-            # slack under that cap. The model's native max is 262K, but the pool
-            # can't hold a full 262K sequence, so 262K would fail vLLM startup.
-            # Do NOT exceed ~0.96 util (0.97 caused a full node lockup on
-            # 2026-06-25). A single 224K sequence consumes ~7.4GiB of KV --
-            # nearly the whole pool -- so concurrency is capped low (see
-            # --max-num-seqs below); raising the window further requires more
-            # VRAM, not more util.
-            - --max-model-len=229376
+            # 173K context (177184 tokens). This is vLLM's MEASURED ceiling for
+            # the unsloth quant at util 0.96 on v0.27.1 (2026-08-15): the engine
+            # profiled 5.71GiB of available KV and refused to boot at 229376
+            # ("7.32 GiB KV cache is needed ... estimated maximum model length
+            # is 177184"). The July 80K ceiling for this quant is stale: v0.27.1
+            # profiles CUDA graph memory explicitly, freeing more for KV.
+            # Headroom over the largest observed exa-agent session (~164K
+            # tokens) is only ~9K, and a single max-length sequence consumes
+            # the entire pool, so long-context concurrency is 1-2 sessions;
+            # short prompts still run 8-way (see --max-num-seqs). To regain the
+            # 224K window, switch back to the rdtand quant (~18GiB resident,
+            # ~8.3GiB pool) or add VRAM. Do NOT exceed ~0.96 util (0.97 caused
+            # a full node lockup on 2026-06-25).
+            - --max-model-len=177184
             # nv-01's GPU is time-sliced (replicas=4) and shared with
             # GPU-operator validators and the DRA plugin. (The embeddings server
             # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
             # reserved ~31.6GB, leaving ~1GB free, which contributed to a full
             # node lockup (2026-06-25) back when embeddings was ALSO on the GPU.
             # With the lighter ~18GiB-resident rdtand quant, 0.96 (~30.7GB
-            # reserved) yields an ~8.3GiB fp8 KV pool (~250K tokens) -- the
-            # headroom needed to hold the 224K window above. This is the
-            # documented CEILING: 0.97 reserved ~31.6GB (~1GB free) and caused a
-            # full node lockup on 2026-06-25. Do NOT push past 0.96.
+            # reserved) yields an ~8.3GiB fp8 KV pool (~250K tokens; 5.71GiB
+            # and a 177184-token ceiling with the unsloth quant, measured
+            # 2026-08-15) -- the headroom that held the 224K window under
+            # rdtand. This is the documented CEILING: 0.97 reserved ~31.6GB
+            # (~1GB free) and caused a full node lockup on 2026-06-25. Do NOT
+            # push past 0.96.
             - --gpu-memory-utilization=0.96
             # Per-step token budget for (chunked) prefill + decode. Bumped from
             # 4096 to 8192 to handle medium-length tool-context prompts more
@@ -132,10 +126,10 @@ spec:
             # and the pod restarted (exit 0, "Completed"). 32-way still matches or
             # exceeds realistic concurrent agent count, lets vLLM QUEUE excess
             # requests instead of compute-locking, and keeps /health responsive.
-            # Keep capture-size == max-num-seqs. Dropped 32 -> 8 alongside the
-            # max-model-len raise to 224K: a single 224K sequence consumes
-            # ~7.4GiB of the ~8.3GiB fp8 KV pool, so the pool can only hold a
-            # couple of full-length sequences at once. 8-way lets vLLM admit a
+            # Keep capture-size == max-num-seqs. 8-way alongside the 177184
+            # window: a single max-length sequence consumes ~5.5GiB of the
+            # 5.71GiB fp8 KV pool, so the pool holds only ONE full-length
+            # sequence at a time. 8-way lets vLLM admit a
             # burst of short/medium agent prompts while QUEUEING (not
             # compute-locking) when several long-context sessions land together;
             # prefix caching + chunked prefill keep queued work moving. If agent
