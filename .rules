@@ -22,9 +22,9 @@ client timeouts — retry or use port-forward / direct `kubectl`.
 ## Model backend
 
 All agents share one in-cluster vLLM backend (`vllm.ai-system:8000`,
-OpenAI-compatible), served as `qwen36-local`
-(`rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm`, dense 27B) on
-`nv-01`'s RTX 5090. Inference never leaves the cluster. 131K context (262K
+OpenAI-compatible), served as `qwen 3.8 - local`
+(`unsloth/Qwen3.8-27B-NVFP4`, dense 27B) on
+`nv-01`'s RTX 5090. Inference never leaves the cluster. 173K context (262K
 native, capped for KV headroom), fp8 KV cache, prefix caching, qwen3
 tool/reasoning parsers. Cross-session vector memory is on (`vectorEnabled:
 true`); flux-agent disables per-agent memory to stay under the window. Prefer

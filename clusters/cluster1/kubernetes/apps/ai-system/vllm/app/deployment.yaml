@@ -45,25 +45,25 @@ spec:
           args:
             # ----------------------------------------------------------------
             # MODEL: unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
-            # dense Qwen3.6-27B:
-            #   https://huggingface.co/unsloth/Qwen3.6-27B-NVFP4
+            # dense Qwen3.8-27B:
+            #   https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4
             # A 27B DENSE model (all params active -> slower per-token than the
             # old 35B-A3B MoE, but strong agentic-coding quality), with a
             # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
             # paged KV, so long context stays cheap) and 262K native context.
             # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
-            # We previously ran rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm,
-            # which ALSO compresses the vision tower + 248K-vocab
-            # embeddings/lm_head (~20GB disk / ~18GiB resident). THIS quant
-            # keeps those in BF16 -> ~26GB on disk / ~23GiB RESIDENT, leaving
-            # only ~3GiB for the fp8 KV pool (measured 2026-07-11). We still
+            # History: rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
+            # (~20GB disk / ~18GiB resident), then unsloth/Qwen3.6-27B-NVFP4
+            # (~26GB / ~23GiB resident, BF16 vision tower). THIS 3.8 quant is
+            # Unsloth Dynamic V3.0: ~19.9GB on disk, the smallest of the three,
+            # so it leaves MORE KV headroom than either 3.6 quant. We still
             # serve TEXT-ONLY via --language-model-only (the vision tower's
             # weights load but are never used by kagent).
-            # WARNING: the rdtand-tuned 224K window FAILED vLLM startup on this
-            # quant (2026-08-15): vLLM measured 5.71GiB of available KV (7.32GiB
-            # needed for 229376) and computed the ceiling as 177184, which is
-            # what --max-model-len now uses. All other args remain IDENTICAL
-            # to the rdtand config per request.
+            # All tuning below is IDENTICAL to the Qwen3.6 config per request:
+            # the 177184 window was vLLM's measured ceiling for the 3.6 unsloth
+            # quant (5.71GiB KV available, 2026-08-15). With this smaller 3.8
+            # quant the same window fits with extra margin; do not raise it
+            # without re-measuring (and never past util 0.96, see below).
             # Quantization is compressed-tensors and AUTO-DETECTED from the
             # checkpoint's quantization_config -- do NOT pass --quantization
             # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
@@ -73,12 +73,16 @@ spec:
             # :nightly).
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=unsloth/Qwen3.6-27B-NVFP4
+            - --model=unsloth/Qwen3.8-27B-NVFP4
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (unsloth/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
             # clients; kagent and Zed both use this name, not the weights path.
-            - --served-model-name=qwen36-local
+            # NOTE: the id literally contains spaces ("qwen 3.8 - local"), per
+            # request; clients must send it exactly. The kagent HelmRelease
+            # provider was updated in the same commit; the old qwen36-local id
+            # is retired.
+            - --served-model-name=qwen 3.8 - local
             # NOTE: --quantization is intentionally OMITTED. This checkpoint is
             # compressed-tensors NVFP4 and vLLM auto-detects it from the config;
             # forcing modelopt (the 35B's quant) would mis-load the weights.
@@ -86,7 +90,7 @@ spec:
             # long context.
             - --kv-cache-dtype=fp8
             # 173K context (177184 tokens). This is vLLM's MEASURED ceiling for
-            # the unsloth quant at util 0.96 on v0.27.1 (2026-08-15): the engine
+            # the 3.6 unsloth quant at util 0.96 on v0.27.1 (2026-08-15): the engine
             # profiled 5.71GiB of available KV and refused to boot at 229376
             # ("7.32 GiB KV cache is needed ... estimated maximum model length
             # is 177184"). The July 80K ceiling for this quant is stale: v0.27.1
@@ -138,13 +142,14 @@ spec:
             - --max-num-seqs=8
             - --max-cudagraph-capture-size=8
             - --enable-prefix-caching
-            # Qwen3.6's hybrid (Gated-DeltaNet) arch may ship custom modeling
+            # Qwen3.8's hybrid (Gated-DeltaNet) arch may ship custom modeling
             # code; the model card sets trust-remote-code. NOTE: executes repo
             # Python.
             - --trust-remote-code
-            # Qwen3.6 tool-call + reasoning parsers, per the Qwen3.6-27B model
-            # card (the dense 27B uses the qwen3_coder tool parser -- NOT the
-            # 35B's qwen3_xml; reasoning parser stays qwen3).
+            # Qwen3.8 tool-call + reasoning parsers (same qwen3_5 arch family
+            # as 3.6, per the model card: the dense 27B uses the qwen3_coder
+            # tool parser -- NOT the 35B's qwen3_xml; reasoning parser stays
+            # qwen3).
             - --enable-auto-tool-choice
             - --tool-call-parser=qwen3_coder
             - --reasoning-parser=qwen3

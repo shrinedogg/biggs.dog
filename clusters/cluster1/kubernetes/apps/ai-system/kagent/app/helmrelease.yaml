@@ -153,7 +153,7 @@ spec:
         provider: OpenAI
         # Must match vLLM's --served-model-name (not the HuggingFace weights
         # path -- see vllm/app/deployment.yaml for why they differ).
-        model: "qwen36-local"
+        model: "qwen 3.8 - local"
         apiKeySecretRef: kagent-vllm
         apiKeySecretKey: OPENAI_API_KEY
         config:
