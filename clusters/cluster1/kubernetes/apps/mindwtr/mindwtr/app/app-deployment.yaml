@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: mindwtr-app
-          image: ghcr.io/dongdongbh/mindwtr-app:1.2.0
+          image: ghcr.io/dongdongbh/mindwtr-app:1.2.1
           ports:
             - containerPort: 5173
               name: http
