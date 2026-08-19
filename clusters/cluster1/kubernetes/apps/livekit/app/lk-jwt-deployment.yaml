@@ -28,7 +28,7 @@ spec:
       containers:
         - name: lk-jwt-service
           # v0.5.0 — pinned tag (no latest)
-          image: ghcr.io/element-hq/lk-jwt-service:0.5.0
+          image: ghcr.io/element-hq/lk-jwt-service:0.6.0
           imagePullPolicy: IfNotPresent
           env:
             - name: LIVEKIT_JWT_BIND
