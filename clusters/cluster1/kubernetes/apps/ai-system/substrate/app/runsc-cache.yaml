@@ -35,7 +35,7 @@ spec:
       # Run wherever the atelet DaemonSet runs (all nodes).
       containers:
       - name: stage
-        image: amazon/aws-cli:2.36.24
+        image: amazon/aws-cli:2.36.27
         env:
         - {name: AWS_ACCESS_KEY_ID, value: rustfsadmin}
         - {name: AWS_SECRET_ACCESS_KEY, value: rustfsadmin}
