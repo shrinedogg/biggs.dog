@@ -27,7 +27,7 @@ spec:
       hostUsers: false
       containers:
         - name: pocket-id
-          image: ghcr.io/pocket-id/pocket-id:v2.13.0
+          image: ghcr.io/pocket-id/pocket-id:v2.14.0
           env:
             # Public URL behind the agentgateway (TLS terminated at the gateway).
             - name: APP_URL
