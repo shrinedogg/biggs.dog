@@ -44,7 +44,6 @@ clusters/
 └── cluster1/                      # 🏠 On-prem bare-metal workload cluster (6 nodes)
     ├── flux-system/               # FluxInstance + sources
     └── kubernetes/apps/
-        ├── affine/                # Collaborative workspace
         ├── ai-system/             # vLLM + kagent agents + substrate runtime + Flux/VM/Exa MCP
         ├── auth/                  # SSO stack (Pocket ID + OAuth2 Proxy)
         ├── biggs/                 # Tribute
@@ -57,7 +56,6 @@ clusters/
         ├── livekit/             # LiveKit SFU (WebRTC media server for MatrixRTC)
         ├── kube-system/           # Cilium (BGP), CoreDNS, NFD, GPU plugins, storage
         ├── liquidctl/             # NZXT Kraken Elite AIO fan/pump control (nv-01)
-        ├── manticore/             # Full-text search
         ├── matrix/                # Continuwuity (Matrix)
         ├── media/                 # Emby, Bookboss, Ersatz, Nsyncd
         ├── mindwtr/               # Mindwtr notes PWA + self-hosted sync server
@@ -141,7 +139,7 @@ A single-node cluster hosted on UpCloud, exposed on the public WAN IP `87.58.147
 
 Both clusters run a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
 
-- **`cluster1`** — `network-policies-apps` (`policies/apps/`) covers lower-risk application namespaces (affine, auth, biggs, dragonfly, games, jitsi, manticore, matrix, media, renovate). `network-policies-infra` (`policies/infra/`) covers higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering only the Hubble relay/UI pods).
+- **`cluster1`** — `network-policies-apps` (`policies/apps/`) covers lower-risk application namespaces (auth, biggs, dragonfly, games, jitsi, matrix, media, renovate). `network-policies-infra` (`policies/infra/`) covers higher-risk infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering only the Hubble relay/UI pods).
 - **`cluster0`** — `network-policies-apps` covers auth (Dex), netbird, and omni. `network-policies-infra` covers networking (agentgateway), cert-manager, external-secrets, flux-system, and Cilium L2 announcement. Suspend independently with `flux suspend kustomization network-policies-infra` if the edge or control plane regresses.
 
 ### Identity & SSO
@@ -204,7 +202,6 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | **Media** | Emby, Bookboss, Ersatz, Nsyncd | Content & book management |
 | **Communication** | LiveKit SFU, Continuwuity (Matrix) | WebRTC media server for MatrixRTC & messaging |
 | **Task Management** | Mindwtr, mindwtr-agent | Offline PWA + self-hosted sync server; GTD agent with MCP tools |
-| **Productivity** | AFFiNE, Manticore Search | Collaborative workspace, full-text search |
 | **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast](#-dreamcast-game-streaming-stack)) |
 | **Game Servers** | Windrose Online | Persistent MMO on Wine backend |
 | **Hardware** | liquidctl | NZXT Kraken Elite AIO fan/pump curves on `nv-01` (privileged, raw USB HID) |
