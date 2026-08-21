@@ -22,8 +22,6 @@ resources:
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
   - barman-oci.yaml
-  - affine-oci.yaml
-  - manticore-repo.yaml
   - nvidia-repo.yaml
   - fenrir-git.yaml
   - fenrir-oci.yaml
