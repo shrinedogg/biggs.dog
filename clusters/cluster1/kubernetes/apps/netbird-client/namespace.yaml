@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: netbird-client
+  labels:
+    # The netbird client needs NET_ADMIN, /dev/net/tun and hostNetwork to create
+    # the WireGuard interface and install routes (it acts as a NetBird network
+    # router publishing cluster1's CIDRs to the mesh). All three are forbidden
+    # under `baseline` -- which is the correct level for the unprivileged
+    # netbird SERVER (that one runs in cluster0 of this repo, see
+    # clusters/cluster0/kubernetes/apps/netbird) -- so this client lives in a
+    # separate `privileged` namespace.
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged

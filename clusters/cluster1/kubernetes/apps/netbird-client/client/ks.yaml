@@ -1,0 +1,27 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app netbird-client
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/netbird-client/client/app
+  # prune: false matches both the repo-wide cutover posture (root sync pruning
+  # disabled, see flux-instance.yaml) and the biggs-sz netbird-client this was
+  # ported from. A hostPath-backed netbird state dir must not be orphaned from
+  # its peer identity by a careless delete.
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m
+  dependsOn:
+    # ClusterSecretStore (onepassword-connect) must exist for the setup-key
+    # ExternalSecret to materialise.
+    - name: secretstore
