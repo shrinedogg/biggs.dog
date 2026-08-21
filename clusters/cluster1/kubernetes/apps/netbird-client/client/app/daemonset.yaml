@@ -1,0 +1,200 @@
+# NetBird client as a privileged hostNetwork DaemonSet.
+#
+# cluster1 (biggs.dog) is the on-prem 6-node bare-metal workload cluster. This
+# DaemonSet puts one pod per node that:
+#   1. registers as a NetBird peer against the NetBird SERVER running in this
+#      repo's cluster0 (apps/netbird, exposed via agentgateway at
+#      https://netbird.biggs.dog), and
+#   2. acts as a NetBird NETWORK ROUTER, publishing cluster1's pod/service
+#      CIDRs to the mesh so other peers (cluster0's router, road-warriors) can
+#      reach cluster1 services through these nodes.
+#
+# === Management URL: public, NOT in-cluster ===
+# The netbird server runs in cluster0 (UpCloud edge, WAN 87.58.147.51), not in
+# this cluster. Management/signal gRPC is routed through the public hostname
+# (agentgateway terminates TLS, h2c to the server pod; 24h stream timeouts in
+# the cluster0 netbird app), and the certificate is publicly valid, so the
+# plain public URL is correct here. Name resolution works from these nodes via
+# the split-horizon chain documented in docs/NOTES.md: CoreDNS forwards
+# biggs.dog to k8s-gateway, whose fallthrough forwards unknown names (this one
+# is unknown to cluster DNS) to NextDNS -> public answer. Do NOT point
+# NB_MANAGEMENT_URL at netbird-server.netbird.svc.cluster.local: that Service
+# exists only in cluster0.
+#
+# === Why privileged + hostNetwork (and why NOT in the `netbird` namespace) ===
+# Bringing up the WireGuard interface + installing routes needs NET_ADMIN,
+# /dev/net/tun and hostNetwork, all forbidden under the `baseline` Pod Security
+# level (the netbird namespace in cluster0 is baseline -- correct for the
+# unprivileged server/dashboard), hence this separate `netbird-client`
+# namespace labelled `privileged`.
+#
+# === Cilium / network policy (intentionally none) ===
+# There is no cluster-wide default-deny on cluster1 (network-policies/ holds
+# per-namespace allow-lists only) and the host firewall is disabled (see
+# kube-system/cilium: kubeProxyReplacement=true, no enableHostFirewall).
+# A hostNetwork pod carries the reserved:host identity, not a pod-label
+# endpoint identity, so namespace CiliumNetworkPolicies wouldn't select it
+# anyway. A network router also needs unconstrained egress (management,
+# signal, relay, STUN, and dynamic P2P peer endpoints). We therefore
+# deliberately do NOT add a CiliumNetworkPolicy here -- the namespace defaults
+# to allow, which is correct for this component.
+#
+# === Publishing the cluster CIDRs (NetBird dashboard, not k8s) ===
+# The router role is configured server-side, not in this manifest:
+#   * Networks -> Network Resources: add cluster1's pod CIDR 10.244.0.0/16
+#     (from kube-system/cilium ipv4NativeRoutingCIDR) and the service CIDR
+#     (get it with: kubectl cluster-info dump | grep -i
+#     service-cluster-ip-range, or from the Omni cluster config).
+#   * Networks -> Network Routers: add a router whose peer is the "cluster1"
+#     peer this DaemonSet registers as (NB_HOSTNAME=cluster1), with masquerade
+#     ON so pods see traffic from the node IP (no return route needed in-pod).
+#     Keep it separate from cluster0's network resource; routing groups in the
+#     dashboard decide who reaches which cluster.
+#   * Access Control -> Policies: allow the peer groups that should reach
+#     those CIDRs (e.g. the cluster0 routing peer, road-warriors).
+# The client MUST NOT pass --disable-server-routes (default leaves them
+# enabled, which is what makes it act as a router). Do not add that flag.
+#
+# === On-prem NAT (UDM) note ===
+# cluster1 nodes sit on 192.168.2.0/24 behind the UDM. Direct P2P connections
+# rely on NetBird's NAT traversal (STUN + hole punching), which usually works
+# behind the UDM; if a peer pair cannot punch through, traffic falls back to
+# the relay (netbird-server on cluster0), which always works. A per-node UDP
+# 51820 port-forward on the UDM (NB_WIREGUARD_PORT, the WireGuard listen
+# port) is optional and only needed to guarantee direct connections.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: netbird-client
+  namespace: netbird-client
+  labels:
+    app.kubernetes.io/name: netbird-client
+    app.kubernetes.io/component: router
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: netbird-client
+      app.kubernetes.io/component: router
+  updateStrategy:
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: netbird-client
+        app.kubernetes.io/component: router
+    spec:
+      hostNetwork: true
+      # Resolve in-cluster DNS names where possible. Without this a
+      # hostNetwork pod uses the node's resolv.conf and won't resolve *.svc.
+      dnsPolicy: ClusterFirstWithHostNet
+      terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: sysctl
+          image: busybox:1.36
+          securityContext:
+            privileged: true
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              # IP forwarding is mandatory for a subnet router. Cilium already
+              # sets net.ipv4.ip_forward=1 on the node (kubeProxyReplacement);
+              # this is idempotent insurance against a node where it isn't.
+              # rp_filter=2 (loose) avoids asymmetric-route drops for traffic
+              # in via wt0 / out via the node NIC -- a classic VPN-router
+              # failure mode. If you hit rp_filter-related oddities, the
+              # alternative is to leave this alone and set
+              # NB_USE_LEGACY_ROUTING=true on the netbird container.
+              sysctl -w net.ipv4.ip_forward=1 || true
+              sysctl -w net.ipv4.conf.all.rp_filter=2 || true
+      containers:
+        - name: netbird
+          # Client image; pinned to match the server release in this repo
+          # (clusters/cluster0/.../netbird: netbirdio/netbird-server:0.77.0).
+          # netbirdio/netbird and netbirdio/netbird-server ship together;
+          # confirm the tag exists for the client image when bumping the
+          # server.
+          image: netbirdio/netbird:0.77.0
+          # Binary lives at /usr/local/bin/netbird in current images (moved
+          # from /go/bin/netbird in older releases -- the old path broke the
+          # pod with "exec: /go/bin/netbird: no such file or directory"). We
+          # invoke the binary directly, bypassing the image's
+          # netbird-entrypoint.sh (which wraps `service run` + `up` in a bash
+          # supervisor): foreground mode runs the daemon in-process as a
+          # single PID, which is the k8s-native shape. All config comes from
+          # NB_* env vars (precedence: env > flag > config file).
+          command: ["/usr/local/bin/netbird"]
+          args: ["up", "--foreground-mode"]
+          env:
+            - name: NB_MANAGEMENT_URL
+              # Public endpoint of the netbird server in cluster0. See the
+              # header: do not use the in-cluster Service name, it only
+              # resolves inside cluster0.
+              value: "https://netbird.biggs.dog"
+            - name: NB_ADMIN_URL
+              value: "https://netbird.biggs.dog"
+            - name: NB_SETUP_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: netbird-client-setup-key
+                  key: setup-key
+            - name: NB_CONFIG
+              value: "/var/lib/netbird/config.json"
+            - name: NB_STATE_DIR
+              value: "/var/lib/netbird"
+            - name: NB_HOSTNAME
+              # Must be unique in the NetBird network: the biggs-sz cluster0
+              # router already registers as "cluster0". This is the name to
+              # pick as the routing peer when configuring a Network Router.
+              value: "cluster1"
+            - name: NB_LOG_FILE
+              value: "console"
+            - name: NB_LOG_LEVEL
+              value: "info"
+            # --- hostNetwork hygiene: do NOT rewrite the node's config ---
+            # The client would otherwise inject mesh DNS into /etc/resolv.conf
+            # and write /etc/ssh/ssh_config.d/99-netbird.conf ON THE NODE,
+            # which could break node/kubelet DNS. A pure subnet router doesn't
+            # need either, so disable both.
+            - name: NB_DISABLE_DNS
+              value: "true"
+            - name: NB_DISABLE_SSH_CONFIG
+              value: "true"
+          securityContext:
+            privileged: true
+            capabilities:
+              add: [NET_ADMIN, SYS_ADMIN, NET_RAW]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          volumeMounts:
+            - name: tun
+              mountPath: /dev/net/tun
+            - name: state
+              mountPath: /var/lib/netbird
+          # NOTE: no readiness/liveness probe. The natural check,
+          # `netbird status --check ready`, needs the daemon's unix socket
+          # (/var/run/netbird.sock), which foreground mode does NOT create
+          # (verified on 0.74.3: no socket in /var/run, none in
+          # /proc/net/unix across the host netns; status CLI fails with
+          # "failed to connect to daemon"). A probe that can never succeed
+          # keeps every pod NotReady forever and fails the Flux health check.
+          # Health signal is the process itself: a hung/exited daemon
+          # crash-loops the container and shows in DS status/restarts.
+      volumes:
+        - name: tun
+          hostPath:
+            path: /dev/net/tun
+            type: CharDevice
+        - name: state
+          # Persist WireGuard keypair + login so pod restarts reuse the same
+          # peer rather than re-registering. Talos keeps /var on the
+          # EPHEMERAL partition (writable, persists across reboots; a node
+          # reset wipes it, after which the setup key re-registers the peer).
+          hostPath:
+            path: /var/lib/netbird-client
+            type: DirectoryOrCreate
