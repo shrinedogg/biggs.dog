@@ -90,7 +90,7 @@ spec:
       terminationGracePeriodSeconds: 30
       initContainers:
         - name: sysctl
-          image: busybox:1.36
+          image: busybox:1.38
           securityContext:
             privileged: true
           command:
