@@ -27,7 +27,7 @@ spec:
       containers:
         - name: netbird
           # NOTE: netbird-server tags have no "v" prefix.
-          image: netbirdio/netbird-server:0.77.0
+          image: netbirdio/netbird-server:0.77.1
           # Image ENTRYPOINT is /go/bin/netbird-server; only override the CMD.
           args: ["--config", "/etc/netbird/config.yaml"]
           ports:
