@@ -115,7 +115,7 @@ spec:
           # netbirdio/netbird and netbirdio/netbird-server ship together;
           # confirm the tag exists for the client image when bumping the
           # server.
-          image: netbirdio/netbird:0.77.0
+          image: netbirdio/netbird:0.77.1
           # Binary lives at /usr/local/bin/netbird in current images (moved
           # from /go/bin/netbird in older releases -- the old path broke the
           # pod with "exec: /go/bin/netbird: no such file or directory"). We
