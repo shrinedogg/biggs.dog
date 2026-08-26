@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://ghcr.io/kagent-dev/substrate/helm/substrate-crds
   ref:
-    tag: "0.0.20"
+    tag: "0.0.21"
