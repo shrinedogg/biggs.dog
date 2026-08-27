@@ -41,7 +41,7 @@ spec:
       containers:
         - name: vllm
           # CUDA 12.9 build supports the 5090 (Blackwell, sm_120).
-          image: docker.io/vllm/vllm-openai:v0.27.1
+          image: docker.io/vllm/vllm-openai:v0.28.0
           args:
             # ----------------------------------------------------------------
             # MODEL: unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
