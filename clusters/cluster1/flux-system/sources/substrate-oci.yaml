@@ -14,4 +14,4 @@ spec:
     # namespace (substrate runs in ai-system on this cluster). Renovate bumps
     # are grouped + automerge:false — see the substrate-stack rule in
     # renovate.json for the full migration checklist.
-    tag: "0.0.20"
+    tag: "0.0.21"

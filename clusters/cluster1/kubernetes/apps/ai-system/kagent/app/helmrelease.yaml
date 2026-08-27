@@ -222,7 +222,7 @@ spec:
       # feature gates — the worker CrashLoops with "atunnel: reading credential
       # bundle: ... no such file or directory". Renovate bumps for the whole
       # substrate stack are grouped + automerge:false (see renovate.json).
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.20
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21
       template:
         spec:
           nodeSelector:
