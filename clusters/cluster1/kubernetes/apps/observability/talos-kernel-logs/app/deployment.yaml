@@ -29,7 +29,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: vector
-          image: timberio/vector:0.57.0-distroless-libc
+          image: timberio/vector:0.58.0-distroless-libc
           args: ["--config", "/etc/vector/vector.yaml"]
           ports:
             - name: kmsg
