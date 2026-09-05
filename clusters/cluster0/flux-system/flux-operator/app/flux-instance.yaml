@@ -64,5 +64,4 @@ spec:
     url: "https://github.com/shrinedogg/biggs.dog.git"
     ref: "refs/heads/main"
     path: "clusters/cluster0"
-    provider: github
     pullSecret: "flux-github-pat"

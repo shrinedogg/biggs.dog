@@ -87,6 +87,13 @@ spec:
             proxy:
               disabled: true        # Cilium kubeProxyReplacement
           machine:
+            network:
+              # DHCP on this VLAN hands out lan-dns (192.168.6.16, cluster1)
+              # first; with cluster1 down the first resolver blackholes and
+              # every lookup stalls ~4s. Pin working upstreams.
+              nameservers:
+                - 192.168.2.1
+                - 45.90.28.232
             install:
               # The raw image is written to disk by the Tinkerbell workflow;
               # this value governs in-place upgrades (image from
