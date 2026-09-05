@@ -13,4 +13,4 @@ spec:
   # renovate: datasource=github-releases depName=sidero-community/cluster-api-bootstrap-provider-talos
   version: "v0.7.6"
   fetchConfig:
-    url: "https://github.com/sidero-community/cluster-api-bootstrap-provider-talos/releases"
+    url: "https://github.com/sidero-community/cluster-api-bootstrap-provider-talos/releases/v0.7.6/bootstrap-components.yaml"
