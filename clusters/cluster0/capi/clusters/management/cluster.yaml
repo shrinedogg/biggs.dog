@@ -1,0 +1,115 @@
+# Single-node Talos management cluster (biggs.dog cluster0), shape from
+# knr-ops mgmt/local-talos (#105): imperative (explicit controlPlaneRef), one
+# machine carrying the whole management plane. Site values are committed, per
+# the knr-ops management-cluster convention.
+#
+# Deltas vs knr-ops local-talos:
+# - CNI is Cilium (kube-proxy replacement), installed at create time by the
+#   ClusterResourceSet in cilium-crs.yaml, so cni.name=none + proxy.disabled
+#   are patched into the generated machine config.
+# - The TinkerbellCluster carries templateOverrideRef to a Talos-aware
+#   workflow (talos-workflow-template.yaml); CAPT's default template is
+#   Ubuntu/cloud-init and cannot install Talos.
+---
+apiVersion: cluster.x-k8s.io/v1beta2
+kind: Cluster
+metadata:
+  name: cluster0
+  namespace: default
+  labels:
+    biggs.dog/cluster: cluster0
+spec:
+  clusterNetwork:
+    pods:
+      cidrBlocks:
+        - 10.244.0.0/16
+    services:
+      cidrBlocks:
+        - 10.96.0.0/12
+    serviceDomain: cluster.local
+  controlPlaneEndpoint:
+    host: 192.168.2.31
+    port: 6443
+  controlPlaneRef:
+    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    kind: TalosControlPlane
+    name: cluster0
+  infrastructureRef:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: TinkerbellCluster
+    name: cluster0
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: TinkerbellCluster
+metadata:
+  name: cluster0
+  namespace: default
+spec:
+  # Talos-aware provisioning workflow. The referenced Template lives in the
+  # Tinkerbell cluster (external mode: cluster1), created by the bench-test
+  # task in the migration plan and re-applied there declaratively.
+  templateOverrideRef:
+    name: talos-metal
+    namespace: default
+---
+apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+kind: TalosControlPlane
+metadata:
+  name: cluster0
+  namespace: default
+spec:
+  replicas: 1
+  # renovate: datasource=github-releases depName=kubernetes/kubernetes
+  version: "v1.36.0"
+  infrastructureTemplate:
+    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    kind: TinkerbellMachineTemplate
+    name: cluster0
+  controlPlaneConfig:
+    controlplane:
+      generateType: controlplane
+      # Major.minor contract version only (docs/extending.md Talos rule).
+      # renovate: datasource=github-releases depName=siderolabs/talos
+      talosVersion: v1.14
+      strategicPatches:
+        - |
+          cluster:
+            allowSchedulingOnControlPlanes: true
+            apiServer:
+              certSANs:
+                - 192.168.2.31
+            network:
+              cni:
+                name: none          # Cilium via ClusterResourceSet (cilium-crs.yaml)
+            proxy:
+              disabled: true        # Cilium kubeProxyReplacement
+          machine:
+            install:
+              # The raw image is written to disk by the Tinkerbell workflow;
+              # this value governs in-place upgrades (image from
+              # status.installerImage via the CABPT handoff).
+              disk: /dev/nvme0n1
+            features:
+              kubePrism:
+                enabled: true
+                port: 7445
+            kubelet:
+              extraMounts:
+                - destination: /var/mnt/host-path
+                  type: bind
+                  source: /var/mnt/host-path
+                  options: [rbind, rshared, rw]
+---
+apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+kind: TinkerbellMachineTemplate
+metadata:
+  name: cluster0
+  namespace: default
+spec:
+  template:
+    spec:
+      # Direct hardware binding: the single management machine by its
+      # Tinkerbell Hardware CR name (cluster1 tinkerbell stack, ns default).
+      hardwareName: talos-mgmt-01
+      bootOptions:
+        bootMode: netboot

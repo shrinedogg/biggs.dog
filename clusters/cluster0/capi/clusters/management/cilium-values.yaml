@@ -1,0 +1,58 @@
+cgroup:
+  automount:
+    enabled: false
+  hostRoot: /sys/fs/cgroup
+cluster:
+  id: 2
+  name: cluster0
+cni:
+  exclusive: true
+devices: "eth+ enp+ enx+ eno+ ens+ bond+"
+ipam:
+  mode: kubernetes
+# Bypass the in-cluster Service VIP so the agent can reach the API server
+# before the datapath is up. "auto" resolves from the node's kubeconfig;
+# replace with the control-plane VIP if auto-detection fails on this
+# cluster.
+k8sServiceHost: localhost
+kubeProxyReplacement: true
+kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
+# cluster0 announces its LoadBalancer VIP via L2 (see
+# ../../networking/cilium-lb-ip-pool.yaml and cilium-l2-announcement.yaml),
+# unlike cluster1 which uses BGP.
+l2announcements:
+  enabled: true
+operator:
+  # Management cluster: keep a single operator replica so it schedules on
+  # small node counts (the chart default of 2 requires 2 schedulable nodes
+  # due to the operator's hostname anti-affinity).
+  replicas: 1
+  rollOutPods: true
+prometheus:
+  enabled: true
+  trustCRDsExist: true
+rollOutCiliumPods: true
+securityContext:
+  capabilities:
+    ciliumAgent:
+      - CHOWN
+      - KILL
+      - NET_ADMIN
+      - NET_RAW
+      - IPC_LOCK
+      - SYS_ADMIN
+      - SYS_RESOURCE
+      - PERFMON
+      - BPF
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    cleanCiliumState:
+      - NET_ADMIN
+      - SYS_ADMIN
+      - SYS_RESOURCE
+socketLB:
+  enabled: true
+  hostNamespaceOnly: true
+k8sServicePort: 7445

@@ -1,23 +1,7 @@
 ---
-apiVersion: kustomize.toolkit.fluxcd.io/v1
-kind: Kustomization
-metadata:
-  name: &app cert-manager
-  namespace: flux-system
-spec:
-  commonMetadata:
-    labels:
-      app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/app
-  prune: false
-  sourceRef:
-    kind: GitRepository
-    name: flux-system
-  wait: false
-  interval: 3m
-  retryInterval: 1m
-  timeout: 2m
----
+# The `cert-manager` Kustomization lives in capi/infrastructure/flux-ks.yaml
+# (single definition; the capi/ subtree must be a valid standalone Flux root
+# for the kind bootstrap cluster). Only the issuers stay here.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
