@@ -22,9 +22,13 @@ spec:
   endpointSelector: {}
   egress:
     - toEndpoints:
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: kube-system
-            k8s:k8s-app: coredns
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: In
+              values: [kube-system]
+            - key: k8s:k8s-app
+              operator: In
+              values: [coredns, kube-dns]
       toPorts:
         - ports:
             - port: "53"
@@ -58,6 +62,8 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+# CoreDNS label note: on fresh Talos the built-in CoreDNS pods carry
+# k8s-app: kube-dns (not coredns); DNS egress selectors match BOTH labels.
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
