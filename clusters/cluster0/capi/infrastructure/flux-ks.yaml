@@ -1,0 +1,46 @@
+---
+# cert-manager + capi-operator: the components CAPI needs underneath it.
+# cert-manager's Flux Kustomization is defined HERE (single definition) so the
+# capi/ subtree is a valid standalone Flux root for the kind bootstrap cluster;
+# the app manifests still live under kubernetes/apps/cert-manager. The issuers
+# Kustomization (kubernetes/apps/cert-manager/cert-manager/ks.yaml) depends on
+# this one.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app cert-manager
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/cert-manager/cert-manager/app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app capi-operator
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/capi/infrastructure/capi-operator
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m
+  dependsOn:
+    - name: cert-manager

@@ -1,0 +1,66 @@
+# knr-bootstrap configuration for biggs.dog cluster0 (on-prem Talos management
+# node). Consumed by the knr-ops bootstrap-rs binary as:
+#
+#   cd <this checkout>
+#   BOOTSTRAP_CONFIG=bootstrap.toml knr-bootstrap local-talos
+#
+# Field names mirror bootstrap-rs/src/config.rs. Environment name and kind
+# mirror knr-ops local-talos so the binary's environment-kind logic (kind
+# bootstrap -> GitHub-synced CAPI -> pivot to a single Talos node) applies
+# unchanged.
+
+[bootstrap]
+default-environment = "local-talos"
+git-branch = "main"
+kind-cluster = "mgmt"
+kind-context = "kind-mgmt"
+registry-name = "knr-registry"
+flux-namespace = "flux-system"
+github-pat-secret = "flux-github-pat"
+sops-age-secret = "sops-age"
+mgmt-namespace = "default"
+mgmt-context = "cluster0"
+
+[charts]
+# Chart versions installed imperatively before Flux exists. Must stay equal
+# to the HelmReleases that adopt them: flux-operator (clusters/cluster0/
+# flux-system/flux-operator/app/helmrelease.yaml chartRef), cert-manager
+# (kubernetes/apps/cert-manager/cert-manager/app/helmrelease.yaml), and
+# capi-operator (capi/infrastructure/capi-operator/helmrelease.yaml).
+flux-operator = "0.58.0"
+cert-manager = "1.21.1"
+capi-operator = "0.28.0"
+
+[environments.local-talos]
+kind = "local-talos"
+# GitHub sync, like knr-ops aws/local-talos: a physical machine cannot reach a
+# laptop-hosted registry. Requires GITHUB_TOKEN + GIT_REPO_URL in the env.
+sync = "github"
+# CAPI-only subtree: the kind bootstrap cluster must not deploy the cluster0
+# workloads (Cilium, Omni, ...). The management node widens its FluxInstance
+# path to clusters/cluster0 once after the pivot (migration plan Task 22).
+sync-path = "clusters/cluster0/capi"
+mgmt-cluster = "cluster0"
+# PXE install + first Talos boot takes longer than kind/EKS provisioning.
+mgmt-ready-timeout = "45m"
+infra-provider-namespace = "capt-system"
+# Well-known clusterctl name for the Tinkerbell infra provider.
+infra-provider-name = "tinkerbell-tinkerbell"
+provider-manifests = [
+  "clusters/cluster0/capi/capi-providers/capi-system/namespace.yaml",
+  "clusters/cluster0/capi/capi-providers/capi-system/providers.yaml",
+  "clusters/cluster0/capi/capi-providers/cabpt-system/namespace.yaml",
+  "clusters/cluster0/capi/capi-providers/cabpt-system/provider.yaml",
+  "clusters/cluster0/capi/capi-providers/cacppt-system/namespace.yaml",
+  "clusters/cluster0/capi/capi-providers/cacppt-system/provider.yaml",
+  "clusters/cluster0/capi/capi-providers/capt-system/namespace.yaml",
+  "clusters/cluster0/capi/capi-providers/capt-system/provider.yaml",
+]
+
+[environments.local-talos.teardown]
+# cluster0 owns no CAPI workload clusters.
+capi-workloads = []
+# Bare-metal semantics (knr-ops #105 scope item 8): teardown deletes the CAPI
+# objects so CAPT releases the Hardware back to the pool, but never wipes the
+# machine itself.
+hardware-release = true

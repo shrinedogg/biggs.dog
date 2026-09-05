@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Root of the CAPI management subtree. Synced standalone by the kind bootstrap
+# cluster (bootstrap.toml sync-path) and as part of clusters/cluster0 by the
+# management node after the pivot (the FluxInstance path is widened once
+# post-pivot; see the migration plan in .hermes/plans/).
+resources:
+  - sources
+  - infrastructure/flux-ks.yaml
+  - capi-providers/flux-ks.yaml
+  - clusters/flux-ks.yaml

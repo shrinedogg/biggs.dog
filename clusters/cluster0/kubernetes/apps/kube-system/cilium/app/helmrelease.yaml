@@ -38,11 +38,11 @@ spec:
     devices: "eth+ enp+ enx+ eno+ ens+ bond+"
     ipam:
       mode: kubernetes
-    # Bypass the in-cluster Service VIP so the agent can reach the API server
-    # before the datapath is up. "auto" resolves from the node's kubeconfig;
-    # replace with the control-plane VIP if auto-detection fails on this
-    # cluster.
-    k8sServiceHost: auto
+    # The node runs KubePrism on 7445 (Talos); the CRS bootstrap copy
+    # (capi/clusters/management/cilium-crs.yaml) is rendered from THESE
+    # values by check-cilium-crs.sh, so they must stay in sync.
+    k8sServiceHost: localhost
+    k8sServicePort: 7445
     kubeProxyReplacement: true
     kubeProxyReplacementHealthzBindAddr: 0.0.0.0:10256
     # cluster0 announces its LoadBalancer VIP via L2 (see
