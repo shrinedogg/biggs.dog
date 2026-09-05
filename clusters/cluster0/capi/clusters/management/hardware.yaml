@@ -19,6 +19,8 @@ kind: Hardware
 metadata:
   name: talos-mgmt-01
   namespace: default
+  labels:
+    biggs.dog/cluster0-machine: "true"
   annotations:
     v1alpha1.tinkerbell.org/provisioned: "true"
     hardware.tinkerbell.org/installer-image: factory.talos.dev/metal-installer/2bbb0f87bfbce0f6062ac47225f915a07e2362786727d85377ae7ccab636813c:v1.14.0

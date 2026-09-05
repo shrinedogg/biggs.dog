@@ -32,11 +32,11 @@ spec:
     host: 192.168.2.31
     port: 6443
   controlPlaneRef:
-    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    apiGroup: controlplane.cluster.x-k8s.io
     kind: TalosControlPlane
     name: cluster0
   infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    apiGroup: infrastructure.cluster.x-k8s.io
     kind: TinkerbellCluster
     name: cluster0
 ---
@@ -65,7 +65,7 @@ spec:
   machineTemplate:
     spec:
       infrastructureRef:
-        apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+        apiGroup: infrastructure.cluster.x-k8s.io
         kind: TinkerbellMachineTemplate
         name: cluster0
   controlPlaneConfig:
@@ -111,6 +111,10 @@ metadata:
 spec:
   template:
     spec:
-      # Direct hardware binding: the single management machine by its
-      # Tinkerbell Hardware CR name (hardware.yaml, same directory).
-      hardwareName: talos-mgmt-01
+      # Direct hardware binding: the single management machine, by label (the
+      # CAPT webhook forbids hardwareName in templates).
+      hardwareAffinity:
+        required:
+          - labelSelector:
+              matchLabels:
+                biggs.dog/cluster0-machine: "true"
