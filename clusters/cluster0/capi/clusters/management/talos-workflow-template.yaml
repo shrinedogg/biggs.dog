@@ -4,7 +4,7 @@
 # image and reboots. Talos then fetches its machine config from Hegel
 # (talos.config kernel arg, baked into the Image Factory schematic
 # d8e2d3d6...b673, created 2026-09-05 with talos.platform=metal and
-# extraKernelArgs talos.config=http://192.168.2.30:50061/2009-04-04/user-data).
+# extraKernelArgs talos.config=http://192.168.2.30:7080/2009-04-04/user-data).
 #
 # CAPT template precedence: TinkerbellMachine.spec.templateOverride >
 # Hardware annotation capt-template-override > TinkerbellCluster
@@ -37,7 +37,7 @@ spec:
             image: quay.io/tinkerbell/actions/image2disk:latest
             timeout: 1200
             environment:
-              IMG_URL: https://factory.talos.dev/image/d8e2d3d6d3fb0757a31733a853282f91ef7ad8596d1acb3e87fe88d188bdd673/v1.14.0/metal-amd64.raw.xz
+              IMG_URL: https://factory.talos.dev/image/3ae3a62ec7f0850f7a91ff15ea93ae4dc08ccb2dde627aaf83ee55b856b087cf/v1.14.0/metal-amd64.raw.xz
               DEST_DISK: /dev/nvme0n1
               COMPRESSED: "true"
           - name: "reboot"
