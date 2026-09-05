@@ -7,9 +7,10 @@
 # - CNI is Cilium (kube-proxy replacement), installed at create time by the
 #   ClusterResourceSet in cilium-crs.yaml, so cni.name=none + proxy.disabled
 #   are patched into the generated machine config.
-# - The TinkerbellCluster carries templateOverrideRef to a Talos-aware
-#   workflow (talos-workflow-template.yaml); CAPT's default template is
-#   Ubuntu/cloud-init and cannot install Talos.
+# - No Tinkerbell Workflow: cluster1 (the planned PXE host) is offline, so the
+#   node boots from a Talos ISO and pulls its config from Tootles (see
+#   hardware.yaml); CAPT's default workflow template is Ubuntu/cloud-init and
+#   could not install Talos anyway.
 ---
 apiVersion: cluster.x-k8s.io/v1beta2
 kind: Cluster
@@ -44,13 +45,9 @@ kind: TinkerbellCluster
 metadata:
   name: cluster0
   namespace: default
-spec:
-  # Talos-aware provisioning workflow. The referenced Template lives in the
-  # Tinkerbell cluster (external mode: cluster1), created by the bench-test
-  # task in the migration plan and re-applied there declaratively.
-  templateOverrideRef:
-    name: talos-metal
-    namespace: default
+# No workflow template: the Hardware carries the provisioned annotation, so
+# CAPT never creates a Tinkerbell Workflow (ISO-boot flow, see hardware.yaml).
+spec: {}
 ---
 apiVersion: controlplane.cluster.x-k8s.io/v1beta1
 kind: TalosControlPlane
@@ -109,7 +106,5 @@ spec:
   template:
     spec:
       # Direct hardware binding: the single management machine by its
-      # Tinkerbell Hardware CR name (cluster1 tinkerbell stack, ns default).
+      # Tinkerbell Hardware CR name (hardware.yaml, same directory).
       hardwareName: talos-mgmt-01
-      bootOptions:
-        bootMode: netboot
