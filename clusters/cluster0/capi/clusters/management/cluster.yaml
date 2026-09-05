@@ -86,53 +86,15 @@ spec:
                 name: none          # Cilium via ClusterResourceSet (cilium-crs.yaml)
             proxy:
               disabled: true        # Cilium kubeProxyReplacement
-            # Edge names resolve to the cluster0 gateway VIP in-cluster (public
-            # DNS still points at the retired UpCloud IP until the WAN cutover).
-            # Without this, Omni's OIDC discovery to dex.biggs.dog leaves the
-            # cluster and crashes the pod. Same coredns-custom pattern as
-            # cluster1's Omni template.
-            inlineManifests:
-              - name: coredns-custom
-                contents: |
-                  apiVersion: v1
-                  kind: ConfigMap
-                  metadata:
-                    name: coredns
-                    namespace: kube-system
-                  data:
-                    Corefile: |
-                      .:53 {
-                          errors
-                          health {
-                              lameduck 5s
-                          }
-                          ready
-                          log . {
-                              class error
-                          }
-                          prometheus :9153
-
-                          hosts {
-                              192.168.2.31 omni.biggs.dog dex.biggs.dog netbird.biggs.dog factory.biggs.dog home.biggs.dog
-                              fallthrough
-                          }
-
-                          kubernetes cluster.local in-addr.arpa ip6.arpa {
-                              pods insecure
-                              fallthrough in-addr.arpa ip6.arpa
-                              ttl 30
-                          }
-                          forward . /etc/resolv.conf {
-                             max_concurrent 1000
-                          }
-                          cache 30 {
-                             disable success cluster.local
-                             disable denial cluster.local
-                          }
-                          loop
-                          reload
-                          loadbalance
-                      }
+            # NOTE: the coredns edge-names hosts override (omni/dex/netbird/
+            # factory/home.biggs.dog -> 192.168.2.31, the gateway VIP) is a
+            # MANUAL post-bootstrap step, not an inlineManifest here: CABPT
+            # v0.6.4 has no in-place rollout strategy, so any
+            # controlPlaneConfig change replaces the control-plane machine.
+            # On this single-node cluster that reinstalls the node from the
+            # ISO. The live override is in the kube-system/coredns ConfigMap
+            # (same coredns-custom pattern as cluster1's Omni template);
+            # re-apply it after any node rebuild.
           machine:
             network:
               # DHCP on this VLAN hands out lan-dns (192.168.6.16, cluster1)
