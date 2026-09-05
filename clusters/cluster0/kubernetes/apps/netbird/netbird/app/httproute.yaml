@@ -10,6 +10,9 @@ metadata:
   namespace: netbird
   labels:
     app.kubernetes.io/name: netbird
+  annotations:
+    # external-dns CNAMEs this hostname to home.biggs.dog (ddns-maintained WAN IP)
+    external-dns.alpha.kubernetes.io/target: home.biggs.dog
 spec:
   parentRefs:
     - name: cluster0-gateway

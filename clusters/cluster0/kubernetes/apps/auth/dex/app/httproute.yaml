@@ -5,6 +5,9 @@ metadata:
   namespace: auth
   labels:
     app.kubernetes.io/name: dex
+  annotations:
+    # external-dns CNAMEs this hostname to home.biggs.dog (ddns-maintained WAN IP)
+    external-dns.alpha.kubernetes.io/target: home.biggs.dog
 spec:
   hostnames:
     - dex.biggs.dog

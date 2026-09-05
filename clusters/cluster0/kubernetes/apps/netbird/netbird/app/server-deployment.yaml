@@ -90,7 +90,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: upcloud-block-storage-maxiops
+  storageClassName: host-path
   resources:
     requests:
       storage: 1Gi
