@@ -1,0 +1,40 @@
+---
+# Tinkerbell workflow template for installing Talos on bare metal. CAPT's
+# generated default template is Ubuntu-shaped (oci2disk + cloud-init writefile
+# + kexec) and cannot install Talos; this override writes the Talos raw disk
+# image and reboots. Talos then fetches its machine config from Tootles via
+# the talos.config kernel arg baked into the Image Factory schematic
+# 3ae3a62e...87cf (talos.platform=metal,
+# talos.config=http://192.168.2.30:7080/2009-04-04/user-data).
+# Keep in sync with clusters/cluster0/capi/clusters/management/
+# talos-workflow-template.yaml (the CAPT-side copy).
+apiVersion: tinkerbell.org/v1alpha1
+kind: Template
+metadata:
+  name: talos-metal
+  namespace: default
+spec:
+  data: |
+    version: "0.1"
+    name: talos-metal
+    global_timeout: 3600
+    tasks:
+      - name: "install-talos"
+        worker: "{{.device_1}}"
+        volumes:
+          - /dev:/dev
+          - /dev/console:/dev/console
+        actions:
+          - name: "write-talos-raw-image"
+            # TODO(pin): pin by digest once the bench test passes
+            image: quay.io/tinkerbell/actions/image2disk:latest
+            timeout: 1200
+            environment:
+              IMG_URL: https://factory.talos.dev/image/3ae3a62ec7f0850f7a91ff15ea93ae4dc08ccb2dde627aaf83ee55b856b087cf/v1.14.0/metal-amd64.raw.xz
+              DEST_DISK: /dev/nvme0n1
+              COMPRESSED: "true"
+          - name: "reboot"
+            # TODO(pin): pin by digest once the bench test passes
+            image: quay.io/tinkerbell/actions/reboot:latest
+            timeout: 90
+            pid: host

@@ -1,0 +1,24 @@
+---
+# Talos provisioning workflow template, referenced by TinkerbellCluster
+# templateOverrideRef (cluster0 capi tree). Lives in the Tinkerbell cluster:
+# CAPT resolves the ref through its external Tinkerbell client.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app tinkerbell-templates
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/tinkerbell/templates/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: false
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+  dependsOn:
+    - name: tinkerbell

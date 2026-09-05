@@ -1,0 +1,40 @@
+---
+# The cluster0 management node (2026-09 migration). The name must equal
+# TinkerbellMachineTemplate.spec.template.spec.hardwareName in
+# clusters/cluster0/capi/clusters/management/cluster.yaml.
+# The installer-image annotation is consumed by the CAPT fork ->
+# TinkerbellMachine.status.installerImage -> CABPT machine.install.image and
+# governs in-place Talos upgrades. The initial install image is written by the
+# workflow template (../templates/).
+apiVersion: tinkerbell.org/v1alpha1
+kind: Hardware
+metadata:
+  name: talos-mgmt-01
+  namespace: default
+  annotations:
+    hardware.tinkerbell.org/installer-image: factory.talos.dev/metal-installer/3ae3a62ec7f0850f7a91ff15ea93ae4dc08ccb2dde627aaf83ee55b856b087cf:v1.14.0
+spec:
+  disks:
+    - device: /dev/nvme0n1
+  metadata:
+    instance:
+      hostname: cluster0-cp-01
+      id: 24:4b:fe:5c:d9:4a
+    facility:
+      facility_code: home
+  interfaces:
+    - dhcp:
+        arch: x86_64
+        hostname: cluster0-cp-01
+        ip:
+          address: 192.168.2.31
+          gateway: 192.168.2.1
+          netmask: 255.255.255.0
+        lease_time: 86400
+        mac: 24:4b:fe:5c:d9:4a
+        name_servers:
+          - 192.168.2.1
+        uefi: true
+      netboot:
+        allowPXE: true
+        allowWorkflow: true

@@ -1,0 +1,60 @@
+---
+# Tinkerbell v0.25.0: single deployment running Smee (DHCP/TFTP/iPXE), the
+# Tink server + controller, and Tootles (EC2-style metadata, Hegel successor)
+# behind one HTTP server on 7080. hostNetwork on control-01 so proxyDHCP sees
+# L2 broadcasts (the init macvlan relay is disabled). The UDM remains the
+# network's DHCP server; Smee runs in proxy mode and only answers PXE clients.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tinkerbell
+  namespace: tinkerbell
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: tinkerbell
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    publicIP: 192.168.2.30
+    trustedProxies: []
+    # HookOS artifact downloads for PXE-booting machines (osie nginx runs
+    # hostNetwork on control-01, port 7173).
+    artifactsFileServer: http://192.168.2.30:7173
+    deployment:
+      hostNetwork: true
+      nodeSelector:
+        kubernetes.io/hostname: control-01
+      init:
+        enabled: false
+      envs:
+        globals:
+          publicIpv4: 192.168.2.30
+          enableRufioController: false   # no BMC on the target machine
+          enableSecondstar: false
+          enableUI: false
+        smee:
+          dhcpMode: proxy                # UDM keeps issuing leases
+          dhcpIPForPacket: 192.168.2.30
+          dhcpSyslogIP: 192.168.2.30
+          dhcpTftpIP: 192.168.2.30
+          dhcpIpxeHttpBinaryHost: 192.168.2.30
+          dhcpIpxeHttpScriptHost: 192.168.2.30
+          ipxeScriptTinkServerAddrPort: 192.168.2.30:42113
+    service:
+      enabled: false                     # hostNetwork replaces the LB
+    optional:
+      kubevip:
+        enabled: false
+      osie:
+        hostNetwork: true
+        nodeSelector:
+          kubernetes.io/hostname: control-01

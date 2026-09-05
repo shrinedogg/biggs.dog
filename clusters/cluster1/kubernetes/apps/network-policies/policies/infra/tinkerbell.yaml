@@ -1,0 +1,57 @@
+# Namespace: tinkerbell (temporary cluster0 bootstrap infra).
+# The tinkerbell pod runs hostNetwork, which bypasses Cilium endpoint policy;
+# these rules document intent and cover any non-hostNetwork pods in the
+# namespace. Default-deny is implicit via endpointSelector: {}.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-tinkerbell
+  namespace: tinkerbell
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - kube-apiserver
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: coredns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    # hookos artifact download + action images (one-time, image pulls go to
+    # registries through the node's own egress, but the pod also fetches the
+    # hook artifacts tarball)
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Tootles metadata + smee iPXE HTTP from the LAN (the PXE-booting machine,
+# future Talos machines), Tink gRPC from HookOS workers, TFTP/proxyDHCP are
+# host-network UDP and not Cilium-policed.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-tinkerbell
+  namespace: tinkerbell
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromCIDR:
+        - 192.168.2.0/24
+      toPorts:
+        - ports:
+            - port: "7080"
+              protocol: TCP
+            - port: "42113"
+              protocol: TCP

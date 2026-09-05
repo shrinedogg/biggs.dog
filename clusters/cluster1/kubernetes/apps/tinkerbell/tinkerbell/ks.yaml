@@ -1,0 +1,22 @@
+---
+# Temporary Tinkerbell stack for PXE-installing the cluster0 management node
+# (2026-09 migration). Runs hostNetwork on control-01. Removed when Tinkerbell
+# relocates to cluster0 (plan Phase F).
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app tinkerbell
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/tinkerbell/tinkerbell/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m

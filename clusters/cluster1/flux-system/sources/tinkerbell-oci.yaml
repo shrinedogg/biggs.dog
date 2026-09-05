@@ -1,0 +1,13 @@
+---
+# OCI chart source for the Tinkerbell stack (temporary cluster0 bootstrap
+# infra; removed when Tinkerbell relocates to cluster0).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: tinkerbell
+  namespace: flux-system
+spec:
+  interval: 12h
+  url: oci://ghcr.io/tinkerbell/charts/tinkerbell
+  ref:
+    tag: v0.25.0
