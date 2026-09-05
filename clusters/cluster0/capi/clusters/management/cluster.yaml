@@ -32,11 +32,11 @@ spec:
     host: 192.168.2.31
     port: 6443
   controlPlaneRef:
-    apiVersion: controlplane.cluster.x-k8s.io/v1beta1
+    apiGroup: controlplane.cluster.x-k8s.io
     kind: TalosControlPlane
     name: cluster0
   infrastructureRef:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
+    apiGroup: infrastructure.cluster.x-k8s.io
     kind: TinkerbellCluster
     name: cluster0
 ---
@@ -58,10 +58,16 @@ spec:
   replicas: 1
   # renovate: datasource=github-releases depName=kubernetes/kubernetes
   version: "v1.36.0"
-  infrastructureTemplate:
-    apiVersion: infrastructure.cluster.x-k8s.io/v1beta1
-    kind: TinkerbellMachineTemplate
-    name: cluster0
+  # CACPPT v0.6.4 serves v1beta1 (storage) with the modern CAPI v1beta2 KCP
+  # layout: the infra reference lives at machineTemplate.spec.infrastructureRef
+  # (the v1alpha3 field infrastructureTemplate only exists on the v1alpha3
+  # schema; knr-ops's v1beta1+v1alpha3 hybrid fails CRD validation).
+  machineTemplate:
+    spec:
+      infrastructureRef:
+        apiGroup: infrastructure.cluster.x-k8s.io
+        kind: TinkerbellMachineTemplate
+        name: cluster0
   controlPlaneConfig:
     controlplane:
       generateType: controlplane
@@ -105,6 +111,10 @@ metadata:
 spec:
   template:
     spec:
-      # Direct hardware binding: the single management machine by its
-      # Tinkerbell Hardware CR name (hardware.yaml, same directory).
-      hardwareName: talos-mgmt-01
+      # Direct hardware binding: the single management machine, by label (the
+      # CAPT webhook forbids hardwareName in templates).
+      hardwareAffinity:
+        required:
+          - labelSelector:
+              matchLabels:
+                biggs.dog/cluster0-machine: "true"
