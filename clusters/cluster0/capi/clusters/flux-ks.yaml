@@ -23,6 +23,7 @@ spec:
     name: flux-system
   path: ./clusters/cluster0/capi/clusters/management
   dependsOn:
+    - name: tinkerbell
     - name: cacppt-system
     - name: capt-system
     - name: cabpt-system

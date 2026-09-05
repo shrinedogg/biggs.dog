@@ -1,0 +1,49 @@
+---
+# The cluster0 management node. Name must equal
+# TinkerbellMachineTemplate.spec.template.spec.hardwareName (cluster.yaml).
+#
+# ISO-boot flow (no PXE, cluster1 offline): the machine is booted from
+#   https://factory.talos.dev/image/<schematic>/v1.14.0/metal-amd64.iso
+# (schematic bakes talos.platform=metal and
+# talos.config=http://192.168.3.150:7080/tootles/instanceID/talos-mgmt-01/2009-04-04/user-data,
+# the operator Mac running the kind bootstrap cluster); Talos fetches its config from Tootles by
+# instance ID (spec.metadata.instance.id). The provisioned annotation makes
+# CAPT skip the Tinkerbell Workflow (nothing runs HookOS here) and mark the
+# TinkerbellMachine Ready as soon as it has written userData; Talos performs
+# the install itself (machine.install.disk from the CABPT config).
+#
+# installer-image is mirrored by the CAPT fork into status.installerImage and
+# consumed by CABPT as machine.install.image (initial install AND upgrades).
+apiVersion: tinkerbell.org/v1alpha1
+kind: Hardware
+metadata:
+  name: talos-mgmt-01
+  namespace: default
+  annotations:
+    v1alpha1.tinkerbell.org/provisioned: "true"
+    hardware.tinkerbell.org/installer-image: factory.talos.dev/metal-installer/2bbb0f87bfbce0f6062ac47225f915a07e2362786727d85377ae7ccab636813c:v1.14.0
+spec:
+  disks:
+    - device: /dev/nvme0n1
+  metadata:
+    instance:
+      id: talos-mgmt-01
+      hostname: cluster0-cp-01
+    facility:
+      facility_code: home
+  interfaces:
+    - dhcp:
+        arch: x86_64
+        hostname: cluster0-cp-01
+        ip:
+          address: 192.168.2.31
+          gateway: 192.168.2.1
+          netmask: 255.255.255.0
+        lease_time: 86400
+        mac: 24:4b:fe:5c:d9:4a
+        name_servers:
+          - 192.168.2.1
+        uefi: true
+      netboot:
+        allowPXE: false
+        allowWorkflow: false

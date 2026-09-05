@@ -1,0 +1,55 @@
+---
+# Tinkerbell in "metadata-only" mode, colocated with CAPT (local mode, no
+# external kubeconfig). cluster1 is offline (2026-09-05), so there is no LAN
+# PXE stack: the management node boots from a Talos ISO whose schematic bakes
+#   talos.config=http://<host>:7080/tootles/instanceID/talos-mgmt-01/2009-04-04/user-data
+# Tootles resolves the Hardware by spec.metadata.instance.id (instanceEndpoint
+# route), so the client IP (NATed by Docker Desktop while on kind) does not
+# matter. CAPT writes the CABPT machine config into Hardware.spec.userData;
+# Talos fetches it, installs itself, and bootstraps.
+#
+# Smee, HookOS, Rufio, Secondstar, UI: disabled (no PXE, no BMC). Only the
+# Tink server/controller (CRDs, Workflow no-op) and Tootles run, hostNetwork
+# on 7080. On kind: reach it via a docker port publisher on the kind network
+# (plan Task 19). After the pivot: 192.168.2.31:7080 directly.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: tinkerbell
+  namespace: tinkerbell
+spec:
+  interval: 10m
+  chartRef:
+    kind: OCIRepository
+    name: tinkerbell
+    namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    trustedProxies: []
+    deployment:
+      hostNetwork: true
+      init:
+        enabled: false
+      envs:
+        globals:
+          publicIpv4: 192.168.2.31
+          enableSmee: false
+          enableRufioController: false
+          enableSecondstar: false
+          enableUI: false
+        tootles:
+          instanceEndpoint: true
+    service:
+      enabled: false
+    optional:
+      kubevip:
+        enabled: false
+      hookos:
+        enabled: false
