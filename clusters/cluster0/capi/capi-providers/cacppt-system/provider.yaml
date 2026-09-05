@@ -10,4 +10,4 @@ spec:
   # renovate: datasource=github-releases depName=sidero-community/cluster-api-control-plane-provider-talos
   version: "v0.6.4"
   fetchConfig:
-    url: "https://github.com/sidero-community/cluster-api-control-plane-provider-talos/releases"
+    url: "https://github.com/sidero-community/cluster-api-control-plane-provider-talos/releases/v0.6.4/control-plane-components.yaml"
