@@ -97,6 +97,13 @@ spec:
                 enabled: true
                 port: 7445
             kubelet:
+              # CAPI node matching: CAPT replaces PROVIDER_ID with
+              # tinkerbell://<ns>/<hardware-name> when it stores the config on
+              # Hardware.spec.userData, so the kubelet registers with the
+              # providerID the Machine object carries. Without this the Machine
+              # never gains a nodeRef and clusterctl move refuses to run.
+              extraConfig:
+                providerID: PROVIDER_ID
               extraMounts:
                 - destination: /var/mnt/host-path
                   type: bind
