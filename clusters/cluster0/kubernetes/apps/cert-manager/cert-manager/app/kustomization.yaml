@@ -1,0 +1,10 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Reconciled by the `cert-manager` Flux Kustomization defined in
+# clusters/cluster0/capi/infrastructure/flux-ks.yaml, which also runs on the
+# kind bootstrap cluster (no external-secrets there): keep this directory to
+# the namespace + HelmRelease only. The cloudflare-api-token ExternalSecret
+# lives with its consumers in ../issuers.
+resources:
+  - namespace.yaml
+  - helmrelease.yaml
