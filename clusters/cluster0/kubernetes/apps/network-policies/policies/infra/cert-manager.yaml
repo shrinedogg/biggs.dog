@@ -70,6 +70,10 @@ spec:
   egress:
     - toFQDNs:
         - matchName: api.cloudflare.com
+        # ACME issuers: account registration + DNS-01 order flow (cluster1 has
+        # no cert-manager CNP, so this was never covered there either).
+        - matchName: acme-v02.api.letsencrypt.org
+        - matchName: acme-staging-v02.api.letsencrypt.org
       toPorts:
         - ports:
             - port: "443"
