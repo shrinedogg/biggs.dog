@@ -17,6 +17,14 @@ data:
     biggs.dog:1053 {
         errors
         cache 30
+        # cluster0 on-prem cutover (2026-09 migration, plan Task 24): the four
+        # edge names move from the UpCloud public IP to the cluster0 node address. Uncomment
+        # in the same commit that flips Cloudflare to the ddns CNAMEs so LAN
+        # clients skip the WAN hairpin entirely.
+        # hosts {
+        #     192.168.2.31 omni.biggs.dog dex.biggs.dog netbird.biggs.dog factory.biggs.dog
+        #     fallthrough
+        # }
         # Forward to k8s-gateway's ClusterIP (NOT its .6.6 LB VIP): a pod reaching
         # a LoadBalancer VIP whose backend is on the SAME node hits a Cilium
         # hairpin failure, so the lan-dns replica co-located with k8s-gateway got

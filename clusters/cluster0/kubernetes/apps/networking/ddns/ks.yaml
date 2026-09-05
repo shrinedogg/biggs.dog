@@ -1,13 +1,16 @@
+---
+# Keeps home.biggs.dog -> current WAN IP (external-dns CNAMEs the edge
+# hostnames to it). SUSPENDED until the cutover step (see external-dns/ks.yaml).
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: &app image-factory
+  name: &app ddns
   namespace: flux-system
 spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/omni/image-factory/app
+  path: ./clusters/cluster0/kubernetes/apps/networking/ddns/app
   prune: false
   sourceRef:
     kind: GitRepository
@@ -16,9 +19,6 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 5m
+  suspend: true
   dependsOn:
-    - name: openebs
     - name: secretstore
-    - name: issuers
-    - name: agentgateway
-    - name: dex

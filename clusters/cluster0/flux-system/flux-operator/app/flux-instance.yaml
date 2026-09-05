@@ -65,4 +65,4 @@ spec:
     ref: "refs/heads/main"
     path: "clusters/cluster0"
     provider: github
-    pullSecret: "flux-system"
+    pullSecret: "flux-github-pat"

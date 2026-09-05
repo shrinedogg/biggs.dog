@@ -5,6 +5,10 @@ metadata:
   namespace: networking
 spec:
   gatewayClassName: agentgateway
+  infrastructure:
+    annotations:
+      lbipam.cilium.io/ips: 192.168.2.31
+      lbipam.cilium.io/sharing-key: cluster0-edge
   listeners:
     - hostname: omni.biggs.dog
       name: omni-https

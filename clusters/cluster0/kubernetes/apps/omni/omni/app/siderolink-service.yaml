@@ -1,19 +1,13 @@
 # SideroLink exposure (machine enrollment): machine-api/event-sink/k8s-proxy
 # (TCP 8090/8091/8100) + WireGuard (UDP 50180).
 #
-# The UpCloud Managed Load Balancer (type: LoadBalancer via the UpCloud CCM)
-# only supports TCP/HTTP frontends -- there is NO UDP mode (product-level
-# limitation). Because this Service includes UDP 50180, a LoadBalancer stays
-# pending forever (SyncLoadBalancerFailed, LB stuck at 'setup-server') -- the
-# same root cause as netbird-stun. agentgateway can't route UDP either. So
-# SideroLink is exposed directly on the node's public IP instead.
-#
-# 87.58.147.51 is bound on the node's eth2 (verified), and the single node owns
-# it, so externalIPs makes Cilium (kube-proxy-replacement) serve all four ports
-# (TCP + UDP) on the node's public NIC -> the omni pod. omni advertises
-# WireGuard at 87.58.147.51:50180 (--siderolink-wireguard-advertised-addr), so
-# this matches what machines are told to use. Reachability needs the UpCloud
-# firewall to allow inbound 8090/8091/8100 TCP + 50180 UDP. No cloud LB involved.
+# On-prem single-node cluster0 (2026-09 migration): the Cilium LB address is
+# the node's own IP 192.168.2.31 (cilium-lb-ip-pool.yaml), shared with the
+# agentgateway Service via the lbipam sharing key, so one address fronts all
+# edge protocols.
+# Machines (all on the LAN) reach SideroLink directly on the VIP, matching
+# --siderolink-wireguard-advertised-addr=192.168.2.31:50180. No WAN exposure:
+# nothing is forwarded from the UDM for these ports.
 apiVersion: v1
 kind: Service
 metadata:
@@ -21,10 +15,11 @@ metadata:
   namespace: omni
   labels:
     app.kubernetes.io/name: omni
+  annotations:
+    lbipam.cilium.io/ips: 192.168.2.31
+    lbipam.cilium.io/sharing-key: cluster0-edge
 spec:
-  type: ClusterIP
-  externalIPs:
-    - 87.58.147.51 # node eth2 public IP (single-node cluster0)
+  type: LoadBalancer
   selector:
     app.kubernetes.io/name: omni
   ports:

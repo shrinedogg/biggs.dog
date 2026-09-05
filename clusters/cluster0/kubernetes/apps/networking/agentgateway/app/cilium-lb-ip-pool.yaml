@@ -7,4 +7,4 @@ metadata:
   name: cluster0-lb-ip-pool
 spec:
   blocks:
-    - cidr: 87.58.147.51/32
+    - cidr: 192.168.2.31/32

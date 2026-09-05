@@ -5,6 +5,8 @@ resources:
   - flux-operator-repo.yaml
   # cert-manager HelmRepository moved to capi/sources/ (single definition).
   - external-secrets-repo.yaml
+  - openebs-repo.yaml
+  - external-dns-repo.yaml
   - onepass-repo.yaml
   - cilium-repo.yaml
   - gateway-api-crds-git.yaml

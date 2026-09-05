@@ -1,0 +1,58 @@
+---
+# Local-path storage for the single-node Talos cluster0: backs the Omni
+# (etcd/sqlite), Image Factory registry, and NetBird PVCs. The basePath is
+# bind-mounted into the kubelet by the TalosControlPlane patch
+# (capi/clusters/management/cluster.yaml). host-path is the default SC; the
+# legacy upcloud-block-storage-maxiops name is gone (see netbird
+# server-deployment).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: openebs
+  namespace: openebs-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: openebs
+      version: 4.6.0
+      sourceRef:
+        kind: HelmRepository
+        name: openebs
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    alloy:
+      enabled: false
+    openebs-crds:
+      csi:
+        volumeSnapshots:
+          enabled: false # snapshot-controller manages those CRDs
+    localpv-provisioner:
+      localpv:
+        basePath: /var/mnt/host-path
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+      hostpathClass:
+        name: host-path
+        isDefaultClass: true
+      analytics:
+        enabled: false
+      helperPod:
+        image:
+          registry: quay.io/
+    zfs-localpv:
+      enabled: false
+    lvm-localpv:
+      enabled: false
+    mayastor:
+      enabled: false

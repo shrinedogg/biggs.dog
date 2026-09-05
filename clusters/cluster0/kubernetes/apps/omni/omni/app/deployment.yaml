@@ -59,9 +59,9 @@ spec:
             - --etcd-embedded-db-path=/_out/omni-etcd/
             - --sqlite-storage-path=/_out/sqlite/sqlite.db
             - --advertised-api-url=https://omni.biggs.dog/
-            - --machine-api-advertised-url=https://omni.biggs.dog:8090/
-            - --siderolink-wireguard-advertised-addr=87.58.147.51:50180
-            - --advertised-kubernetes-proxy-url=https://omni.biggs.dog:8100/
+            - --machine-api-advertised-url=https://192.168.2.31:8090/
+            - --siderolink-wireguard-advertised-addr=192.168.2.31:50180
+            - --advertised-kubernetes-proxy-url=https://192.168.2.31:8100/
             - --auth-auth0-enabled=false
             - --auth-oidc-enabled=true
             - --auth-oidc-provider-url=https://dex.biggs.dog
