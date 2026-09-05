@@ -50,9 +50,27 @@ spec:
       helperPod:
         image:
           registry: quay.io/
+    # cluster0 wants ONLY localpv-provisioner (hostpath). The 4.6.0 umbrella
+    # chart deploys the etcd/nats/loki/minio/diskpool stack and the zfs+lvm
+    # node DaemonSets unless both the legacy flags and the engines block say
+    # no (helm install timed out on all of them on the single node; the zfs
+    # node DS crashloops without a zpool).
     zfs-localpv:
       enabled: false
     lvm-localpv:
       enabled: false
     mayastor:
       enabled: false
+    loki:
+      enabled: false
+    minio:
+      enabled: false
+    engines:
+      local:
+        lvm:
+          enabled: false
+        zfs:
+          enabled: false
+      replicated:
+        mayastor:
+          enabled: false
