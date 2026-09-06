@@ -74,6 +74,14 @@ spec:
       # Major.minor contract version only (docs/extending.md Talos rule).
       # renovate: datasource=github-releases depName=siderolabs/talos
       talosVersion: v1.14
+      # WARNING: every byte inside strategicPatches is hashed by CABPT --
+      # comments included. Changing anything here (even a comment) replaces
+      # the control-plane MACHINE (no in-place strategy in v0.6.4), which on
+      # this single-node cluster means reinstalling the node from the ISO.
+      # Related: the coredns edge-names hosts override (omni/dex/netbird/
+      # factory/home.biggs.dog -> 192.168.2.31, the gateway VIP) is a MANUAL
+      # post-bootstrap step in the kube-system/coredns ConfigMap, NOT an
+      # inlineManifest here, for exactly this reason. Re-apply after rebuilds.
       strategicPatches:
         - |
           cluster:
@@ -86,15 +94,6 @@ spec:
                 name: none          # Cilium via ClusterResourceSet (cilium-crs.yaml)
             proxy:
               disabled: true        # Cilium kubeProxyReplacement
-            # NOTE: the coredns edge-names hosts override (omni/dex/netbird/
-            # factory/home.biggs.dog -> 192.168.2.31, the gateway VIP) is a
-            # MANUAL post-bootstrap step, not an inlineManifest here: CABPT
-            # v0.6.4 has no in-place rollout strategy, so any
-            # controlPlaneConfig change replaces the control-plane machine.
-            # On this single-node cluster that reinstalls the node from the
-            # ISO. The live override is in the kube-system/coredns ConfigMap
-            # (same coredns-custom pattern as cluster1's Omni template);
-            # re-apply it after any node rebuild.
           machine:
             network:
               # DHCP on this VLAN hands out lan-dns (192.168.6.16, cluster1)
