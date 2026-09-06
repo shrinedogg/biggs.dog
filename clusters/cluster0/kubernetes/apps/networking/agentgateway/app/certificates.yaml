@@ -7,34 +7,15 @@
 # issuance does not require DNS to point at the cluster first.
 #
 # Notes:
-#  - dex, netbird: plain-HTTP backends; the gateway is the sole TLS terminator,
-#    so this is the only cert they need.
+#  - dex: plain-HTTP backend; the gateway is the sole TLS terminator,
+#    so this is the only cert it needs.
 #  - omni: serves its OWN TLS (deployment mounts omni-biggs-dog-tls at /tls and
 #    runs with --cert/--key, backend-protocol HTTPS -> re-encrypt). That pod
 #    mount is satisfied by the separate Certificate in the `omni` namespace
 #    (apps/omni/omni/app/certificate.yaml); THIS one feeds only the gateway's
 #    client-facing omni-https listener. Two certs for one hostname is expected.
-#  - image-factory: plain-HTTP backend like dex/netbird; the gateway is the
+#  - image-factory: plain-HTTP backend like dex; the gateway is the
 #    sole TLS terminator, so this is the only cert it needs.
-apiVersion: cert-manager.io/v1
-kind: Certificate
-metadata:
-  name: netbird-biggs-dog
-  namespace: networking
-spec:
-  commonName: netbird.biggs.dog
-  dnsNames:
-    - netbird.biggs.dog
-  secretName: netbird-biggs-dog-tls
-  duration: 720h # 30 days
-  renewBefore: 168h # 7 days
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
-  usages:
-    - digital signature
-    - key encipherment
----
 apiVersion: cert-manager.io/v1
 kind: Certificate
 metadata:

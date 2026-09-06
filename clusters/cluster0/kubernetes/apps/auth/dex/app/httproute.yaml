@@ -6,11 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: dex
   annotations:
-    # WAN name after the cluster1 rebuild: cluster1's gateway gets a
-    # route for this hostname (cross-cluster backend to the cluster0
-    # gateway VIP) and cluster1's external-dns CNAMEs it to
-    # home.biggs.dog. Until then its A record points at 192.168.2.31
-    # (LAN) via the same manual-record batch as omni/factory.
+    # LAN-only name: Cloudflare holds a MANUAL A record -> 192.168.2.31
+    # (public zone, private value; never port-forwarded).
 spec:
   hostnames:
     - dex.biggs.dog

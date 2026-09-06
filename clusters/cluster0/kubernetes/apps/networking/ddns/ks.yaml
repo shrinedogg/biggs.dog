@@ -1,7 +1,7 @@
 ---
-# Keeps home.biggs.dog -> current WAN IP. After the cluster1 rebuild its
-# gateway fronts netbird/dex.biggs.dog and cluster1's external-dns CNAMEs
-# them here. SUSPENDED until that cutover (nothing WAN-side consumes it yet).
+# Keeps home.biggs.dog -> current WAN IP. SUSPENDED indefinitely: nothing
+# consumes it (NetBird dropped 2026-09-06; the UDM's own VPN covers remote
+# access). Kept in-tree only as a ready-made option.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
