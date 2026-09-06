@@ -3,5 +3,4 @@ kind: Kustomization
 resources:
   - ./namespace.yaml
   - ./agentgateway/ks.yaml
-  - ./external-dns/ks.yaml
   - ./ddns/ks.yaml

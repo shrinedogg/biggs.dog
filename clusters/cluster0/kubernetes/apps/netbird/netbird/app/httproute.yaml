@@ -11,8 +11,11 @@ metadata:
   labels:
     app.kubernetes.io/name: netbird
   annotations:
-    # external-dns CNAMEs this hostname to home.biggs.dog (ddns-maintained WAN IP)
-    external-dns.alpha.kubernetes.io/target: home.biggs.dog
+    # WAN name after the cluster1 rebuild: cluster1's gateway gets a
+    # route for this hostname (cross-cluster backend to the cluster0
+    # gateway VIP) and cluster1's external-dns CNAMEs it to
+    # home.biggs.dog. Until then its A record points at 192.168.2.31
+    # (LAN) via the same manual-record batch as omni/factory.
 spec:
   parentRefs:
     - name: cluster0-gateway
