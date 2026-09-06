@@ -4,5 +4,5 @@ kind: Kustomization
 resources:
   # INFRA TIER — roll out first (gateway edge, cert/secret controllers, flux)
   - ./infra-ks.yaml
-  # APPS TIER — roll out second (dex, netbird, omni)
+  # APPS TIER — roll out second (dex, omni)
   - ./apps-ks.yaml

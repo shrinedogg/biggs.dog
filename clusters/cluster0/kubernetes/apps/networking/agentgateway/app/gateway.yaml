@@ -34,18 +34,6 @@ spec:
         certificateRefs:
           - kind: Secret
             name: dex-biggs-dog-tls
-    - hostname: netbird.biggs.dog
-      name: netbird-https
-      port: 443
-      protocol: HTTPS
-      allowedRoutes:
-        namespaces:
-          from: All
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - kind: Secret
-            name: netbird-biggs-dog-tls
     - hostname: factory.biggs.dog
       name: factory-https
       port: 443

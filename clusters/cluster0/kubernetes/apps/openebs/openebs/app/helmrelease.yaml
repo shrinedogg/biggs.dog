@@ -3,8 +3,7 @@
 # (etcd/sqlite), Image Factory registry, and NetBird PVCs. The basePath is
 # bind-mounted into the kubelet by the TalosControlPlane patch
 # (capi/clusters/management/cluster.yaml). host-path is the default SC; the
-# legacy upcloud-block-storage-maxiops name is gone (see netbird
-# server-deployment).
+# legacy upcloud-block-storage-maxiops name is gone.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:

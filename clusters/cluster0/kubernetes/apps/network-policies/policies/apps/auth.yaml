@@ -65,7 +65,7 @@ spec:
             - port: "5556"
               protocol: TCP
 ---
-# In-cluster OIDC clients (omni, image-factory-oauth2, netbird) reach dex
+# In-cluster OIDC clients (omni, image-factory-oauth2) reach dex
 # directly via the `dex.auth.svc` ClusterIP or through the gateway public IP.
 # Scoped to the specific client namespaces (strictest policy).
 apiVersion: cilium.io/v2
@@ -81,8 +81,6 @@ spec:
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: omni
-        - matchLabels:
-            k8s:io.kubernetes.pod.namespace: netbird
       toPorts:
         - ports:
             - port: "80"
