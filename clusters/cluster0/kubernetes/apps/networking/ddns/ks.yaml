@@ -1,6 +1,7 @@
 ---
-# Keeps home.biggs.dog -> current WAN IP (external-dns CNAMEs the edge
-# hostnames to it). SUSPENDED until the cutover step (see external-dns/ks.yaml).
+# Keeps home.biggs.dog -> current WAN IP. After the cluster1 rebuild its
+# gateway fronts netbird/dex.biggs.dog and cluster1's external-dns CNAMEs
+# them here. SUSPENDED until that cutover (nothing WAN-side consumes it yet).
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:

@@ -48,8 +48,9 @@ spec:
 # On-prem single-node cluster0 (2026-09 migration): UDP 3478 rides the node's
 # own IP 192.168.2.31 via Cilium LB-IPAM (sharing key cluster0-edge) -- the UpCloud Managed LB had no UDP mode, which forced
 # externalIPs; that workaround is gone. NetBird advertises STUN as
-# stun:netbird.biggs.dog:3478; netbird.biggs.dog CNAMEs to home.biggs.dog
-# (external-dns + ddns) and the UDM forwards UDP 3478 to the VIP.
+# stun:netbird.biggs.dog:3478; after the cluster1 rebuild netbird.biggs.dog
+# CNAMEs to home.biggs.dog (cluster1's external-dns + ddns) and the UDM
+# forwards UDP 3478 here. Until then its A record is 192.168.2.31 (LAN).
 apiVersion: v1
 kind: Service
 metadata:

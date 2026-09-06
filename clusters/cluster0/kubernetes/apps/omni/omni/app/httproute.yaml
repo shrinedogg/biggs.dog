@@ -7,8 +7,9 @@ metadata:
     app.kubernetes.io/name: omni
   annotations:
     agentgateway.dev/backend-protocol: "HTTPS"
-    # external-dns CNAMEs this hostname to home.biggs.dog (ddns-maintained WAN IP)
-    external-dns.alpha.kubernetes.io/target: home.biggs.dog
+    # LAN-only name: Cloudflare holds a MANUAL A record -> 192.168.2.31
+    # (public zone, private value; never port-forwarded). cluster1's
+    # external-dns must NOT touch it.
 spec:
   hostnames:
     - omni.biggs.dog
