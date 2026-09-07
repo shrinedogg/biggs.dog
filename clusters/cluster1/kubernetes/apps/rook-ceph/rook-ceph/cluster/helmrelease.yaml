@@ -52,7 +52,10 @@ spec:
           - name: telemetry
             enabled: false
       mon:
-        count: 3
+        # TEMPORARY for the 2026-09-07 cluster1 rebuild (Rook "adopt an existing
+        # cluster" procedure): a single mon whose store gets replaced with the
+        # captured mon-f data. Restore to 3 once ceph -s is HEALTH_OK.
+        count: 1
         allowMultiplePerNode: false
       network:
         provider: host
