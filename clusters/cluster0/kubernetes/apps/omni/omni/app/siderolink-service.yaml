@@ -4,7 +4,10 @@
 # On-prem single-node cluster0 (2026-09 migration): the Cilium LB address is
 # the node's own IP 192.168.2.31 (cilium-lb-ip-pool.yaml), shared with the
 # agentgateway Service via the lbipam sharing key, so one address fronts all
-# edge protocols.
+# edge protocols. The two Services live in different namespaces (omni,
+# networking), so Cilium also requires sharing-cross-namespace on BOTH sides;
+# without it LB-IPAM refuses the IP ("different and not permitted namespace")
+# and machines cannot enroll.
 # Machines (all on the LAN) reach SideroLink directly on the VIP, matching
 # --siderolink-wireguard-advertised-addr=192.168.2.31:50180. No WAN exposure:
 # nothing is forwarded from the UDM for these ports.
@@ -18,6 +21,7 @@ metadata:
   annotations:
     lbipam.cilium.io/ips: 192.168.2.31
     lbipam.cilium.io/sharing-key: cluster0-edge
+    lbipam.cilium.io/sharing-cross-namespace: networking
 spec:
   type: LoadBalancer
   selector:

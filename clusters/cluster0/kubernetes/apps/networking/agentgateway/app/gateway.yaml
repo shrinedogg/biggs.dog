@@ -9,6 +9,9 @@ spec:
     annotations:
       lbipam.cilium.io/ips: 192.168.2.31
       lbipam.cilium.io/sharing-key: cluster0-edge
+      # omni/omni-siderolink shares this IP from another namespace; Cilium
+      # LB-IPAM needs the grant on both Services (see siderolink-service.yaml).
+      lbipam.cilium.io/sharing-cross-namespace: omni
   listeners:
     - hostname: omni.biggs.dog
       name: omni-https
