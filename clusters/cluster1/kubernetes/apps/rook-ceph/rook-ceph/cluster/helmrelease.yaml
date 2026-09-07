@@ -77,19 +77,23 @@ spec:
       storage:
         useAllNodes: false
         useAllDevices: false
+        # OSD devices are named by stable /dev/disk/by-id path (model + serial),
+        # never by /dev/nvmeXn1: NVMe enumeration order is not stable across
+        # reboots on the two-drive workers. On 2026-09-07 worker-04 came up with
+        # nvme0n1/nvme1n1 swapped and Talos was installed over its OSD.
         nodes:
           - name: worker-01
             devices:
-              - name: /dev/nvme0n1
+              - name: /dev/disk/by-id/nvme-Micron_7450_MTFDKBA960TFR_25355290185D
           - name: worker-02
             devices:
-              - name: /dev/nvme0n1
+              - name: /dev/disk/by-id/nvme-Micron_7450_MTFDKBA960TFR_253552901287
           - name: worker-03
             devices:
-              - name: /dev/nvme0n1
+              - name: /dev/disk/by-id/nvme-Micron_7450_MTFDKBA960TFR_25355290110F
           - name: worker-04
             devices:
-              - name: /dev/nvme0n1
+              - name: /dev/disk/by-id/nvme-Micron_7450_MTFDKBA960TFR_253552902B9E
         config:
           osdsPerDevice: "1"
 
