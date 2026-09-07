@@ -59,9 +59,16 @@ spec:
             - --etcd-embedded-db-path=/_out/omni-etcd/
             - --sqlite-storage-path=/_out/sqlite/sqlite.db
             - --advertised-api-url=https://omni.biggs.dog/
-            - --machine-api-advertised-url=https://192.168.2.31:8090/
+            # Machine API and k8s proxy are advertised by HOSTNAME, not IP: the
+            # TLS cert is the Let's Encrypt omni.biggs.dog cert (DNS SAN only,
+            # LE does not issue IP SANs). Talos validates the machine-api URL
+            # host against the cert; advertising https://192.168.2.31:8090/
+            # made every enrolling node fail with an IP-SAN error.
+            # omni.biggs.dog resolves to 192.168.2.31 on public and LAN DNS.
+            # WireGuard is plain UDP, no TLS, so the IP is fine there.
+            - --machine-api-advertised-url=https://omni.biggs.dog:8090/
             - --siderolink-wireguard-advertised-addr=192.168.2.31:50180
-            - --advertised-kubernetes-proxy-url=https://192.168.2.31:8100/
+            - --advertised-kubernetes-proxy-url=https://omni.biggs.dog:8100/
             - --auth-auth0-enabled=false
             - --auth-oidc-enabled=true
             - --auth-oidc-provider-url=https://dex.biggs.dog
