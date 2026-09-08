@@ -37,19 +37,25 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 
 ### GPU Time-Slicing and vLLM
 
-The single RTX 5090 (32 GB) is sliced into **4 `nvidia.com/gpu` replicas**:
-1. One held by `nvidia-gpu-tuning` DaemonSet (caps boost clock to mitigate Xid 109 errors).
-2. One reserved for vLLM when idle (consuming ~22-30 GB, leaving minimal free VRAM).
-3. Two for the session's Wolf sidecar + game container.
+`nv-01` is equipped with **dual NVIDIA GeForce RTX 5090 dGPUs** (32 GB each, 64 GB total GDDR7 VRAM):
+1. **ASUS TUF Gaming GeForce RTX 5090** (32 GB, PCIe slot 1, direct, Gen5 x8)
+2. **Zotac GAMING GeForce RTX 5090 AMP Extreme Infinity** (32 GB, PCIe slot 2 via 900mm Gen5 riser, upright mount, Gen5 x8)
 
-When a gaming pod spins up, the `gpu-arbiter-operator` scales vLLM to 0, freeing its slice so the session has two slices available (up to 8 GB per game pod).
+Hosted on an **ASRock X870E Taichi Lite** motherboard (PCIe 5.0 x8/x8 bifurcation, wide 4-pitch / 81 mm slot spacing, no M.2 lane-sharing conflict) in a **Lian Li O11D EVO XL** chassis with a 1600W PSU.
+
+The GPU Operator configures 4x time-slicing per physical GPU, providing **8 total schedulable `nvidia.com/gpu` replicas** across the node:
+1. One held by `nvidia-gpu-tuning` DaemonSet (which tunes both cards via `NVIDIA_VISIBLE_DEVICES=all`).
+2. Replicas allocated to vLLM (single-card footprint consuming ~18 GiB weights + 5.71 GiB fp8 KV cache, or scalable across both cards via `-tp 2`).
+3. Two replicas for an active Dreamcast gaming session (one for the Wolf sidecar, one for the game container).
+
+When a gaming pod spins up, the `gpu-arbiter-operator` scales vLLM to 0. Even with 64 GB across two cards, arbitration manages peak board power (~1100-1200W transient under dual full load), chassis thermals, and prevents NVRM Xid 109 context switch timeouts under concurrent heavy graphics and compute workloads.
 
 ### DCGM Metrics and Gate Lifting
 
 The `gpu-arbiter-operator` removes the `gpu.biggs.dog/await-vram` scheduling gate via a three-condition precedent:
 
 1. **vLLM down** (~1-2s latency) - the primary signal.
-2. **Free VRAM threshold** (`DCGM_FI_DEV_FB_FREE` via VictoriaMetrics, ~30s lag) - the secondary signal.
+2. **Free VRAM threshold** (`max(DCGM_FI_DEV_FB_FREE)` across monitored GPUs via VictoriaMetrics, ~30s lag) - the secondary signal.
 3. **Safety timeout** (`spec.timeoutSeconds`, default 45s) - fallback if metrics are stale or missing.
 
 If any condition holds, the gate lifts and the pod can schedule. This degrades gracefully: even if DCGM exporter stalls or metrics lag, the session will not hang indefinitely.
@@ -60,10 +66,10 @@ Getting the full stack running required several insights:
 
 - **LB IP sharing** - the operator's `--lb-sharing-key` is aligned to `direwolf` so Cilium LB-IPAM hands every per-session RTP Service the same external IP as the proxy. Mismatched keys split the IP and the RTSP handshake times out (macOS errno 60).
 - **GPU on the app container** - the game container needs its own `nvidia.com/gpu` request; CDI driver/device injection is per-allocated-container, so without it the app has no render node and produces a black stream.
-- **GPU time-multiplexing with vLLM (`gpu-arbiter`)** - the 32 GB RTX 5090 cannot hold both a gaming session and vLLM at once. Scaling now uses the `deployments/scale` subresource; a backwards `client.MergeFrom` previously emitted `{"spec":{"replicas":null}}`, deleting the field so it defaulted back to `1` and vLLM never actually scaled down; and (2) status is written with a full `Status().Update()` rather than a JSON merge patch, so zero-valued `omitempty` fields like `gamePods` clear instead of going stale.
+- **GPU workload arbitration with vLLM (`gpu-arbiter`)** - coordinates workload lifecycle between vLLM and Dreamcast gaming sessions on `nv-01`. Scaling uses the `deployments/scale` subresource; a backwards `client.MergeFrom` previously emitted `{"spec":{"replicas":null}}`, deleting the field so it defaulted back to `1` and vLLM never actually scaled down; and status is written with a full `Status().Update()` rather than a JSON merge patch so zero-valued `omitempty` fields like `gamePods` clear instead of going stale. Arbitration avoids simultaneous peak power draw across both 5090s and protects against Xid 109 context switch timeouts during sessions.
 - **`GBM_BACKENDS_PATH`** - set on both the Wolf sidecar and the Steam container; the CDI hook drops the NVIDIA GBM backend in `/usr/local/lib/gbm` while Mesa only searches `/usr/lib/x86_64-linux-gnu/gbm`.
 - **Patched Wolf compositor (wl_drm fix)** - Wolf's `gst-wayland-display` advertised both the legacy `wl_drm` global and `zwp_linux_dmabuf_v1` v4 feedback; nested wlroots (Sway 0.19+) binds both and aborts on the duplicate device announcement (`assert(wl->drm_render_name == NULL)`). The patched `shrinedogg/wolf` image skips `wl_drm` when dmabuf v4 feedback is active (legacy clients can opt back in with `GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1`). This was needed to try Sway as the compositor; the Steam app now runs under Gamescope instead, but the patch stays deployed so Sway remains a working option (and Gamescope's Wayland client path is unaffected either way).
-- **Gamescope device pinning (`--prefer-vk-device`)** - nv-01's Ryzen 7800X3D exposes an AMD iGPU (RADV `RAPHAEL_MENDOCINO`, PCI `1002:164e`, `/dev/dri/renderD128`) alongside the RTX 5090 (PCI `10de:2b85`, `/dev/dri/renderD129`). The Steam container is privileged (for `uinput` hotplug, see below), so it sees both GPUs; Gamescope enumerates Vulkan devices and selects the AMD iGPU, then aborts at `CVulkanTexture::BInit` (`rendervulkan.cpp:2195`, assertion `modifiers.size() > 0`) because the iGPU cannot provide the dmabuf modifiers it needs. `GAMESCOPE_MODE` (default `-b` in the GOW `launch-comp.sh`, interpolated unquoted so it word-splits into args) is set to `-b --prefer-vk-device 10de:2b85` to force gamescope onto the dGPU. (Wolf's capture is unaffected; it is pinned via `wolfConfig.runtimeVariables.renderNode: /dev/dri/renderD129`.)
+- **Gamescope and Vulkan device pinning (`VK_DRIVER_FILES`)** - `nv-01` physically exposes three GPU adapters: the AMD Ryzen 7800X3D integrated graphics (RADV `RAPHAEL_MENDOCINO`, PCI `1002:164e`, `/dev/dri/renderD128`) and the dual RTX 5090 dGPUs (`10de:2b85`, `/dev/dri/renderD129` and `renderD130`). Because the Steam container is privileged (for `uinput` hotplug), it sees all adapters. Mesa's Vulkan loader enumerates AMD as device 0 by default, causing Gamescope to abort on modifier negotiation. Setting `VK_DRIVER_FILES=/etc/vulkan/icd.d/nvidia_icd.json` restricts the Vulkan loader strictly to the NVIDIA ICD so only the RTX 5090s are exposed to Steam, DXVK, vkd3d, and Gamescope.
 - **`/dev/shm` sizing** - a 4Gi memory-backed `emptyDir` at `/dev/shm`; the 64Mi runtime default exhausts instantly under Steam's CEF UI, yielding a black screen with only a cursor.
 - **User namespaces** - Steam's pressure-vessel runtime requires `user.max_user_namespaces`, which Talos defaults to `0`. Enabled cluster-wide via Omni machine-config patches on every node (node-level config, not in this repo); also used by the `auth` workload, which runs with `hostUsers: false` so its containers' root maps to an unprivileged host UID.
 - **Privileged Steam container** - Wolf hotplugs `uinput` devices mid-session; Kubernetes has no equivalent of Docker's `device_cgroup_rules`, so the container must be privileged to open the late-appearing `/dev/input/event`* nodes.
@@ -189,9 +195,10 @@ The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-
 - **NFD** (Node Feature Discovery) - detects hardware capabilities (GPU models, CPU flags, etc.) and labels nodes.
 - **Intel GPU Plugin** - enables Intel iGPU device plugin for media transcoding on worker nodes.
 - **NVIDIA GPU Operator** - device plugin with time-slicing (chart `v26.7.0`; driver and toolkit provided by Talos system extensions).
-- **Omni (Sidero)** - run in-cluster on `cluster0` (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.10.5`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `192.168.2.31:50180`). Sole manager of `cluster1` (the hosted Sidero SaaS Omni is retired). Node join is via the generic ISO from `factory.biggs.dog` (control-01 needs the `control-01-bond` media preset because its switch ports are a static LACP aggregate). Machine templates and per-machine patches: `.omni/cluster1/self-hosted/` (git-ignored, `omnictl cluster template sync -f cluster-template.yaml`). LAN clients must resolve `omni.biggs.dog` to `192.168.2.31`: both `k8s-gateway` and `lan-dns` carry a `hosts` block for edge names because the Cloudflare-proxied public answer 403s gRPC. Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy`. Backed by embedded etcd + SQLite PVCs on OpenEBS; OIDC login via Dex.
+- **Omni (Sidero)** - run in-cluster on `cluster0` (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.10.5`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `192.168.2.31:50180`). Sole manager of `cluster1` (the hosted Sidero SaaS Omni is retired). Node join is via the generic ISO from `factory.biggs.dog` (control-01 needs the `control-01-bond` media preset because its switch ports are a static LACP aggregate). Machine templates and per-machine patches: `.omni/cluster1/self-hosted/` (git-ignored, `omnictl cluster template sync -f cluster-template.yaml`). Hardware template tracks `nv-01`'s dual RTX 5090 topology (ASRock X870E Taichi Lite x8/x8 bifurcation, ASUS TUF in slot 1, Zotac AMP Extreme Infinity upright in slot 2 via 900mm riser, Lian Li O11D EVO XL, 1600W PSU, Sidero kernel-signed open GPU modules 595.71.05). LAN clients must resolve `omni.biggs.dog` to `192.168.2.31`: both `k8s-gateway` and `lan-dns` carry a `hosts` block for edge names because the Cloudflare-proxied public answer 403s gRPC. Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy`. Backed by embedded etcd + SQLite PVCs on OpenEBS; OIDC login via Dex.
 - **Talos Image Factory** - builds and signs custom Talos Linux images with cosign (`ghcr.io/siderolabs/image-factory:v1.6.0`). Stateless HTTP service on `:8080` behind an `oauth2-proxy` authenticated against Dex at `factory.biggs.dog`. Durable state lives in a registry PVC. cosign signing key and public key are mounted as Secrets. Rate-limit policy and an embedded OCI registry (`registry-deployment`) are also deployed.
 - **Cluster API (CAPI) on `cluster0`** - CAPI operator (`0.28.0`), core CAPI `v1.14`, CABPT `v0.7.6`, CACPPT `v0.6.4`, and CAPT `v0.7.1` (Tinkerbell) manage the management node. Manifests live in `clusters/cluster0/capi/`.
+- **`nv-01` Dual-GPU Node Hardware** - AMD Ryzen 7 7800X3D (8C / 16T), 64 GB DDR5 RAM, dual NVIDIA GeForce RTX 5090 dGPUs (ASUS TUF in PCIe slot 1 + Zotac AMP Extreme Infinity upright in PCIe slot 2 via 900mm riser, 64 GB total GDDR7 VRAM), ASRock X870E Taichi Lite motherboard (PCIe 5.0 x8/x8 bifurcation), Lian Li O11D EVO XL chassis, 1600W PSU, Samsung 9100 PRO 1TB install disk, Realtek RTL8126 5GbE NIC (`enp9s0`), and Sidero Talos kernel-signed open GPU modules (`595.71.05`).
 - **Per-machine Omni `ConfigPatch`es** - node-level config lives in Omni as per-machine `ConfigPatch`es (each node carries a `10-<machine-id>` user patch: hostname, NIC rings, node-specific tweaks). Local copies live under `.omni/cluster1/self-hosted/` (git-ignored). Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
 
 ### Automation
@@ -204,9 +211,9 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### vLLM Deployment
 
-- **Model**: [`unsloth/Qwen3.8-27B-NVFP4`](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) (served as `qwen 3.8 - local`) - a **27B dense** model with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), NVFP4 via compressed-tensors (~19.9 GB on disk / ~18 GiB resident on the 32 GB card). **173K context** served (`--max-model-len=177184`; native max 262K).
+- **Model**: [`unsloth/Qwen3.8-27B-NVFP4`](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) (served as `qwen 3.8 - local`) - a **27B dense** model with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), NVFP4 via compressed-tensors (~19.9 GB on disk / ~18 GiB resident on a 32 GB card). **173K context** served (`--max-model-len=177184`; native max 262K).
 - **Version**: `docker.io/vllm/vllm-openai:v0.28.0` (CUDA 12.9 for Blackwell GPU support on RTX 5090).
-- **GPU**: One of the RTX 5090's 4 time-slices; vLLM pins the bulk of the 32 GB card.
+- **GPU**: Deployed on `nv-01`'s dual RTX 5090 platform (64 GB total VRAM). vLLM currently runs with a single-card 32 GB allocation (~18 GiB weights + 5.71 GiB KV cache at 173K context), leaving the second 5090 available for multi-GPU scaling (`-tp 2`) or dedicated streaming isolation.
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
 
@@ -240,7 +247,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 - **Port**: 7997 (internal service).
 - **API**: OpenAI-compatible `/v1/embeddings` endpoint.
 - **Usage**: Backing kagent's long-term vector memory via the `embedding-model` ModelConfig.
-- **CPU-only by design**: The single GPU (`nv-01`) is committed to vLLM and scaled to 0 during gaming. Running embeddings on CPU avoids contention and prevents node memory pressure.
+- **CPU-only by design**: The dual RTX 5090s on `nv-01` are reserved for LLM inference and game streaming. Running embeddings on CPU avoids unnecessary VRAM reservation and maintains clean separation.
 
 ### kagent Agents
 
