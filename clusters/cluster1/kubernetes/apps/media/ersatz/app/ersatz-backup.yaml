@@ -41,6 +41,10 @@ spec:
   restic:
     pruneIntervalDays: 60 # Retain backups for 60 days
     repository: b2-backup-ersatz
+    # No default StorageClass on the rebuilt cluster (2026-09-08): without this the
+    # volsync-created cache PVC sits Pending with 'no storage class is set'.
+    cacheCapacity: 1Gi
+    cacheStorageClassName: ceph-block
     retain:
       daily: 1
       weekly: 1
