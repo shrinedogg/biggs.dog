@@ -70,8 +70,9 @@ spec:
         kubeletDir: /var/lib/kubelet
         podSecurityContext:
           runAsNonRoot: false
-        securityContext:
-          privileged: true
+        # zfsNode.securityContext is the POD securityContext in zfs-localpv;
+        # privileged is a container field (rejected by server-side apply) and the
+        # chart already sets privileged: true on the plugin container.
         encrKeysDir: /var/openebs/keys
       analytics:
         enabled: false
