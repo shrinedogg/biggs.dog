@@ -194,15 +194,13 @@ spec:
       # substrate workers. The substrate HelmRelease (ai-system/substrate/)
       # deploys the substrate control plane in the same ai-system namespace.
       #
-      # INTERIM (2026-09-08): disabled. substrate 0.0.21 requires the
-      # PodCertificateRequest/ClusterTrustBundle feature gates (beta, default
-      # off in K8s 1.36, GA in 1.37) which Talos does not enable, so ate-api
-      # cannot run and the kagent controller exited on
-      # 'dial ate-api dns:///api.ai-system.svc:443'. Re-enable after the
-      # feature-gate change lands and the substrate HelmRelease is Ready.
+      # Requires the PodCertificateRequest/ClusterTrustBundle feature gates
+      # (beta, default-off in K8s 1.36), enabled 2026-09-08 via the Omni
+      # cluster template (apiServer extraArgs + runtime-config on the control
+      # plane, kubelet extraArgs on all nodes).
       # ------------------------------------------------------------------
       substrate:
-        enabled: false
+        enabled: true
         ateApiEndpoint: "dns:///api.ai-system.svc:443"
         ateApiInsecure: true
         # The chart's substrate-ate-api-rbac template binds the env-source
@@ -217,10 +215,7 @@ spec:
         ateApiServer:
           namespace: ai-system
     substrateWorkerPool:
-      # INTERIM (2026-09-08): no pool while the substrate integration is off
-      # (see substrate.enabled above); the v0.0.21 ateom workers CrashLoop
-      # without the pod-certificate feature gates anyway.
-      create: false
+      create: true
       replicas: 1
       # PINNED to the substrate control-plane version. The ateom worker image
       # MUST move in lockstep with ate-controller/atelet/atenet-router and the
