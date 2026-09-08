@@ -95,6 +95,16 @@ spec:
       # Serves a /metrics endpoint on :9153, required for serviceMonitor
       - name: prometheus
         parameters: 0.0.0.0:9153
+      # cluster0 edge names. k8s_gateway only knows cluster1 routes, so without
+      # this they fall through to public DNS, which returns the Cloudflare
+      # proxy IP; Cloudflare's edge answers gRPC with a 403 challenge page and
+      # omnictl / the Omni-proxied kubeconfig break for every LAN client whose
+      # resolver conditionally forwards biggs.dog here. The hosts plugin runs
+      # before k8s_gateway and forward in CoreDNS plugin order.
+      - name: hosts
+        configBlock: |-
+          192.168.2.31 omni.biggs.dog dex.biggs.dog netbird.biggs.dog factory.biggs.dog
+          fallthrough
       # NextDNS resolvers ONLY -- NOT /etc/resolv.conf (-> kube-dns -> loop).
       # These are the homelab's NextDNS IPs (filtering/logging); the k8s-gateway
       # CNP allows egress world:53 so they're reachable from the pod.
