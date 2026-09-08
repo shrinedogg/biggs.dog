@@ -22,6 +22,24 @@ spec:
     toolbox:
       enabled: true
     cephClusterSpec:
+      # CephX key rotation (CVE-2025-30156). Daemon keys (mon/mgr/osd/admin/
+      # crash/exporter) rotate to aes256k; CSI keys rotate to NEW aes keys
+      # because host kernels are 6.18 (aes256k kernel mounts need 7.0+).
+      # keepPriorKeyCountMax keeps the in-use CSI keys active so existing PVC
+      # mounts survive. Revisit csi.keyType once Talos ships kernel 7.0.
+      security:
+        cephx:
+          daemon:
+            keyRotationPolicy: KeyGeneration
+            keyGeneration: 2
+          csi:
+            keyRotationPolicy: KeyGeneration
+            keyGeneration: 2
+            keepPriorKeyCountMax: 1
+            keyType: aes
+          rbdMirrorPeer:
+            keyRotationPolicy: KeyGeneration
+            keyGeneration: 2
       cephConfig:
         global:
           bdev_enable_discard: "true" # quote
