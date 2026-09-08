@@ -31,3 +31,30 @@ subjects:
 - kind: ServiceAccount
   name: agent-sandbox-controller
   namespace: ai-system
+---
+# The controller also injects its webhook CA bundle into the Sandbox CRDs at
+# startup ("Patching CRDs with generated CA bundle"). The upstream chart's
+# generated RBAC has no customresourcedefinitions rule, so on a fresh install
+# the controller CrashLoops with 'cannot get resource customresourcedefinitions
+# ... at the cluster scope'.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: agent-sandbox-crd-ca-injection
+rules:
+- apiGroups: ["apiextensions.k8s.io"]
+  resources: ["customresourcedefinitions"]
+  verbs: ["get", "list", "watch", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: agent-sandbox-crd-ca-injection
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: agent-sandbox-crd-ca-injection
+subjects:
+- kind: ServiceAccount
+  name: agent-sandbox-controller
+  namespace: ai-system
