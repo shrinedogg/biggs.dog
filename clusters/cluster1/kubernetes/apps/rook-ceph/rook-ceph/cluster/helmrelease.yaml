@@ -40,6 +40,15 @@ spec:
           rbdMirrorPeer:
             keyRotationPolicy: KeyGeneration
             keyGeneration: 2
+      # mon b is pinned to control-01 (Rook node assignment), which carries
+      # the control-plane NoSchedule taint; without this toleration the mon
+      # pod stays Pending and blocks cephx rotation (EBUSY mon stop checks).
+      placement:
+        mon:
+          tolerations:
+            - key: node-role.kubernetes.io/control-plane
+              operator: Exists
+              effect: NoSchedule
       cephConfig:
         global:
           bdev_enable_discard: "true" # quote
