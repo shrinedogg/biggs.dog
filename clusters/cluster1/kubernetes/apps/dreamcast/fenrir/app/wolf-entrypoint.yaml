@@ -28,17 +28,17 @@ data:
       source "${init_script}"
     done
 
-    # Dual-GPU nv-01: the device plugin decides which RTX 5090 this sidecar is
-    # allocated, and CDI injects only that card's DRM render node, with host
-    # numbering (renderD129 = 5090 in slot 1, renderD130 = 5090 in slot 2).
-    # The operator sets WOLF_RENDER_NODE statically from the App CR
-    # (wolfConfig.runtimeVariables.renderNode), so whenever the allocation
-    # lands on the other card the configured node does not exist in this
-    # container: wolf cannot detect the GPU vendor, falls back to software
-    # x264/x265, and waylanddisplaysrc fails to open the node, so the Wayland
-    # display never comes up and the app sits in "Waiting for wayland
-    # display..." while Moonlight shows no video. Fix it at boot: if the
-    # configured node is absent, use the NVIDIA render node that was injected.
+    # Dual-GPU nv-01 (renderD129 = 5090 in slot 1, renderD130 = 5090 in slot
+    # 2). The operator sets WOLF_RENDER_NODE statically from the App CR
+    # (wolfConfig.runtimeVariables.renderNode). The sidecar runs privileged
+    # (user.yaml, NVENC peer-init workaround), so it sees every host render
+    # node and the configured one is normally present. This fallback covers
+    # the unprivileged case, where CDI injects only the allocated card's node:
+    # if the configured node is absent, wolf cannot detect the GPU vendor,
+    # falls back to software x264/x265, and waylanddisplaysrc fails to open
+    # the node, so the Wayland display never comes up, the app sits in
+    # "Waiting for wayland display..." and Moonlight shows no video. In that
+    # case use whichever NVIDIA render node was injected.
     if [ ! -e "${WOLF_RENDER_NODE:-/dev/dri/renderD128}" ]; then
       detected=""
       for node in /dev/dri/renderD*; do

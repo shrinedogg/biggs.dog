@@ -23,14 +23,20 @@ spec:
       storageClassName: host-path
   wolfConfig:
     runtimeVariables:
-      # The NVIDIA container toolkit injects the allocated GPU's DRM node with
-      # its host numbering (renderD128 is the AMD iGPU and never injected).
-      # nv-01 has two RTX 5090s (renderD129 / renderD130) and the device
-      # plugin picks either for the wolf sidecar, so this static value is only
-      # a default: the wolf-root-entrypoint ConfigMap re-points WOLF_RENDER_NODE
-      # at the injected NVIDIA node when this one is absent. Without that, wolf
-      # can't detect the GPU vendor, falls back to software encoding, and the
-      # Wayland display never starts (black / no video in Moonlight).
+      # DRM nodes carry host numbering: renderD128 is the AMD iGPU, renderD129
+      # the RTX 5090 in slot 1, renderD130 the RTX 5090 in slot 2. Pinning
+      # renderD129 keeps the whole session on one card: wolf's compositor and
+      # NVENC run there and the nested Sway follows wolf's dmabuf device.
+      # Which 5090 Steam/Proton render on is up to the Vulkan loader (both
+      # cards are visible to the privileged app container); cross-card dmabuf
+      # imports would show up as black windows or CPU copies, not verified
+      # either way yet. Both the wolf sidecar and the app container
+      # are privileged, so the node is always present whatever the device
+      # plugin allocated; if it ever is not (unprivileged sidecar), the
+      # wolf-root-entrypoint ConfigMap re-points WOLF_RENDER_NODE at the
+      # injected NVIDIA node. A wrong/missing node means wolf can't detect
+      # the GPU vendor, falls back to software encoding, and the Wayland
+      # display never starts (no video in Moonlight).
       renderNode: /dev/dri/renderD129
   template:
     spec:
@@ -83,8 +89,7 @@ spec:
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:
     runtimeVariables:
-      # See the firefox app above: default only, the entrypoint fixes it up
-      # when the sidecar is allocated the other 5090.
+      # See the firefox app above: pins the session to the slot-1 5090.
       renderNode: /dev/dri/renderD129
     startAudioServer: false
     startVirtualCompositor: false
@@ -390,13 +395,37 @@ spec:
               # a steam_app_* window exists, runs the fullscreen command directly
               # (idempotent). Matches the focus-guard pattern above. Also
               # fullscreens Steam Big Picture (class="steam") so BPM isn't tiled
-              # behind the game.
+              # behind the game. The tree check lives in a script file: an
+              # inline python3 -c with "\n" inside bash double quotes passes
+              # the backslashes literally, so the one-liner was a SyntaxError
+              # every 2s and the watcher never fullscreened anything.
+              cat > /tmp/sway-has-steam.py <<'PYEOF'
+              import json
+              import sys
+
+              tree = json.load(sys.stdin)
+              found = False
+
+              def walk(node):
+                  global found
+                  if not isinstance(node, dict):
+                      return
+                  props = node.get("window_properties") or {}
+                  if node.get("type") == "con" and (props.get("class") or "").startswith("steam"):
+                      found = True
+                  for key in ("nodes", "floating_nodes"):
+                      for child in node.get(key) or []:
+                          walk(child)
+
+              walk(tree)
+              sys.exit(0 if found else 1)
+              PYEOF
               if [ "$RUN_SWAY" = "true" ]; then
                 (
                   while [ ! -S /tmp/.X11-unix/sway.socket ]; do sleep 2; done
                   while true; do
                     if SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg -t get_tree 2>/dev/null | \
-                       python3 -c "import sys,json\nt=json.load(sys.stdin)\nf=False\ndef w(n):\n global f\n if isinstance(n,dict):\n  if n.get('type')=='con' and ((n.get('window_properties') or {}).get('class') or '').startswith('steam'): f=True\n  for k in ('nodes','floating_nodes'):\n   for c in n.get(k,[]) or []: w(c)\nw(t)\nsys.exit(0 if f else 1)"; then
+                       python3 /tmp/sway-has-steam.py; then
                       SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam_app_*"] fullscreen enable' >/dev/null 2>&1 || true
                       SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam"] fullscreen enable' >/dev/null 2>&1 || true
                     fi
@@ -454,6 +483,5 @@ spec:
             sizeLimit: 4Gi
   wolfConfig:
     runtimeVariables:
-      # See the firefox app above: default only, the entrypoint fixes it up
-      # when the sidecar is allocated the other 5090.
+      # See the firefox app above: pins the session to the slot-1 5090.
       renderNode: /dev/dri/renderD129
