@@ -1,0 +1,47 @@
+---
+# Ceph CSI driver definitions for the ceph-csi-operator.
+#
+# Rook v1.20 installs the ceph-csi-operator and creates CephConnection and
+# ClientProfile, but does NOT create the Driver CR. Without it no provisioner
+# or nodeplugin runs and no PVC on the ceph-block StorageClass can bind. On
+# the previous cluster this object existed but was applied out of band and was
+# lost in the 2026-09-07 rebuild. Managed here alongside the driver RBAC.
+#
+# Spec mirrors rook/deploy/examples/operator.yaml for v1.20.6. The imageSet
+# ConfigMap is created by the Rook operator. CephFS is intentionally absent
+# (operator HelmRelease sets csi.enableCephfsDriver: false).
+apiVersion: csi.ceph.io/v1
+kind: OperatorConfig
+metadata:
+  name: ceph-csi-operator-config
+  namespace: rook-ceph
+spec:
+  driverSpecDefaults:
+    log:
+      verbosity: 0
+    imageSet:
+      name: rook-csi-operator-image-set-configmap
+    enableMetadata: true
+    generateOMapInfo: false
+    fsGroupPolicy: File
+    deployCsiAddons: false
+    nodePlugin:
+      priorityClassName: system-node-critical
+      kubeletDirPath: /var/lib/kubelet
+      enableSeLinuxHostMount: false
+    controllerPlugin:
+      priorityClassName: system-cluster-critical
+      deploymentStrategy:
+        type: Recreate
+---
+apiVersion: csi.ceph.io/v1
+kind: Driver
+metadata:
+  name: rook-ceph.rbd.csi.ceph.com
+  namespace: rook-ceph
+spec:
+  fsGroupPolicy: File
+  nodePlugin:
+    updateStrategy:
+      type: RollingUpdate
+  controllerPlugin: {}
