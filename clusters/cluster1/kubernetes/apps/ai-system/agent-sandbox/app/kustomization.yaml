@@ -8,3 +8,7 @@
 # executeCodeBlocks in the declarative agents.
 resources:
   - helmrelease.yaml
+  # Webhook cert secret namespace + RBAC (controller looks for
+  # agent-sandbox-webhook-certs in agent-sandbox-system regardless of the
+  # release namespace).
+  - agent-sandbox-system-rbac.yaml
