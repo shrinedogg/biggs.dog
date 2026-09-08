@@ -28,6 +28,35 @@ data:
       source "${init_script}"
     done
 
+    # Dual-GPU nv-01: the device plugin decides which RTX 5090 this sidecar is
+    # allocated, and CDI injects only that card's DRM render node, with host
+    # numbering (renderD129 = 5090 in slot 1, renderD130 = 5090 in slot 2).
+    # The operator sets WOLF_RENDER_NODE statically from the App CR
+    # (wolfConfig.runtimeVariables.renderNode), so whenever the allocation
+    # lands on the other card the configured node does not exist in this
+    # container: wolf cannot detect the GPU vendor, falls back to software
+    # x264/x265, and waylanddisplaysrc fails to open the node, so the Wayland
+    # display never comes up and the app sits in "Waiting for wayland
+    # display..." while Moonlight shows no video. Fix it at boot: if the
+    # configured node is absent, use the NVIDIA render node that was injected.
+    if [ ! -e "${WOLF_RENDER_NODE:-/dev/dri/renderD128}" ]; then
+      detected=""
+      for node in /dev/dri/renderD*; do
+        [ -e "$node" ] || continue
+        vendor="$(cat "/sys/class/drm/$(basename "$node")/device/vendor" 2>/dev/null || true)"
+        if [ "$vendor" = "0x10de" ]; then
+          detected="$node"
+          break
+        fi
+      done
+      if [ -n "$detected" ]; then
+        gow_log "WOLF_RENDER_NODE=${WOLF_RENDER_NODE:-unset} is not present in this container; using injected NVIDIA render node ${detected}"
+        export WOLF_RENDER_NODE="$detected"
+      else
+        gow_log "WARNING: WOLF_RENDER_NODE=${WOLF_RENDER_NODE:-unset} is not present and no NVIDIA render node was found under /dev/dri; wolf will fall back to software encoding"
+      fi
+    fi
+
     gow_log "Launching the container's startup script as root"
     chmod +x /opt/gow/startup.sh
     exec /opt/gow/startup.sh

@@ -23,10 +23,14 @@ spec:
       storageClassName: host-path
   wolfConfig:
     runtimeVariables:
-      # The NVIDIA container toolkit injects the GPU's DRM node with its
-      # host numbering: on nv-01 the dGPU is renderD129 (renderD128 doesn't
-      # exist inside the container). With the wrong node wolf can't detect
-      # the GPU vendor and silently falls back to software x264 encoding.
+      # The NVIDIA container toolkit injects the allocated GPU's DRM node with
+      # its host numbering (renderD128 is the AMD iGPU and never injected).
+      # nv-01 has two RTX 5090s (renderD129 / renderD130) and the device
+      # plugin picks either for the wolf sidecar, so this static value is only
+      # a default: the wolf-root-entrypoint ConfigMap re-points WOLF_RENDER_NODE
+      # at the injected NVIDIA node when this one is absent. Without that, wolf
+      # can't detect the GPU vendor, falls back to software encoding, and the
+      # Wayland display never starts (black / no video in Moonlight).
       renderNode: /dev/dri/renderD129
   template:
     spec:
@@ -79,7 +83,8 @@ spec:
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:
     runtimeVariables:
-      # See the firefox app above: the dGPU's DRM node is renderD129.
+      # See the firefox app above: default only, the entrypoint fixes it up
+      # when the sidecar is allocated the other 5090.
       renderNode: /dev/dri/renderD129
     startAudioServer: false
     startVirtualCompositor: false
@@ -449,5 +454,6 @@ spec:
             sizeLimit: 4Gi
   wolfConfig:
     runtimeVariables:
-      # See the firefox app above: the dGPU's DRM node is renderD129.
+      # See the firefox app above: default only, the entrypoint fixes it up
+      # when the sidecar is allocated the other 5090.
       renderNode: /dev/dri/renderD129
