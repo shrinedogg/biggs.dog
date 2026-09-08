@@ -26,7 +26,7 @@ spec:
   values:
     # Run two replicas so the biggs.dog zone authority is not a single point of
     # failure. lan-dns AND the in-cluster Talos CoreDNS both forward biggs.dog to
-    # this Service's ClusterIP (10.105.74.41); with one backend, any brief pod
+    # this Service's ClusterIP (10.101.183.97); with one backend, any brief pod
     # blip dropped a couple of UDP probes, tripped CoreDNS forward's max_fails
     # ejection, and produced LAN-wide SERVFAIL storms until recovery. Two backends
     # behind the ClusterIP keep the upstream healthy through a single-pod hiccup.
@@ -73,7 +73,7 @@ spec:
     # LOOP HAZARD: the chart's DEFAULT extraZonePlugins forward is
     # `forward . /etc/resolv.conf`, which points at in-cluster kube-dns, which
     # forwards biggs.dog BACK here (biggs.dog:53 zone in kube-system/coredns ->
-    # 10.105.74.41). With the default forward, fallthrough loops -> SERVFAIL.
+    # 10.101.183.97). With the default forward, fallthrough loops -> SERVFAIL.
     # The extraZonePlugins list below is the chart default REPLICATED IN FULL,
     # with ONLY the forward parameters changed from `/etc/resolv.conf` to the
     # homelab's NextDNS resolvers (45.90.28.232 / 45.90.30.232) to break that
@@ -112,9 +112,9 @@ spec:
       # Pinned to the live ClusterIP so it survives a Service recreate. lan-dns
       # and the Talos-managed kube-dns both forward biggs.dog to this address
       # (NOT the .6.6 LB VIP, which fails the same-node Cilium LB hairpin when a
-      # resolver pod is co-located with the k8s-gateway pod). Was 10.97.206.83,
+      # resolver pod is co-located with the k8s-gateway pod). Was 10.105.74.41 on the pre-2026-09-07 cluster and 10.97.206.83 before that,
       # which never applied because ClusterIP is immutable once assigned.
-      clusterIP: 10.105.74.41
+      clusterIP: 10.101.183.97
       loadBalancerIP: 192.168.6.6
       port: 53
       externalTrafficPolicy: Cluster # Allow any node to forward traffic

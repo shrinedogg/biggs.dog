@@ -36,7 +36,7 @@ data:
         # SERVFAIL storm plus a `. IN NS` re-probe flood. Never ejecting keeps us
         # forwarding through transient hiccups; k8s-gateway now runs 2 backends
         # behind this ClusterIP, so Cilium load-balances away from a bad pod.
-        forward . 10.105.74.41 {
+        forward . 10.101.183.97 {
             max_fails 0
         }
         reload
