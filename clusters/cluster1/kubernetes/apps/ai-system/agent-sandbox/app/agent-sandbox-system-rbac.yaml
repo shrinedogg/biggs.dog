@@ -1,0 +1,33 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agent-sandbox-system
+---
+# The agent-sandbox controller (SA ai-system:agent-sandbox-controller)
+# prepares its webhook cert secret in the upstream-default namespace
+# agent-sandbox-system even when installed elsewhere. Grant it exactly
+# the secret access it needs there.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: agent-sandbox-webhook-certs
+  namespace: agent-sandbox-system
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: agent-sandbox-webhook-certs
+  namespace: agent-sandbox-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: agent-sandbox-webhook-certs
+subjects:
+- kind: ServiceAccount
+  name: agent-sandbox-controller
+  namespace: ai-system
