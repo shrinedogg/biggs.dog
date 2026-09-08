@@ -1,0 +1,12 @@
+---
+# The substrate chart renders ate-controller/atelet resources into the
+# upstream-default namespace `ate-system` but does not create it; the Helm
+# install fails server-side apply with 'namespaces "ate-system" not found'.
+# Privileged enforcement: gVisor runsc sandboxes and the atenet router need
+# NET_ADMIN and /dev access, same posture as ai-system itself.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ate-system
+  labels:
+    pod-security.kubernetes.io/enforce: privileged
