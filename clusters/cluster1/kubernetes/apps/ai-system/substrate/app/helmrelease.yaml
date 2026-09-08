@@ -22,6 +22,28 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          # The chart has no storageClass knob: the postgres StatefulSet
+          # volumeClaimTemplate and the rustfs-data PVC set only `storage`,
+          # relying on a cluster default StorageClass. The rebuilt cluster has
+          # no default SC (2026-09-08), so both PVCs sat Pending with
+          # 'no storage class is set'. host-path (OpenEBS local) matches the
+          # ai-system convention in AGENTS.md. volumeClaimTemplates/PVC spec
+          # are immutable, so the pre-existing empty sts and PVCs were deleted
+          # once by hand when this landed.
+          - target:
+              kind: StatefulSet
+              name: postgres
+            patch: |-
+              - op: add
+                path: /spec/volumeClaimTemplates/0/spec/storageClassName
+                value: host-path
+          - target:
+              kind: PersistentVolumeClaim
+              name: rustfs-data
+            patch: |-
+              - op: add
+                path: /spec/storageClassName
+                value: host-path
           # STEP 1 (connection): the chart does NOT pass --ateapi-conn-spec, so
           # the ate-controller binary dials its hardcoded default
           # dns:///api.ate-system.svc:443 (upstream's namespace). This cluster
