@@ -32,6 +32,12 @@ spec:
     # the wolf sidecar and one for the game container, so a single GPU is not
     # enough without sharing. The sidecar and the game may land on different
     # cards; see fenrir/app/wolf-entrypoint.yaml for the render-node handling.
+    # failRequestsGreaterThanOne is deliberately left at its default (false):
+    # the plugin runs in CDI mode and injects only the allocated card, so a
+    # pod-level NVIDIA_VISIBLE_DEVICES=all does NOT expose the second card
+    # (verified 2026-09-09). ai-system/vllm (tensor-parallel 2) therefore
+    # requests 5 replicas to pigeonhole across both cards; enabling
+    # failRequestsGreaterThanOne would reject that pod.
     devicePlugin:
       config:
         create: true

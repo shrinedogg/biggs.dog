@@ -44,118 +44,114 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.28.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: unsloth's NVFP4 (compressed-tensors) quant of Alibaba's
-            # dense Qwen3.8-27B:
-            #   https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4
-            # A 27B DENSE model (all params active -> slower per-token than the
-            # old 35B-A3B MoE, but strong agentic-coding quality), with a
-            # Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep
-            # paged KV, so long context stays cheap) and 262K native context.
-            # NVFP4 needs Blackwell (nv-01's RTX 5090, sm_120).
-            # History: rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm
-            # (~20GB disk / ~18GiB resident), then unsloth/Qwen3.6-27B-NVFP4
-            # (~26GB / ~23GiB resident, BF16 vision tower). THIS 3.8 quant is
-            # Unsloth Dynamic V3.0: ~19.9GB on disk, the smallest of the three,
-            # so it leaves MORE KV headroom than either 3.6 quant. We still
-            # serve TEXT-ONLY via --language-model-only (the vision tower's
-            # weights load but are never used by kagent).
-            # All tuning below is IDENTICAL to the Qwen3.6 config per request:
-            # the 177184 window was vLLM's measured ceiling for the 3.6 unsloth
-            # quant (5.71GiB KV available, 2026-08-15). With this smaller 3.8
-            # quant the same window fits with extra margin; do not raise it
-            # without re-measuring (and never past util 0.96, see below).
-            # Quantization is compressed-tensors and AUTO-DETECTED from the
-            # checkpoint's quantization_config -- do NOT pass --quantization
-            # (the old --quantization=modelopt was for NVIDIA's 35B and is wrong
-            # here).
-            # NOTE: if v0.23.0 lacks the dense Qwen3_5ForConditionalGeneration
-            # arch or the qwen3_coder tool parser, bump the image tag (or use
-            # :nightly).
+            # MODEL: Alibaba's official FP8 (W8A8, dynamic activation scaling)
+            # checkpoint of dense Qwen3.8-27B:
+            #   https://huggingface.co/Qwen/Qwen3.8-27B-FP8
+            # ~28.7GB safetensors incl. the MTP draft head. A 27B DENSE model
+            # with a Gated-DeltaNet / gated-attention hybrid (only 16 of 64
+            # layers keep paged KV, so long context stays cheap) and 262K
+            # native context. FP8 is native on Blackwell (sm_120).
+            #
+            # WHY FP8 + TP=2 (2026-09-09): nv-01 now carries TWO RTX 5090s
+            # (32GB each). FP8 is the highest-fidelity quant that fits the
+            # pair: ~14.4GiB of weights per card leaves an estimated ~10GiB
+            # fp8 KV pool PER CARD (~20GiB total), versus the 5.91GiB the
+            # single-card unsloth NVFP4 quant had. That is enough for the full
+            # 262K native window AND real long-context concurrency, and it
+            # avoids the tool-call/coding accuracy loss of 4-bit weight quants
+            # on a dense 27B.
+            # History: rdtand/Qwen3.6-27B-PrismaSCOUT NVFP4 (~18GiB resident),
+            # unsloth/Qwen3.6-27B-NVFP4 (~23GiB), unsloth/Qwen3.8-27B-NVFP4
+            # (~21.8GB on disk, 177184-token ceiling on one card). The unsloth
+            # 3.8 weights stay cached on the PVC for a single-card fallback.
+            # Quantization is fp8 and AUTO-DETECTED from the checkpoint's
+            # quantization_config -- do NOT pass --quantization.
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=unsloth/Qwen3.8-27B-NVFP4
+            - --model=Qwen/Qwen3.8-27B-FP8
             # served-model-name is intentionally different from --model:
-            # the slash in the HuggingFace path (unsloth/) gets stripped by some
+            # the slash in the HuggingFace path (Qwen/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
             # clients; kagent and Zed both use this name, not the weights path.
             # NOTE: the id literally contains spaces ("qwen 3.8 - local"), per
-            # request; clients must send it exactly. The kagent HelmRelease
-            # provider was updated in the same commit; the old qwen36-local id
-            # is retired.
+            # request; clients must send it exactly. Unchanged across the
+            # NVFP4 -> FP8 swap so no client or kagent edit is needed.
             - --served-model-name=qwen 3.8 - local
-            # NOTE: --quantization is intentionally OMITTED. This checkpoint is
-            # compressed-tensors NVFP4 and vLLM auto-detects it from the config;
-            # forcing modelopt (the 35B's quant) would mis-load the weights.
+            # Split the model across both 5090s. PCIe-only (PHB topology, no
+            # NVLink, no GeForce P2P), so the per-layer allreduce rides host
+            # memory via NCCL; the MTP speed-up below is what pays for it.
+            # If NCCL hangs at startup on this consumer board, the first thing
+            # to try is env NCCL_P2P_DISABLE=1 (forces the host-memory path
+            # explicitly instead of letting NCCL probe P2P).
+            - --tensor-parallel-size=2
             # fp8 KV cache + hybrid attention keep the KV pool small even at
-            # long context.
+            # long context. The checkpoint has no static KV scales, so vLLM
+            # uses dynamic fp8 KV scaling (same as the NVFP4 quants ran).
             - --kv-cache-dtype=fp8
-            # 173K context (177184 tokens). This is vLLM's MEASURED ceiling for
-            # the 3.6 unsloth quant at util 0.96 on v0.27.1 (2026-08-15): the engine
-            # profiled 5.71GiB of available KV and refused to boot at 229376
-            # ("7.32 GiB KV cache is needed ... estimated maximum model length
-            # is 177184"). The July 80K ceiling for this quant is stale: v0.27.1
-            # profiles CUDA graph memory explicitly, freeing more for KV.
-            # Headroom over the largest observed exa-agent session (~164K
-            # tokens) is only ~9K, and a single max-length sequence consumes
-            # the entire pool, so long-context concurrency is 1-2 sessions;
-            # short prompts still run 8-way (see --max-num-seqs). To regain the
-            # 224K window, switch back to the rdtand quant (~18GiB resident,
-            # ~8.3GiB pool) or add VRAM. Do NOT exceed ~0.96 util (0.97 caused
-            # a full node lockup on 2026-06-25).
-            - --max-model-len=177184
-            # nv-01's GPU is time-sliced (replicas=4) and shared with
-            # GPU-operator validators and the DRA plugin. (The embeddings server
-            # moved to CPU, so it no longer contends for VRAM here.) At 0.97 vLLM
-            # reserved ~31.6GB, leaving ~1GB free, which contributed to a full
-            # node lockup (2026-06-25) back when embeddings was ALSO on the GPU.
-            # With the lighter ~18GiB-resident rdtand quant, 0.96 (~30.7GB
-            # reserved) yields an ~8.3GiB fp8 KV pool (~250K tokens; 5.71GiB
-            # and a 177184-token ceiling with the unsloth quant, measured
-            # 2026-08-15) -- the headroom that held the 224K window under
-            # rdtand. This is the documented CEILING: 0.97 reserved ~31.6GB
-            # (~1GB free) and caused a full node lockup on 2026-06-25. Do NOT
-            # push past 0.96.
-            - --gpu-memory-utilization=0.96
-            # Per-step token budget for (chunked) prefill + decode. Bumped from
-            # 4096 to 8192 to handle medium-length tool-context prompts more
-            # efficiently, reducing the number of prefill steps. Short prompts
-            # are unaffected (they complete in one step). Long prompts benefit
-            # from fewer scheduling rounds.
+            # FULL native 262K window. ESTIMATE, not measurement: a 262K
+            # sequence needs ~8.5GiB of fp8 KV (measured 0.0323 GiB per 1K
+            # tokens on v0.28.0 with this arch), against an estimated ~20GiB
+            # pool across both cards. vLLM v1 HARD-FAILS startup if the pool
+            # cannot hold one full max-model-len sequence; if that happens,
+            # the EngineCore ValueError in `kubectl logs --previous` states the
+            # measured ceiling -- set this to that number, do NOT raise util.
+            # Largest observed exa-agent session was ~164K tokens.
+            - --max-model-len=262144
+            # 0.92 per card (~29.4GB reserved of 32.6GB, ~3GB free each).
+            # Deliberately BELOW the old single-card 0.96 ceiling: with two
+            # cards we do not need to ride the edge, and 0.97 (~1GB free)
+            # caused a full node lockup on 2026-06-25. The ~3GB headroom per
+            # card also keeps min(DCGM_FI_DEV_FB_FREE) well under the
+            # gpu-arbiter's 8000MiB gate while vLLM runs, so gaming pods
+            # correctly wait for the arbiter to scale vLLM to 0.
+            # Re-read the startup log after the first boot:
+            #   "Available KV cache memory: N GiB" and
+            #   "GPU KV cache size: N tokens, Maximum concurrency for 262,144
+            #   tokens per request: N.NNx" are the authoritative numbers;
+            # rewrite the estimates in these comments to match.
+            - --gpu-memory-utilization=0.92
+            # Per-step token budget for (chunked) prefill + decode. 8192 handles
+            # medium-length tool-context prompts in few prefill steps; short
+            # prompts complete in one step.
             - --max-num-batched-tokens=8192
-            # Concurrency cap. Bumped from 64 to 32 after a vLLM stall/restart
-            # under parallel kagent fan-out (6-9 agents firing long-context tool-
-            # schema prompts simultaneously). At 64-way the GPU compute saturated
-            # during prefill of multiple long prompts, stalling the async event
-            # loop for 3+ min -- past even the generous 10s×6 liveness headroom --
-            # and the pod restarted (exit 0, "Completed"). 32-way still matches or
-            # exceeds realistic concurrent agent count, lets vLLM QUEUE excess
-            # requests instead of compute-locking, and keeps /health responsive.
-            # Keep capture-size == max-num-seqs. 8-way alongside the 177184
-            # window: a single max-length sequence consumes ~5.5GiB of the
-            # 5.71GiB fp8 KV pool, so the pool holds only ONE full-length
-            # sequence at a time. 8-way lets vLLM admit a
-            # burst of short/medium agent prompts while QUEUEING (not
-            # compute-locking) when several long-context sessions land together;
-            # prefix caching + chunked prefill keep queued work moving. If agent
-            # fan-out proves starved, the lever is more VRAM, not a higher
-            # max-num-seqs at this window.
-            - --max-num-seqs=8
-            - --max-cudagraph-capture-size=8
+            # Concurrency cap. History: 64-way stalled the async loop under
+            # kagent fan-out (prefill of many long prompts compute-locked
+            # /health for 3+ min and the pod restarted); 32-way on the 131K
+            # window was stable; 8-way was forced by the 5.91GiB single-card
+            # pool at 177184. With an estimated ~20GiB pool and ~8.5GiB per
+            # max-length sequence, ~2.5 full 262K sessions fit at once and
+            # 16-way lets vLLM admit a burst of short/medium agent prompts
+            # while QUEUEING (not compute-locking) when several long sessions
+            # land together. Keep capture-size == max-num-seqs; a capture size
+            # larger than the Mamba (GDN) cache lines trips
+            # "assert num_cache_lines >= batch" at startup on this arch.
+            - --max-num-seqs=16
+            - --max-cudagraph-capture-size=16
             - --enable-prefix-caching
+            # MTP speculative decoding using the draft head shipped IN the
+            # checkpoint (no separate draft model). Method string per the vLLM
+            # Qwen3.5/3.6/3.8 recipes: "mtp" (NOT qwen3_next_mtp, that is the
+            # Qwen3-Next MoE). The recipe default is 3 speculative tokens; we
+            # start at 2 as a balance: each speculative token costs KV/batch
+            # capacity and the recipes note MTP lowers throughput under high
+            # concurrency while cutting per-token latency at low concurrency,
+            # which matches agent traffic (few long sessions). Measure
+            # acceptance rate in the vLLM metrics before moving to 3 or 1.
+            - --speculative-config={"method":"mtp","num_speculative_tokens":2}
             # Qwen3.8's hybrid (Gated-DeltaNet) arch may ship custom modeling
             # code; the model card sets trust-remote-code. NOTE: executes repo
             # Python.
             - --trust-remote-code
-            # Qwen3.8 tool-call + reasoning parsers (same qwen3_5 arch family
-            # as 3.6, per the model card: the dense 27B uses the qwen3_coder
-            # tool parser -- NOT the 35B's qwen3_xml; reasoning parser stays
-            # qwen3).
+            # Qwen3.8 tool-call + reasoning parsers, verified against the vLLM
+            # recipe for Qwen/Qwen3.8-27B (recipes.vllm.ai/Qwen/Qwen3.8-27B):
+            # the dense 27B uses the qwen3_coder tool parser (NOT the 35B's
+            # qwen3_xml) and the qwen3 reasoning parser.
             - --enable-auto-tool-choice
             - --tool-call-parser=qwen3_coder
             - --reasoning-parser=qwen3
             # Text-only kagent traffic: skip the vision encoder + multimodal
-            # profiling entirely. REQUIRED for the VRAM fit -- loading the
-            # vision tower would push resident weights to ~26GB and starve KV.
+            # profiling entirely. The vision tower is BF16 in this checkpoint;
+            # loading it would cost ~1.5GiB of KV per card for nothing.
             - --language-model-only
             # Keep port 8000 to match the Service and the kagent provider baseUrl.
             - --host=0.0.0.0
@@ -175,17 +171,32 @@ spec:
               protocol: TCP
           resources:
             requests:
-              nvidia.com/gpu: 1
-              memory: 22Gi
+              nvidia.com/gpu: 5
+              memory: 36Gi
             limits:
-              # Consumes the last of the 4 time-sliced nvidia.com/gpu replicas.
-              nvidia.com/gpu: 1
-              memory: 22Gi
+              # WHY 5 (verified 2026-09-09 with throwaway pods): the device
+              # plugin runs in CDI mode with time-slicing (4 nvidia.com/gpu
+              # replicas per card, 8 on the node). CDI injects ONLY the
+              # allocated card's /dev/nvidiaN and ignores a pod-level
+              # NVIDIA_VISIBLE_DEVICES=all (the toolkit rewrites it to "void";
+              # an unprivileged gpu:1 pod saw exactly one card). Requesting 5
+              # replicas pigeonholes across both cards (4 per card), so TP=2
+              # always gets two DISTINCT GPUs, and 3 replicas stay free for
+              # the operator validators / DRA plugin. This REQUIRES the
+              # device plugin's failRequestsGreaterThanOne to stay false
+              # (the default); setting it true rejects this pod. A gpu:8
+              # request also works but starves every other GPU pod.
+              nvidia.com/gpu: 5
+              # Two TP worker processes + a 28.7GB safetensors load (page
+              # cache is charged to the cgroup during the mmap read). 22Gi
+              # was enough for the single 21.8GB NVFP4 worker; sized up for
+              # the larger checkpoint and the second worker. Node has 64GB.
+              memory: 36Gi
           startupProbe:
             httpGet:
               path: /health
               port: http
-            # First boot downloads weights; allow up to ~30 min.
+            # First boot downloads weights (~28.7GB); allow up to ~30 min.
             periodSeconds: 15
             failureThreshold: 120
             # /health can be briefly slow even once serving; default 1s is tight.
@@ -217,7 +228,8 @@ spec:
           volumeMounts:
             - name: models
               mountPath: /models
-            # vLLM needs a large shared-memory segment for NCCL/IPC.
+            # vLLM needs a large shared-memory segment for NCCL/IPC; with TP=2
+            # over PCIe the allreduce traffic itself goes through here.
             - name: shm
               mountPath: /dev/shm
       volumes:
@@ -227,4 +239,4 @@ spec:
         - name: shm
           emptyDir:
             medium: Memory
-            sizeLimit: 8Gi
+            sizeLimit: 16Gi

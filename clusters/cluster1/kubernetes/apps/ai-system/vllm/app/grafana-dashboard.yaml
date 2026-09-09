@@ -105,7 +105,7 @@ data:
           "id": 3,
           "type": "timeseries",
           "title": "KV Cache Utilisation",
-          "description": "Fraction of the KV cache pool in use. Budget on this host is ~838K tokens (gpu_memory_utilization=0.97, max_num_seqs=32, fp8 KV).",
+          "description": "Fraction of the KV cache pool in use. Budget on this host is an estimated ~630K tokens (fp8 KV, ~20 GiB aggregate pool across both cards at gpu_memory_utilization=0.92, max_num_seqs=16; confirm against the startup log's GPU KV cache size).",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [

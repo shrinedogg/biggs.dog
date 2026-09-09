@@ -30,8 +30,8 @@ spec:
   groups:
     - name: nvidia-gpu-vram
       rules:
-        # VRAM headroom nearly gone. With vLLM at gpu-memory-utilization=0.90
-        # the GPU normally idles ~3GB free; sustained <750MiB means a
+        # VRAM headroom nearly gone. With vLLM at gpu-memory-utilization=0.92
+        # each card normally idles ~3GB free; sustained <750MiB means a
         # co-scheduled consumer (embeddings, GPU-operator validators, DRA
         # workloads, or a Wolf game session) has consumed almost the entire
         # reserve -- the immediate precondition for the NV_ERR_NO_MEMORY

@@ -67,9 +67,12 @@ spec:
         plain: true
         cleanup:
           enabled: true
-          image:
-            repository: rancher/kubectl
-            pullPolicy: IfNotPresent
+          # No image override: the chart default is registry.k8s.io/kubectl
+          # with the tag derived from the cluster kube version. The official
+          # image publishes every kube release in lockstep (v1.36.3 exists),
+          # while the previous rancher/kubectl override lags releases (no
+          # v1.36.3 tag), which wedged the 2026-09-07 uninstall remediation
+          # in ImagePullBackOff.
       serviceMonitor:
         enabled: true
       operator:
@@ -323,8 +326,11 @@ spec:
       spec:
         useDefaultResources: false
         resources:
+          # No cpu limit (key omitted deliberately): an explicit `cpu: null`
+          # is REJECTED by the current operator CRD on a fresh server-side
+          # apply ("spec.resources.limits.cpu: must be of type
+          # integer,string: null"), which wedged the 2026-09-07 reinstall.
           limits:
-            cpu: null
             memory: "8000Mi"
           requests:
             cpu: 500m
