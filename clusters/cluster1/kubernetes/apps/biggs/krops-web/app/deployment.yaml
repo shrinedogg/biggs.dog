@@ -1,0 +1,67 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: krops-web
+  namespace: biggs
+  labels:
+    app: krops-web
+    app.kubernetes.io/name: krops-web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: krops-web
+  template:
+    metadata:
+      labels:
+        app: krops-web
+        app.kubernetes.io/name: krops-web
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        # nginx-unprivileged runs as uid/gid 101.
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: krops-web
+          image: ghcr.io/polarsquad/krops-web:latest@sha256:79cc4bfa22ed2167ad9966030e3a4600e0485b91da43ce77ccad018a7c40ab9e
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            # nginx-unprivileged writes its pid file and temp dirs under /tmp.
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 10
+      volumes:
+        - name: tmp
+          emptyDir: {}
