@@ -21,7 +21,12 @@ spec:
   gateName: gpu.biggs.dog/await-vram
   metrics:
     url: http://vmsingle-stack.observability.svc:8428
-    query: max(DCGM_FI_DEV_FB_FREE)
+    # min, not max: nv-01 has two RTX 5090s and vLLM holds BOTH (TP=2). With
+    # max() the gate is always open while any card is idle, so gaming pods
+    # were admitted into a card vLLM still owned. A session needs the wolf
+    # sidecar AND the app to land on free VRAM, so gate on the emptiest
+    # card's WORST case: only pass when every card has freeMiB available.
+    query: min(DCGM_FI_DEV_FB_FREE)
     timeoutSeconds: 4
   freeMiB: 8000
   timeoutSeconds: 45
