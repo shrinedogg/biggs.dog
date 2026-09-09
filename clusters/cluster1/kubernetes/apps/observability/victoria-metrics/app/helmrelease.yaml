@@ -67,14 +67,12 @@ spec:
         plain: true
         cleanup:
           enabled: true
-          image:
-            repository: rancher/kubectl
-            # Pin the tag: the chart defaults it to the cluster's kube version
-            # (v1.36.3), which rancher/kubectl does not publish (latest is
-            # v1.36.2), and the uninstall cleanup hook then wedges in
-            # ImagePullBackOff, leaving the release stuck 'uninstalling'.
-            tag: v1.36.2
-            pullPolicy: IfNotPresent
+          # No image override: the chart default is registry.k8s.io/kubectl
+          # with the tag derived from the cluster kube version. The official
+          # image publishes every kube release in lockstep (v1.36.3 exists),
+          # while the previous rancher/kubectl override lags releases (no
+          # v1.36.3 tag), which wedged the 2026-09-07 uninstall remediation
+          # in ImagePullBackOff.
       serviceMonitor:
         enabled: true
       operator:
