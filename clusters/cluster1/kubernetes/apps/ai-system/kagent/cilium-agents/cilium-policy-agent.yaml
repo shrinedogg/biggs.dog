@@ -26,7 +26,8 @@ spec:
     executeCodeBlocks: true
     context:
       # Bound session growth so large tool results (cilium policy/flow output)
-      # can't accumulate past the model's 131K context window. At
+      # can't accumulate unboundedly toward the served context window (262K
+      # since the FP8 TP=2 swap). At
       # tokenThreshold ADK summarizes older events (via the local model) and
       # drops the originals. See flux-mcp/app/agent.yaml for full rationale.
       compaction:

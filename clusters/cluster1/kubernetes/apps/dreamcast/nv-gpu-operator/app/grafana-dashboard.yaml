@@ -33,7 +33,7 @@ data:
           "id": 1,
           "type": "timeseries",
           "title": "VRAM Usage",
-          "description": "Framebuffer used vs free vs reserved (MiB). Total on this 32 GB card is ~32,110 MiB; the gpu-arbiter ungames once DCGM_FI_DEV_FB_FREE >= 8000 (vLLM scaled to 0). Free crashing near 0 under inference is normal (gpu_memory_utilization=0.97), but free staying ~0 while GPU_UTIL is also ~0 can indicate a stuck/leaked VRAM consumer.",
+          "description": "Framebuffer used vs free vs reserved (MiB). Total per card is ~32,110 MiB; the gpu-arbiter ungames once min(DCGM_FI_DEV_FB_FREE) across both cards >= 8000 (vLLM scaled to 0). vLLM runs tensor-parallel 2 at gpu_memory_utilization=0.92, so each card sits ~3GB free under inference; free at that floor while GPU_UTIL is also ~0 can indicate a stuck/leaked VRAM consumer.",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [

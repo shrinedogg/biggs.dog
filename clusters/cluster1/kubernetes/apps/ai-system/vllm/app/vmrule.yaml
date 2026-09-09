@@ -46,8 +46,9 @@ spec:
           annotations:
             summary: "vLLM in CrashLoopBackOff"
             description: "The vLLM container has been in CrashLoopBackOff for 5m. Check the vllm-models PVC, GPU availability on nv-01, and startupProbe progress."
-        # KV cache near full -> requests being preempted/swapped. Budget is
-        # ~838K tokens (fp8 KV, gpu_memory-utilization=0.90, max_num_seqs=32).
+        # KV cache near full -> requests being preempted/swapped. Budget is an
+        # estimated ~630K tokens (fp8 KV, ~20 GiB aggregate pool across both
+        # cards at gpu-memory-utilization=0.92, max_num_seqs=16).
         - alert: VllmKVCacheNearFull
           expr: "vllm:gpu_cache_usage_perc > 0.95"
           for: 2m

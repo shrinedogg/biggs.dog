@@ -31,8 +31,8 @@ spec:
     executeCodeBlocks: true
     context:
       # Bound session growth so large tool results (search results,
-      # research dumps) can't accumulate past the model's 131K context
-      # window.
+      # research dumps) can't accumulate unboundedly toward the served context
+      # window (262K since the FP8 TP=2 swap).
       compaction:
         tokenThreshold: 80000
         summarizer:
@@ -40,10 +40,10 @@ spec:
     # Per-agent vector memory is enabled. The earlier overflow on exa was NOT
     # caused by memory (the pgvector `memory` table had 0 rows); it was from
     # Exa search results (~38KB/result) ballooning session history past the
-    # 131K vLLM cap (one session hit ~164K tokens). The real fix was raising
-    # vLLM --max-model-len to 192K (vllm/app/deployment.yaml); memory stays on.
-    # If overflow recurs, prune the kagent pgvector store or raise max-model-len
-    # further (see the vLLM deployment notes).
+    # THEN-current 131K vLLM cap (one session hit ~164K tokens). The fix was
+    # raising vLLM --max-model-len; the window is now the full 262K native
+    # (vllm/app/deployment.yaml), and memory stays on. If overflow recurs,
+    # prune the kagent pgvector store.
     memory:
       # Long-term (cross-session) vector memory via the in-cluster
       # Infinity embedding server (ModelConfig `embedding-model`) + pgvector.

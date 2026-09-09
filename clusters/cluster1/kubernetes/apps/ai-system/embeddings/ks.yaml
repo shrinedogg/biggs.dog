@@ -3,11 +3,12 @@
 # that backs kagent long-term (vector) memory via the `embedding-model`
 # ModelConfig in app/modelconfig.yaml.
 #
-# CPU-only on purpose: the single GPU (nv-01) is fully committed to the chat
-# vLLM (~0.97 util) and is scaled to 0 during gaming by the gpu-arbiter-operator,
-# so a second GPU consumer would contend with both. Embedding traffic from kagent
-# memory is infrequent and low-throughput, so CPU is plenty and keeps this
-# service entirely out of the GPU/gaming-arbiter picture.
+# CPU-only on purpose: both GPUs on nv-01 are fully committed to the chat
+# vLLM (tensor-parallel 2, ~0.92 util each) and are scaled to 0 during gaming
+# by the gpu-arbiter-operator, so a second GPU consumer would contend with
+# both. Embedding traffic from kagent memory is infrequent and low-throughput,
+# so CPU is plenty and keeps this service entirely out of the
+# GPU/gaming-arbiter picture.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:

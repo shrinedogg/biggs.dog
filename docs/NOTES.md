@@ -45,7 +45,7 @@ Hosted on an **ASRock X870E Taichi Lite** motherboard (PCIe 5.0 x8/x8 bifurcatio
 
 The GPU Operator configures 4x time-slicing per physical GPU, providing **8 total schedulable `nvidia.com/gpu` replicas** across the node:
 1. One held by `nvidia-gpu-tuning` DaemonSet (which tunes both cards via `NVIDIA_VISIBLE_DEVICES=all`).
-2. Replicas allocated to vLLM (single-card footprint consuming ~18 GiB weights + 5.71 GiB fp8 KV cache, or scalable across both cards via `-tp 2`).
+2. Five held by vLLM: the CDI device plugin ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so vLLM requests 5 replicas to pigeonhole across both cards (4 per card) for tensor-parallel 2 (~14.4 GiB FP8 weights per card plus an estimated ~10 GiB fp8 KV pool per card).
 3. Two replicas for an active Dreamcast gaming session (one for the Wolf sidecar, one for the game container).
 
 When a gaming pod spins up, the `gpu-arbiter-operator` scales vLLM to 0. Even with 64 GB across two cards, arbitration manages peak board power (~1100-1200W transient under dual full load), chassis thermals, and prevents NVRM Xid 109 context switch timeouts under concurrent heavy graphics and compute workloads.
@@ -55,7 +55,7 @@ When a gaming pod spins up, the `gpu-arbiter-operator` scales vLLM to 0. Even wi
 The `gpu-arbiter-operator` removes the `gpu.biggs.dog/await-vram` scheduling gate via a three-condition precedent:
 
 1. **vLLM down** (~1-2s latency) - the primary signal.
-2. **Free VRAM threshold** (`max(DCGM_FI_DEV_FB_FREE)` across monitored GPUs via VictoriaMetrics, ~30s lag) - the secondary signal.
+2. **Free VRAM threshold** (`min(DCGM_FI_DEV_FB_FREE)` across monitored GPUs via VictoriaMetrics, ~30s lag) - the secondary signal. `min`, not `max`: with vLLM holding BOTH cards (tensor-parallel 2), `max()` reports whichever card is idler and would lift the gate while the other card still has vLLM's VRAM allocated. Only when every card has `freeMiB` available is a session admitted.
 3. **Safety timeout** (`spec.timeoutSeconds`, default 45s) - fallback if metrics are stale or missing.
 
 If any condition holds, the gate lifts and the pod can schedule. This degrades gracefully: even if DCGM exporter stalls or metrics lag, the session will not hang indefinitely.
@@ -212,25 +212,27 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### vLLM Deployment
 
-- **Model**: [`unsloth/Qwen3.8-27B-NVFP4`](https://huggingface.co/unsloth/Qwen3.8-27B-NVFP4) (served as `qwen 3.8 - local`) - a **27B dense** model with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), NVFP4 via compressed-tensors (~19.9 GB on disk / ~18 GiB resident on a 32 GB card). **173K context** served (`--max-model-len=177184`; native max 262K).
+- **Model**: [`Qwen/Qwen3.8-27B-FP8`](https://huggingface.co/Qwen/Qwen3.8-27B-FP8) (served as `qwen 3.8 - local`) - a **27B dense** model with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), Alibaba's official W8A8 FP8 checkpoint (~28.7 GB safetensors incl. the MTP draft head). **Full native 262K context** served (`--max-model-len=262144`).
 - **Version**: `docker.io/vllm/vllm-openai:v0.28.0` (CUDA 12.9 for Blackwell GPU support on RTX 5090).
-- **GPU**: Deployed on `nv-01`'s dual RTX 5090 platform (64 GB total VRAM). vLLM currently runs with a single-card 32 GB allocation (~18 GiB weights + 5.71 GiB KV cache at 173K context), leaving the second 5090 available for multi-GPU scaling (`-tp 2`) or dedicated streaming isolation.
+- **GPU**: Tensor-parallel 2 across BOTH of `nv-01`'s RTX 5090s (~14.4 GiB weights per card, estimated ~10 GiB fp8 KV pool per card). The CDI device plugin injects only the allocated card and ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so the pod requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas to pigeonhole across both cards (verified 2026-09-09 with throwaway pods).
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
 
 ### vLLM Configuration and Performance
 
-**Context cap rationale**: The model's native max is 262K. It is served at 173K (`--max-model-len=177184`) as vLLM's measured ceiling for this quant at util 0.96 (yielding 5.71 GiB available fp8 KV cache). The Gated-DeltaNet hybrid keeps most layers' KV bounded, ensuring long-context prompts remain performant.
+**Context cap rationale**: The model's native max is 262K and it is now served at the full window (`--max-model-len=262144`). The KV fit is an ESTIMATE (~8.5 GiB fp8 KV per max-length sequence against an estimated ~20 GiB aggregate pool at util 0.92 across both cards), not a measurement: vLLM v1 hard-fails startup if the pool cannot hold one full sequence, and the EngineCore `ValueError` in `kubectl logs -n ai-system <pod> --previous` then states the measured ceiling. The Gated-DeltaNet hybrid keeps most layers' KV bounded, ensuring long-context prompts remain performant.
 
 **Configuration details** (from `clusters/cluster1/kubernetes/apps/ai-system/vllm/app/deployment.yaml`):
-- **`--max-model-len 177184` (173K)** - measured ceiling providing headroom over large `exa-agent` sessions (~164K tokens).
-- **`--max-num-seqs 8` / `--max-cudagraph-capture-size 8`** - concurrency cap sized for the dense 27B model on 5.71 GiB KV cache (where one max-length prompt takes most of the pool).
-- **`--gpu-memory-utilization 0.96`** - documented ceiling leaving headroom for CUDA graph allocation. (Util 0.97 contributed to a node lockup when embeddings also ran on GPU).
+- **`--max-model-len 262144` (262K)** - the full native window, headroom over the largest observed `exa-agent` session (~164K tokens).
+- **`--tensor-parallel-size 2`** - splits the model across both 5090s; PCIe-only (no NVLink, no GeForce P2P), so the allreduce rides host memory via NCCL.
+- **`--max-num-seqs 16` / `--max-cudagraph-capture-size 16`** - concurrency cap sized for ~2.5 full-length sessions plus short-prompt bursts.
+- **`--gpu-memory-utilization 0.92`** - ~3 GB free per card; deliberately below the old single-card 0.96 ceiling (0.97 contributed to a node lockup when embeddings also ran on GPU).
 - **`--max-num-batched-tokens 8192`** - reduces prefill scheduling rounds for medium tool prompts.
 - **`--kv-cache-dtype fp8`**.
-- **Quantization**: auto-detected `compressed-tensors` NVFP4 from the checkpoint; no `--quantization` flag is passed.
+- **MTP speculative decoding** - `--speculative-config {"method":"mtp","num_speculative_tokens":2}` using the draft head shipped in the checkpoint.
+- **Quantization**: auto-detected `fp8` from the checkpoint's `quantization_config`; no `--quantization` flag is passed.
 - **Tool-call parser**: `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3` (with `--enable-auto-tool-choice`), paired with the model's built-in chat template.
-- **`--language-model-only`** - skips the vision encoder on this checkpoint, preserving ~3 GB of VRAM for KV cache.
+- **`--language-model-only`** - skips the vision encoder on this checkpoint, preserving VRAM for KV cache.
 - `--enable-prefix-caching`, `--trust-remote-code`.
 
 **Model right-sizing (history)**:
@@ -239,7 +241,8 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 3. `nvidia/Qwen3.6-35B-A3B-NVFP4` (35B MoE, ~19B on disk, Mamba-hybrid, served at 131K).
 4. `rdtand/Qwen3.6-27B-PrismaSCOUT-Blackwell-NVFP4-BF16-vllm` (27B dense, ~18 GiB resident, 192K context).
 5. `unsloth/Qwen3.6-27B-NVFP4` (dense quant with BF16 vision/embeddings, ~23 GiB resident, 177184 ceiling with 5.71 GiB KV).
-6. `unsloth/Qwen3.8-27B-NVFP4` (current: Unsloth Dynamic V3.0, ~19.9 GB disk / ~18 GiB resident, Gated-DeltaNet hybrid attention with only 16 of 64 layers keeping paged KV, 173K context at util 0.96 and 8-way concurrency).
+6. `unsloth/Qwen3.8-27B-NVFP4` (Unsloth Dynamic V3.0, ~19.9 GB disk / ~18 GiB resident on one card, Gated-DeltaNet hybrid attention with only 16 of 64 layers keeping paged KV, 173K context at util 0.96 and 8-way concurrency; weights stay cached on the PVC as the single-card fallback).
+7. `Qwen/Qwen3.8-27B-FP8` (current: official W8A8 FP8, tensor-parallel 2 across both 5090s, full 262K window, 16-way, util 0.92, MTP-2).
 
 ### Embeddings Service
 
