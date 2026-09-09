@@ -69,6 +69,11 @@ spec:
           enabled: true
           image:
             repository: rancher/kubectl
+            # Pin the tag: the chart defaults it to the cluster's kube version
+            # (v1.36.3), which rancher/kubectl does not publish (latest is
+            # v1.36.2), and the uninstall cleanup hook then wedges in
+            # ImagePullBackOff, leaving the release stuck 'uninstalling'.
+            tag: v1.36.2
             pullPolicy: IfNotPresent
       serviceMonitor:
         enabled: true
@@ -323,8 +328,11 @@ spec:
       spec:
         useDefaultResources: false
         resources:
+          # No cpu limit (key omitted deliberately): an explicit `cpu: null`
+          # is REJECTED by the current operator CRD on a fresh server-side
+          # apply ("spec.resources.limits.cpu: must be of type
+          # integer,string: null"), which wedged the 2026-09-07 reinstall.
           limits:
-            cpu: null
             memory: "8000Mi"
           requests:
             cpu: 500m
