@@ -31,7 +31,7 @@ spec:
           containers:
             - name: ddns
               # favonia/cloudflare-ddns: small, non-root capable updater
-              image: docker.io/favonia/cloudflare-ddns:1.15.1
+              image: docker.io/favonia/cloudflare-ddns:1.17.0
               imagePullPolicy: Always
               securityContext:
                 allowPrivilegeEscalation: false
