@@ -1,0 +1,33 @@
+# The docs site moved to GitHub Pages (https://krops.build, polarsquad/krops).
+# This deployment only serves a 301 redirect from krops.biggs.dog so existing
+# bookmarks and links keep working. The ghcr.io/polarsquad/krops-web image is
+# no longer built or updated; the nginx-unprivileged base image (same digest as
+# before) provides the server and the ConfigMap below the redirect.
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: krops-web
+  namespace: biggs
+  labels:
+    app: krops-web
+    app.kubernetes.io/name: krops-web
+data:
+  redirect.conf: |
+    server {
+        listen 8080;
+        listen [::]:8080;
+        server_name _;
+
+        absolute_redirect off;
+
+        location = /healthz {
+            access_log off;
+            default_type text/plain;
+            return 200 "ok\n";
+        }
+
+        location / {
+            return 301 https://krops.build$request_uri;
+        }
+    }

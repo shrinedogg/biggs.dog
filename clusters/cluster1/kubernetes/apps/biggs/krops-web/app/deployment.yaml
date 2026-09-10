@@ -29,8 +29,10 @@ spec:
           type: RuntimeDefault
       containers:
         - name: krops-web
-          image: ghcr.io/polarsquad/krops-web:latest@sha256:79cc4bfa22ed2167ad9966030e3a4600e0485b91da43ce77ccad018a7c40ab9e
-          imagePullPolicy: Always
+          # Base image of the retired ghcr.io/polarsquad/krops-web site image
+          # (its stage-2 FROM, same digest), serving the redirect configmap.
+          image: docker.io/nginxinc/nginx-unprivileged:1.29-alpine@sha256:0c79d56aee561a1d81c63f00eee5fb5fe29279560cdc55e91425133104c7fbe6
+          imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 8080
@@ -44,6 +46,10 @@ spec:
             # nginx-unprivileged writes its pid file and temp dirs under /tmp.
             - name: tmp
               mountPath: /tmp
+            # Redirect config replaces the site's default.conf.
+            - name: conf
+              mountPath: /etc/nginx/conf.d/default.conf
+              subPath: redirect.conf
           resources:
             requests:
               cpu: 10m
@@ -65,3 +71,6 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: conf
+          configMap:
+            name: krops-web
