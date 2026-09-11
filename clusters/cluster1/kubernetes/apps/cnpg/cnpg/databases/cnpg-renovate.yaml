@@ -5,6 +5,14 @@ metadata:
   namespace: cnpg-system
 spec:
   instances: 3
+  # Targeted primary (Sep 2026 rehome): the old primary (-1) is unschedulable
+  # forever — its RWO host-path PV is node-locked to control-01, which now
+  # carries the control-plane NoSchedule taint. Pinning the primary to a
+  # replica on a worker lets CNPG complete the switchover; the -1 PVC/PV were
+  # then deleted out-of-band so -1 re-provisions on a worker with a fresh
+  # host-path volume. Remove this pin once the cluster is healthy again if
+  # you prefer operator-managed failover.
+  primaryInstanceName: cnpg-renovate-2
   bootstrap:
     initdb:
       database: renovate
