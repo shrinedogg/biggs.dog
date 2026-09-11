@@ -188,6 +188,10 @@ spec:
           resources:
             limits:
               nvidia.com/gpu: "1"
+              # Hard RAM cap for the Steam container (Sway + Steam + game
+              # process). nv-01 has ~61Gi total; 24Gi leaves headroom for a
+              # second concurrent session plus vLLM and system.
+              memory: 24Gi
             requests:
               nvidia.com/gpu: "1"
           securityContext:
