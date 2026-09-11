@@ -20,7 +20,7 @@ spec:
   # (stack.observability.vmalert.victoriametrics.com/Applied) as "ready", so the
   # healthy VMRule nvidia-gpu was perpetually reported as 'InProgress' -- a
   # false negative that gated every dependent kustomization (vllm, fenrir,
-  # nvidia-gpu-tuning, intel-gpu-plugin). Limiting the health check to the
+  # intel-gpu-plugin). Limiting the health check to the
   # HelmRelease avoids that while still blocking dependents until the GPU
   # operator chart is reconciled.
   wait: false

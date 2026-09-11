@@ -32,7 +32,7 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 
 **Steam** (gaming)
 - Big Picture mode via Sway (lightweight Wayland compositor). Gamescope was tried (forces fullscreen on a single virtual display) but its Vulkan compositing on the dGPU triggered NVRM Xid 109 (CTX SWITCH TIMEOUT) -> UE5 GPU crash (Fatal error!) on every launch; under Sway the game runs without that crash. Sway's original wl_drm abort is fixed by the patched wolf image.
-- Persistent 250Gi `host-path` PVC at `/home/retro` survives session restarts, storing login, library, and installed games. (Sam's Steam PVC requests 200Gi; the two bind independently against nv-01's root disk.)
+- Persistent 200Gi `host-path` PVC at `/home/retro` survives session restarts, storing login, library, and installed games (joey and stacie each get their own; the two bind independently against nv-01's root disk).
 - DLSS support under Proton (via NVIDIA wine NGX bridge DLLs restored in a separate 4Gi `nvngx-cache` PVC).
 
 ### GPU Time-Slicing and vLLM
@@ -44,9 +44,10 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 Hosted on an **ASRock X870E Taichi Lite** motherboard (PCIe 5.0 x8/x8 bifurcation, wide 4-pitch / 81 mm slot spacing, no M.2 lane-sharing conflict) in a **Lian Li O11D EVO XL** chassis with a 1600W PSU.
 
 The GPU Operator configures 4x time-slicing per physical GPU, providing **8 total schedulable `nvidia.com/gpu` replicas** across the node:
-1. One held by `nvidia-gpu-tuning` DaemonSet (which tunes both cards via `NVIDIA_VISIBLE_DEVICES=all`).
-2. Five held by vLLM: the CDI device plugin ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so vLLM requests 5 replicas to pigeonhole across both cards (4 per card) for tensor-parallel 2 (~14.4 GiB FP8 weights per card plus an estimated ~10 GiB fp8 KV pool per card).
-3. Two replicas for an active Dreamcast gaming session (one for the Wolf sidecar, one for the game container).
+1. Five held by vLLM: the CDI device plugin ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so vLLM requests 5 replicas to pigeonhole across both cards (4 per card) for tensor-parallel 2 (~14.4 GiB FP8 weights per card plus an estimated ~10 GiB fp8 KV pool per card).
+2. Two replicas for an active Dreamcast gaming session (one for the Wolf sidecar, one for the game container).
+
+The `nvidia-gpu-tuning` DaemonSet that previously held one replica and applied `-pm 1 -lgc 0,2600 -pl 550` has been removed; the GPUs now run at stock settings (3105 MHz max boost, 600 W TDP) and all 8 time-sliced replicas are available to workloads.
 
 When a gaming pod spins up, the `gpu-arbiter-operator` scales vLLM to 0. Even with 64 GB across two cards, arbitration manages peak board power (~1100-1200W transient under dual full load), chassis thermals, and prevents NVRM Xid 109 context switch timeouts under concurrent heavy graphics and compute workloads.
 

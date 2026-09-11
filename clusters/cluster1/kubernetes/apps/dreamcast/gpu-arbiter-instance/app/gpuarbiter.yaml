@@ -16,7 +16,6 @@ spec:
         - key: app
           operator: In
           values:
-            - alex-steam
             - direwolf-worker
   gateName: gpu.biggs.dog/await-vram
   metrics:

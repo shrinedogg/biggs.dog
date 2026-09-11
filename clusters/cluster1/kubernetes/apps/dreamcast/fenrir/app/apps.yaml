@@ -119,7 +119,7 @@ spec:
       storageClassName: host-path
       resources:
         requests:
-          storage: 250Gi
+          storage: 200Gi
   template:
     spec:
       hostIPC: true
