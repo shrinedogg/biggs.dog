@@ -236,13 +236,10 @@ spec:
       # together, automerge:false).
       ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21
       template:
-        # NOTE: substrate-crds WorkerPool.spec.template is a flat pod-template
-        # fragment (nodeSelector/affinity/resources directly under `template`,
-        # NOT under template.spec). The extra `spec:` level below has been
-        # carried since 2026-07; the 0.0.21 CRD prunes it silently (fields
-        # not declared are dropped on server-side apply), which is why the
-        # live WorkerPool shows no template at all. Kept for chart-compat
-        # reasons; the nodeSelector pin is enforced by the Deployment patch.
-        spec:
-          nodeSelector:
-            nvidia.com/gpu.present: "true"
+        # Flat pod-template fragment (the chart pipes this verbatim into
+        # WorkerPool.spec.template): nodeSelector sits DIRECTLY under
+        # `template`, not under template.spec — the CRD has no `spec` level
+        # here and the SSA typed-patch rejects it (".spec.template.spec:
+        # field not declared in schema", which broke the 0.10.1 install).
+        nodeSelector:
+          nvidia.com/gpu.present: "true"
