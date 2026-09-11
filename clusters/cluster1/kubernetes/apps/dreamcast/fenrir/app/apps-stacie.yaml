@@ -1,13 +1,14 @@
 ---
-# Apps for the second user (sam). Same images and containers as the alex
-# copies above, but:
-# - unique spec.id values (Moonlight /launch selects by id): 100-102
-# - renderNode /dev/dri/renderD130: pins sam's sessions to the slot-2 RTX
+# Apps for the second user (stacie). Same images and containers as joey's
+# copies in apps.yaml, but:
+# - unique metadata.name AND spec.id (kustomize rejects duplicate App names
+#   in one build; Moonlight /launch selects by id): stacie-firefox/testball/
+#   steam with ids 100-102
+# - renderNode /dev/dri/renderD130: pins stacie's sessions to the slot-2 RTX
 #   5090 so two concurrent sessions split across both cards (compositor +
 #   NVENC + game per card) instead of piling on renderD129.
-# Sam's Steam PVC requests 200Gi. openebs host-path does not enforce the
-# request, so this binds against nv-01's root disk (~208Gi free at
-# provisioning time, and alex-steam is already using 250Gi); treat the
+# Stacie's Steam PVC requests 200Gi like joey's. openebs host-path does not
+# enforce the request, so this binds against nv-01's root disk; treat the
 # requests as a planning ceiling, not a hard limit.
 ---
 # yaml-language-server: $schema=https://github.com/games-on-whales/fenrir/raw/refs/heads/main/schemas/direwolf.games-on-whales.github.io/app_v1alpha1.json
@@ -17,13 +18,13 @@
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: App
 metadata:
-  name: firefox
+  name: stacie-firefox
   namespace: dreamcast
 spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 100
   isHDRSupported: true
-  title: Firefox (sam)
+  title: Firefox (stacie)
   # Operator defaults: RWO, 5Gi. Local openebs host-path keeps the Firefox
   # profile on the node. The earlier "failed to create subPath directory"
   # error on this SC was solved by making the openebs BasePath writable for
@@ -91,13 +92,13 @@ spec:
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: App
 metadata:
-  name: testball
+  name: stacie-testball
   namespace: dreamcast
 spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 101
   isHDRSupported: true
-  title: Test Ball (sam)
+  title: Test Ball (stacie)
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
   wolfConfig:
     runtimeVariables:
@@ -116,13 +117,13 @@ spec:
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: App
 metadata:
-  name: steam
+  name: stacie-steam
   namespace: dreamcast
 spec:
   appAssetWebP: UklGRhwBAABXRUJQVlA4IBABAADQHACdASosAZABPm02mUmkIqKhICgAgA2JaW7hd2EbQAnsA99snIe+2Yy09snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPfbJyHvtk5D32ych77ZOQ99snIe+2TkPekAAD+/9O4f/1K366KRn9B8NO3tyIAAAAAAAAAAAAAAAAAAA==
   id: 102
   isHDRSupported: true
-  title: Steam (sam)
+  title: Steam (stacie)
   # Persists /home/retro (Steam login, library, installed games) across
   # sessions; without it the operator uses an ephemeral emptyDir. Local
   # host-path keeps game data on the GPU node. Note: openebs host-path does

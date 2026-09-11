@@ -73,7 +73,7 @@ data:
           "id": 3,
           "type": "timeseries",
           "title": "XID Errors",
-          "description": "Value of the last XID error code encountered on the GPU. Non-zero = a GPU error occurred; the recurring nv-01 hard-freeze was suspected Xid 109 (CTX_SWITCH_TIMEOUT). See nvidia-gpu-tuning (clock cap 2800 MHz) for the mitigation. Requires the dcgmExporter custom metric profile (nv-gpu-operator/app/helmrelease.yaml).",
+          "description": "Value of the last XID error code encountered on the GPU. Non-zero = a GPU error occurred; the recurring nv-01 hard-freeze was suspected Xid 109 (CTX_SWITCH_TIMEOUT). The clock-cap mitigation (nvidia-gpu-tuning) was removed; Xid 109 on Blackwell + open RM modules is treated as a driver/vBIOS issue. Requires the dcgmExporter custom metric profile (nv-gpu-operator/app/helmrelease.yaml).",
           "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
@@ -116,7 +116,7 @@ data:
           "id": 5,
           "type": "timeseries",
           "title": "Power Draw",
-          "description": "Power draw (W). RTX 5090 stock TDP is 600 W; nvidia-gpu-tuning caps the power limit at 450 W (and the graphics clock at 2800 MHz). Sustained at ceiling + thermal climb = throttling risk.",
+          "description": "Power draw (W). RTX 5090 stock TDP is 600 W (the nvidia-gpu-tuning 450 W cap has been removed). Sustained at ceiling + thermal climb = throttling risk.",
           "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
@@ -137,7 +137,7 @@ data:
           "id": 6,
           "type": "timeseries",
           "title": "Clocks (SM & Memory)",
-          "description": "SM and memory clock frequencies (MHz). RTX 5090 stock max boost is 3105 MHz; nvidia-gpu-tuning caps graphics at 2800 MHz to curb Xid 109 boost transients. A clock suddenly dropping under load while temp is high = thermal/power throttling (Xid 13 precursor).",
+          "description": "SM and memory clock frequencies (MHz). RTX 5090 stock max boost is 3105 MHz (the nvidia-gpu-tuning 2800 MHz clock cap has been removed). A clock suddenly dropping under load while temp is high = thermal/power throttling (Xid 13 precursor).",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [

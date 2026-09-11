@@ -3,10 +3,8 @@
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: User
 metadata:
-  # "alex" is the first user, kept under that name for the pre-multi-user
-  # pairing compatibility (moonlight-proxy v0.1.2 now collects the username
-  # from the pin page, so "alex" is no longer a hardcode).
-  name: alex
+  # The first user (renamed from the original hardcoded "alex").
+  name: joey
   namespace: dreamcast
 spec:
   resources:
@@ -98,16 +96,16 @@ spec:
           add: ["NET_ADMIN"]
 
 ---
-# Second user for concurrent multi-session streaming (Route 2: one Moonlight
-# client per user; /launch only stops that user's sessions). Pair a client
-# with username "sam" on the pin page. The spec mirrors alex: same
+# Second user for concurrent multi-session streaming (one Moonlight client
+# per user; /launch only stops that user's sessions). Pair a client with
+# username "stacie" on the pin page. The spec mirrors joey: same
 # sidecar policies (root wolf entrypoint, GBM path, privileged wolf
-# sidecar for NVENC peer-init, uinput) since they hit the same nv-01
+# sidecar for NVENC peer-init, uinput) since both hit the same nv-01
 # constraints.
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: User
 metadata:
-  name: sam
+  name: stacie
   namespace: dreamcast
   resources:
     limits:
