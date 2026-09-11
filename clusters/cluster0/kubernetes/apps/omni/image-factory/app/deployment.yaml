@@ -34,7 +34,13 @@ spec:
           emptyDir: {}
       containers:
         - name: image-factory
-          image: ghcr.io/siderolabs/image-factory:v1.7.0
+          # Fork of siderolabs/image-factory v1.7.0 with "skip missing
+          # non-amd64 architectures in installer image builds" (branch
+          # skip-arm64-installer, commit 0c49cc9): our custom kernel-module
+          # extensions are amd64-only, and stock v1.7.0 fails the OCI
+          # installer route with "OCI layout has no linux/arm64 manifest".
+          # Upstream issue siderolabs/image-factory#395.
+          image: docker.io/shrinedogg/image-factory:v1.7.0-skip-arm64
           imagePullPolicy: Always
           args:
             - --config
