@@ -11,7 +11,8 @@ spec:
   type: Declarative
   description: >-
     Generates PromQL queries from natural language descriptions.
-  platform: substrate
+  # platform field removed in kagent-crds 0.10.1 (v1alpha2 SandboxAgent):
+  # the substrate settings under spec.substrate are now the only platform config.
   substrate:
     workerPoolRef:
       name: kagent-default

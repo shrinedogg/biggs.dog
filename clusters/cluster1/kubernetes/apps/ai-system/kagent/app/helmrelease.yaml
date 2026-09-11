@@ -226,8 +226,23 @@ spec:
       # feature gates — the worker CrashLoops with "atunnel: reading credential
       # bundle: ... no such file or directory". Renovate bumps for the whole
       # substrate stack are grouped + automerge:false (see renovate.json).
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.26
+      # PINNED to substrate 0.0.21 — the LAST version whose CRDs keep
+      # WorkerPool.spec.ateomImage and SandboxConfig.spec.default (0.0.22
+      # renamed ateomImage -> workerImage, which the kagent 0.10.1 chart
+      # does not speak; kagent is the latest that exists). MUST move in
+      # lockstep with the substrate/substrate-crds OCI source tags. The
+      # v0.0.21 tag tracks the 0.0.21 control plane; do not let Renovate
+      # split this group (renovate.json pins the whole substrate stack
+      # together, automerge:false).
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21
       template:
+        # NOTE: substrate-crds WorkerPool.spec.template is a flat pod-template
+        # fragment (nodeSelector/affinity/resources directly under `template`,
+        # NOT under template.spec). The extra `spec:` level below has been
+        # carried since 2026-07; the 0.0.21 CRD prunes it silently (fields
+        # not declared are dropped on server-side apply), which is why the
+        # live WorkerPool shows no template at all. Kept for chart-compat
+        # reasons; the nodeSelector pin is enforced by the Deployment patch.
         spec:
           nodeSelector:
             nvidia.com/gpu.present: "true"

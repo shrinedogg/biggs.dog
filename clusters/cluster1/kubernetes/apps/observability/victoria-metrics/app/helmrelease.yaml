@@ -342,6 +342,10 @@ spec:
         extraArgs:
           maxLabelsPerTimeseries: "150"
         storage:
+          # No default StorageClass on this cluster (2026-09-08 rebuild):
+          # pin host-path explicitly or the PVC sits Pending forever (this
+          # exact bug wedged the 2026-09-11 reinstall).
+          storageClass: host-path
           accessModes:
             - ReadWriteOnce
           resources:
