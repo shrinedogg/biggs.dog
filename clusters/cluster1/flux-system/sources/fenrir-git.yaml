@@ -6,8 +6,11 @@ metadata:
   namespace: flux-system
 spec:
   interval: 1h
-  url: https://github.com/games-on-whales/fenrir
+  url: https://github.com/shrinedogg/fenrir
   ref:
-    branch: main
+    branch: feat/multi-user
     # Pinned for reproducibility; bump deliberately to pick up CRD changes.
-    commit: ec6c640596aca12a1942dacb034790bcc96eb863
+    # Fork branch: multi-user pairing (username on the pin page) adds the
+    # User CRD status subresource + publicPinURL, needed by the user
+    # controller in the operator v0.1.1.
+    commit: 42474c47abf57687aba8934bf723a69f143189c7
