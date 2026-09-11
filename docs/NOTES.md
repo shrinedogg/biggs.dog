@@ -14,8 +14,8 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 
 | Image | Tag | Reason |
 | ----- | --- | ------ |
-| `docker.io/shrinedogg/direwolf-operator` | `v0.1.0` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent is not up on the first try) and prunes stale `trackedSessions` entries that spam logs. |
-| `docker.io/shrinedogg/moonlight-proxy` | `v0.1.1` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session. |
+| `docker.io/shrinedogg/operator` | `v0.1.1` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent is not up on the first try) and prunes stale `trackedSessions` entries that spam logs. v0.1.1 adds the user controller, which publishes the proxy pin URL into `User.Status.PublicPinURL` for multi-user pairing. |
+| `docker.io/shrinedogg/moonlight-proxy` | `v0.1.2` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session. v0.1.2 adds multi-user pairing: the pin page collects a username and binds the pairing to that `User` CR (replaces the hardcoded `alex`). |
 | `docker.io/shrinedogg/wolf-agent` | `v0.1.0` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers. |
 | `docker.io/shrinedogg/wolf` | `v0.1.0` | Overlay on `wolf:stable` with a patched `gst-wayland-display` ([shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display), branch `fix/optional-wl-drm`): skips the legacy `wl_drm` global when dmabuf v4 feedback is active, fixing the wlroots/Sway nested-compositor abort. |
 | `docker.io/shrinedogg/gpu-arbiter-operator` | `v0.1.1` | Go/controller-runtime port of the original bash `gpu-arbiter`; scales `vllm` to 0 during sessions and lifts the VRAM scheduling gate. v0.1.x fixed scaling to use the `deployments/scale` subresource (a backwards merge patch had emitted `replicas:null`, defaulting back to 1) and switched status writes to a full `Status().Update()` so zero-valued fields clear. |
@@ -32,7 +32,7 @@ Getting the GPU-accelerated game streaming stack working end-to-end required for
 
 **Steam** (gaming)
 - Big Picture mode via Sway (lightweight Wayland compositor). Gamescope was tried (forces fullscreen on a single virtual display) but its Vulkan compositing on the dGPU triggered NVRM Xid 109 (CTX SWITCH TIMEOUT) -> UE5 GPU crash (Fatal error!) on every launch; under Sway the game runs without that crash. Sway's original wl_drm abort is fixed by the patched wolf image.
-- Persistent 250Gi `host-path` PVC at `/home/retro` survives session restarts, storing login, library, and installed games.
+- Persistent 250Gi `host-path` PVC at `/home/retro` survives session restarts, storing login, library, and installed games. (Sam's Steam PVC requests 200Gi; the two bind independently against nv-01's root disk.)
 - DLSS support under Proton (via NVIDIA wine NGX bridge DLLs restored in a separate 4Gi `nvngx-cache` PVC).
 
 ### GPU Time-Slicing and vLLM

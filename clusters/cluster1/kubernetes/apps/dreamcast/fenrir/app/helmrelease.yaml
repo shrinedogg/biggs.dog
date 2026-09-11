@@ -25,12 +25,16 @@ spec:
           operator:
             image:
               # Patched fork: retries stream reconciliation (upstream stalls
-              # the session until the 1-minute reaper kills it whenever
-              # wolf-agent isn't up on the first try) and prunes stale
-              # trackedSessions entries that spam the logs.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
+              # the session until the 1-minute reaper kills it whenever the
+              # agent is not up on the first try) and prunes stale
+              # trackedSessions entries that spam logs.
+              # v0.1.1 adds the user controller: it publishes the proxy pin
+              # URL into User.Status.PublicPinURL (multi-user pairing; the
+              # moonlight-proxy v0.1.2 pin page posts a username, so each
+              # client pairs as its own User CR instead of hardcoded alex).
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.1).
               repository: docker.io/shrinedogg/operator
-              tag: v0.1.0
+              tag: v0.1.1
             # The operator's --lb-sharing-key defaults to POD_NAMESPACE
             # ("dreamcast"), but the chart's moonlight-proxy Service is
             # annotated with sharing-key "direwolf". Mismatched keys make
@@ -40,6 +44,11 @@ spec:
             # so every session Service shares the proxy's LB IP.
             args:
               - --lb-sharing-key=direwolf
+              # The moonlight-proxy Service in this cluster is named
+              # "direwolf" (not the chart's "moonlight-proxy" default), so
+              # the user controller needs the explicit name to publish the
+              # pin URL.
+              - --proxy-service-name=direwolf
             env:
               # Patched fork: the agent acts as fake-udev for hotplugged
               # input devices (writes /run/udev/data entries to the shared
@@ -64,9 +73,13 @@ spec:
               # session pod to come up. A cold start (image pull + wolf boot +
               # agent readiness) exceeds 25s, so upstream returned 500 right
               # before the pod was ready and the client cancelled the session.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.1).
+              # v0.1.2 adds multi-user pairing: the pin page collects a
+              # username (posted with the PIN) and the pairing is bound to
+              # that User CR. The hardcoded-alex pin page is gone, so every
+              # pairing from now on must enter a username.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
               repository: docker.io/shrinedogg/moonlight-proxy
-              tag: v0.1.1
+              tag: v0.1.2
     # Pin the shared moonlight-proxy LoadBalancer VIP. The chart's service.app
     # already carries lbipam.cilium.io/sharing-key: direwolf (and the per-session
     # RTP Services share this IP via that key); Helm merges this annotation in,
