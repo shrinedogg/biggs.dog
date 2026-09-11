@@ -5,6 +5,19 @@ metadata:
   namespace: cnpg-system
 spec:
   instances: 3
+  # The Sep 2026 rebuild created this cluster with instance -1's host-path PV
+  # node-locked to control-01, which carries the control-plane NoSchedule
+  # taint. -1 holds the ONLY copy of the current database incarnation (the
+  # barman WAL archive was polluted by the pre-rebuild system id during the
+  # rebuild, so replicas -2/-3 cannot complete archive recovery). Tolerate
+  # the taint so -1 can run as primary on control-01 until the replicas are
+  # re-cloned from it and a proper switchover can move the primary off.
+  affinity:
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        operator: Equal
+        value: ""
+        effect: NoSchedule
   bootstrap:
     initdb:
       database: pocketid
