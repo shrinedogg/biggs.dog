@@ -96,17 +96,15 @@ spec:
           add: ["NET_ADMIN"]
 
 ---
-# Second user for concurrent multi-session streaming (one Moonlight client
-# per user; /launch only stops that user's sessions). Pair a client with
-# username "stacie" on the pin page. The spec mirrors joey: same
-# sidecar policies (root wolf entrypoint, GBM path, privileged wolf
-# sidecar for NVENC peer-init, uinput) since both hit the same nv-01
-# constraints.
+---
+# yaml-language-server: $schema=https://github.com/games-on-whales/fenrir/raw/refs/heads/main/schemas/direwolf.games-on-whales.github.io/user_v1alpha1.json
 apiVersion: direwolf.games-on-whales.github.io/v1alpha1
 kind: User
 metadata:
+  # The first user (renamed from the original hardcoded "alex").
   name: stacie
   namespace: dreamcast
+spec:
   resources:
     limits:
       nvidia.com/gpu: "1"
@@ -194,4 +192,3 @@ metadata:
         # CAP_NET_ADMIN in the pod's network namespace.
         capabilities:
           add: ["NET_ADMIN"]
-
