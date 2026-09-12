@@ -149,7 +149,10 @@ spec:
       # kubernetes.io/hostname: control-01
 
     # -- Node tolerations for server scheduling to nodes with taints. Details are [here](https://kubernetes.io/docs/concepts/configuration/assign-pod-node/)
-    tolerations: []
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
 
     # -- Pod topologySpreadConstraints
     topologySpreadConstraints: # []
