@@ -52,6 +52,10 @@ spec:
       renderNode: /dev/dri/renderD130
   template:
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       containers:
         - name: app
           image: ghcr.io/games-on-whales/firefox:edge
@@ -100,6 +104,15 @@ spec:
   isHDRSupported: true
   title: Test Ball (stacie)
   # Since volumeClaimTemplate is not defined, an ephemeral EmptyDir volume will be used.
+  # Template carries only the nv-01 GPU-taint toleration: this app
+  # has no app container (the operator assembles the sidecars), and
+  # an empty template.spec preserves that default assembly.
+  template:
+    spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
   wolfConfig:
     runtimeVariables:
       # See the firefox app above: pins the session to the slot-1 5090.
@@ -136,6 +149,10 @@ spec:
           storage: 200Gi
   template:
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       hostIPC: true
       # DLSS: restore the NVIDIA "wine" NGX bridge DLLs that the Talos
       # nonfree-kmod-nvidia extension strips. Proton looks for nvngx.dll /

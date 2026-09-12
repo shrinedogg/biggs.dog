@@ -34,6 +34,10 @@ spec:
       # the GPU node by capability label, matching the rest of the stack.
       nodeSelector:
         nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       terminationGracePeriodSeconds: 5
       containers:
         - name: liquidctl
