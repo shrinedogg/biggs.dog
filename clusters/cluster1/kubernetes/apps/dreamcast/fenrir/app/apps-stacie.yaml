@@ -477,8 +477,11 @@ spec:
           volumeMounts:
             - name: uinput
               mountPath: /dev/uinput
-            - name: input-events
-              mountPath: /dev/input
+            # /dev/input is NOT mounted here: the operator (v0.1.3+) gives
+            # every session pod a pod-private emptyDir at /dev/input and the
+            # wolf-agent mknods only this session's input devices into it.
+            # Mounting the host's /dev/input leaked every other session's
+            # uinput controllers into this pod (duplicate pads, cross-input).
             # Steam's CEF UI (steamwebhelper) allocates its GPU command buffers
             # in /dev/shm; the container-runtime default of 64Mi fills instantly
             # and Big Picture renders nothing (black screen with cursor).
@@ -501,10 +504,9 @@ spec:
           hostPath:
             path: /dev/uinput
             type: CharDevice
-        - name: input-events
-          hostPath:
-            path: /dev/input
-            type: Directory
+        # input-events (hostPath /dev/input) removed: the operator (v0.1.3+)
+        # always creates a pod-private emptyDir at /dev/input. See the
+        # volumeMounts comment above.
         - name: dshm
           emptyDir:
             medium: Memory

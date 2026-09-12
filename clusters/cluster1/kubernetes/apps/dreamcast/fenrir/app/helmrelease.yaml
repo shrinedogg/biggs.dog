@@ -39,9 +39,9 @@ spec:
               # longer deletes other sessions' Services (that livelock was
               # tearing two streams down). Single-session setups are
               # unchanged: the first session keeps the original ports.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.3).
               repository: docker.io/shrinedogg/operator
-              tag: v0.1.2
+              tag: v0.1.3
             # The operator's --lb-sharing-key defaults to POD_NAMESPACE
             # ("dreamcast"), but the chart's moonlight-proxy Service is
             # annotated with sharing-key "direwolf". Mismatched keys make
@@ -61,8 +61,11 @@ spec:
               # input devices (writes /run/udev/data entries to the shared
               # udev-data volume and broadcasts synthetic udev netlink
               # events in the pod netns) so SDL/Steam detect controllers.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.0).
-              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.1
+              # v0.1.2: the agent also mknods this session's input devices
+              # into the pod-private /dev/input (see operator v0.1.3), so
+              # concurrent sessions stop seeing each other's controllers.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
+              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.2
               # Patched wolf: gst-wayland-display no longer advertises the
               # legacy wl_drm global when dmabuf v4 feedback is active, which
               # crashed nested wlroots compositors (sway) with
