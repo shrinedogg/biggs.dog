@@ -4,11 +4,16 @@
 ---
 # Windrose direct-connection game port (LB 192.168.6.11:28050, TCP+UDP).
 # Clients are (a) Windrose running inside dreamcast session pods (pod-to-pod,
-# e.g. joey/stacie steam sessions) and (b) LAN machines connecting to the
-# Cilium LB-IPAM address (reserved:world entity). Without this rule the
-# namespace default-deny drops their SYNs at the windrose pod (verified via
-# Hubble: "Policy denied DROPPED (TCP Flags: SYN)" from dreamcast session
-# pods). Scopes: only pods labeled app.kubernetes.io/name=windrose, only
+# e.g. joey/stacie steam sessions), (b) LAN machines connecting to the Cilium
+# LB-IPAM address (reserved:world entity), and (c) external players via the
+# UDM port-forward. The service uses externalTrafficPolicy: Cluster, so any
+# client whose traffic is forwarded through a non-backend node (BGP ECMP
+# spread, NodePort hops) is SNAT'd to that node's IP and arrives at the pod
+# with the host/remote-node identity instead of world — without the
+# host/remote-node entities below those flows are denied at the pod (verified
+# via Hubble: "Policy denied DROPPED (TCP Flags: SYN)" from node IPs; the
+# same signature broke the UDM port-forward for all external players).
+# Scopes: only pods labeled app.kubernetes.io/name=windrose, only
 # port 28050, TCP and UDP.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -22,6 +27,8 @@ spec:
   ingress:
     - fromEntities:
         - world
+        - host
+        - remote-node
       toPorts:
         - ports:
             - port: "28050"
