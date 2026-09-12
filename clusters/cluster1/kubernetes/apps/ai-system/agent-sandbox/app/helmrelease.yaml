@@ -45,6 +45,15 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
   values:
     namespace:
       create: false

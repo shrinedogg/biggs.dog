@@ -31,6 +31,15 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
   values:
     # Streamable HTTP transport: matches the RemoteMCPServer protocol
     # (STREAMABLE_HTTP) and the /mcp endpoint the kagent controller calls.

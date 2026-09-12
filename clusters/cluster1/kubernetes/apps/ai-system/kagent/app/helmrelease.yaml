@@ -43,6 +43,15 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
           # ----------------------------------------------------------------
           # Grafana MCP — mount the service account token so the mcp/grafana
           # server can authenticate against Grafana. The ExternalSecret
@@ -243,3 +252,7 @@ spec:
         # field not declared in schema", which broke the 0.10.1 install).
         nodeSelector:
           nvidia.com/gpu.present: "true"
+        tolerations:
+          - key: nvidia.com/gpu
+            operator: Exists
+            effect: NoSchedule

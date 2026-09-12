@@ -32,6 +32,10 @@ spec:
       # matching the rest of the ai-system stack.
       nodeSelector:
         nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       # Short grace so vLLM RELEASES VRAM fast when the gpu-arbiter-operator scales it to
       # 0 for a gaming session: the gaming pod is held by a scheduling gate until
       # VRAM is free, and direwolf reaps the session after 60s, so vLLM must let

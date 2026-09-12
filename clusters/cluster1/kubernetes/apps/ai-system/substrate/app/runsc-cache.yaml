@@ -32,6 +32,10 @@ spec:
       labels:
         app: runsc-cache
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       # Run wherever the atelet DaemonSet runs (all nodes).
       containers:
       - name: stage

@@ -22,6 +22,15 @@ spec:
                 path: /spec/template/spec/nodeSelector
                 value:
                   nvidia.com/gpu.present: "true"
+          - target:
+              kind: Deployment
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
           # The chart has no storageClass knob: the postgres StatefulSet
           # volumeClaimTemplate and the rustfs-data PVC set only `storage`,
           # relying on a cluster default StorageClass. The rebuilt cluster has
@@ -37,6 +46,27 @@ spec:
               - op: add
                 path: /spec/volumeClaimTemplates/0/spec/storageClassName
                 value: host-path
+          # Tolerate the nv-01 GPU taint for the chart-managed
+          # postgres StatefulSet and the atelet DaemonSet.
+          - target:
+              kind: StatefulSet
+              name: postgres
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
+          - target:
+              kind: DaemonSet
+            patch: |-
+              - op: add
+                path: /spec/template/spec/tolerations
+                value:
+                  - key: nvidia.com/gpu
+                    operator: Exists
+                    effect: NoSchedule
           - target:
               kind: PersistentVolumeClaim
               name: rustfs-data

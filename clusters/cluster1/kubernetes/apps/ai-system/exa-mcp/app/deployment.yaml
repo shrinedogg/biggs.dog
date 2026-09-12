@@ -43,6 +43,10 @@ spec:
       # Pin to the GPU node (nv-01), matching the rest of the ai-system stack.
       nodeSelector:
         nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       affinity:
         nodeAffinity:
           requiredDuringSchedulingIgnoredDuringExecution:
