@@ -14,6 +14,10 @@ spec:
       labels:
         app: intel-gpu-plugin
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       initContainers:
       - name: intel-gpu-initcontainer
         image: intel/intel-gpu-initcontainer:0.36.0

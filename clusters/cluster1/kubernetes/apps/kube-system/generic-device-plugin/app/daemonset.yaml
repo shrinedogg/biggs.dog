@@ -21,6 +21,10 @@ spec:
       labels:
         app.kubernetes.io/name: generic-device-plugin
     spec:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
       priorityClassName: system-node-critical
       containers:
         - name: generic-device-plugin
