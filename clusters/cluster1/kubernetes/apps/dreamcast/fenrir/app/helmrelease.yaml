@@ -32,9 +32,16 @@ spec:
               # URL into User.Status.PublicPinURL (multi-user pairing; the
               # moonlight-proxy v0.1.2 pin page posts a username, so each
               # client pairs as its own User CR instead of hardcoded alex).
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.1).
+              # v0.1.2 makes concurrent sessions work: every per-session RTP
+              # Service shares one LB VIP, so they are disambiguated by port.
+              # The operator now allocates a unique port block per session and
+              # tells wolf to listen on it (WOLF_RTSP_SETUP_PORT etc.), and no
+              # longer deletes other sessions' Services (that livelock was
+              # tearing two streams down). Single-session setups are
+              # unchanged: the first session keeps the original ports.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
               repository: docker.io/shrinedogg/operator
-              tag: v0.1.1
+              tag: v0.1.2
             # The operator's --lb-sharing-key defaults to POD_NAMESPACE
             # ("dreamcast"), but the chart's moonlight-proxy Service is
             # annotated with sharing-key "direwolf". Mismatched keys make
