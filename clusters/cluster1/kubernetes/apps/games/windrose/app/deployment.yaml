@@ -57,7 +57,7 @@ spec:
         # server image avoids pulling a second image and guarantees the file is
         # owned by uid 1000 (same as the main container).
         - name: stage-config
-          image: docker.io/windroseserver/windroseserver:0.10.0.7.33-372c3516@sha256:754336a4bb4807e4471727da9700e10a7c48fe618fb45612102ff05a7f9427f9
+          image: docker.io/windroseserver/windroseserver:0.10.0.9.32-22d39a16@sha256:2ccfe3319d0b4f9637ba08dbefb44f8c64c97309ba1b5e4c152e418ef63755d7
           command:
             - /bin/bash
             - -c
@@ -72,7 +72,7 @@ spec:
         - name: windrose
           # Pin by digest so Renovate can track and bump it. The tag is kept so
           # Renovate has a version to propose updates against.
-          image: docker.io/windroseserver/windroseserver:0.10.0.7.33-372c3516@sha256:754336a4bb4807e4471727da9700e10a7c48fe618fb45612102ff05a7f9427f9
+          image: docker.io/windroseserver/windroseserver:0.10.0.9.32-22d39a16@sha256:2ccfe3319d0b4f9637ba08dbefb44f8c64c97309ba1b5e4c152e418ef63755d7
           imagePullPolicy: IfNotPresent
           ports:
             # Direct-connection game port (DirectConnectionServerPort in
