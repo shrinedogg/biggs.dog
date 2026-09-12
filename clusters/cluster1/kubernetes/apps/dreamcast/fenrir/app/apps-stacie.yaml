@@ -107,8 +107,10 @@ spec:
   # Template carries only the nv-01 GPU-taint toleration: this app
   # has no app container (the operator assembles the sidecars), and
   # an empty template.spec preserves that default assembly.
+  # containers: [] is required by the CRD whenever a template is set.
   template:
     spec:
+      containers: []
       tolerations:
         - key: nvidia.com/gpu
           operator: Exists
