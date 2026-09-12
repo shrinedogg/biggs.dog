@@ -29,6 +29,10 @@ spec:
       priorityClassName: system-node-critical
       kubeletDirPath: /var/lib/kubelet
       enableSeLinuxHostMount: false
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
     controllerPlugin:
       priorityClassName: system-cluster-critical
       deploymentStrategy:
@@ -44,4 +48,8 @@ spec:
   nodePlugin:
     updateStrategy:
       type: RollingUpdate
+    tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
   controllerPlugin: {}

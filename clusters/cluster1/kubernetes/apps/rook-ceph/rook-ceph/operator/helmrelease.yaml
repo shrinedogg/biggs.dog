@@ -30,6 +30,12 @@ spec:
       # serviceMonitor:
       #   enabled: true  # broken in v1.18.6
     enableDiscoveryDaemon: true
+    # Tolerate the nv-01 GPU taint so rook-discover keeps running there.
+    discover:
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
     monitoring:
       enabled: true
     resources:
