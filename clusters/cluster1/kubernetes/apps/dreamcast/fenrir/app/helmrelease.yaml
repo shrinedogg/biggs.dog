@@ -61,11 +61,13 @@ spec:
               # input devices (writes /run/udev/data entries to the shared
               # udev-data volume and broadcasts synthetic udev netlink
               # events in the pod netns) so SDL/Steam detect controllers.
-              # v0.1.2: the agent also mknods this session's input devices
-              # into the pod-private /dev/input (see operator v0.1.3), so
-              # concurrent sessions stop seeing each other's controllers.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
-              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.2
+              # v0.1.3: the agent also clears runc's privileged-coldplug
+              # copy of host /dev/input at startup (runc walks the host /dev
+              # after mounts, so other sessions' pads leak into the private
+              # dir whenever a pod starts mid-session), then mknods only
+              # this session's devices.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.3).
+              AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.3
               # Patched wolf: gst-wayland-display no longer advertises the
               # legacy wl_drm global when dmabuf v4 feedback is active, which
               # crashed nested wlroots compositors (sway) with
