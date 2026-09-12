@@ -359,17 +359,22 @@ spec:
               # falling back, leaving Steam silent. The wolf pulseaudio server
               # already makes the session's virtual sink the default sink.
 
-              # Run a real udevd inside the container (privileged; the kernel
-              # broadcasts uevents into the pod's netns). This is what lets
-              # games detect the virtual pad Steam Input creates mid-game:
-              # Steam itself receives the Moonlight controller (via the
-              # wolf-agent's fake-udev events), but it then emulates a new
-              # uinput pad for the game, and without udevd nobody writes the
-              # udev db entry or libudev event for it -> SDL/Proton in-game
-              # see no controller at all.
-              /usr/lib/systemd/systemd-udevd --daemon
-              udevadm trigger --subsystem-match=input --action=add 2>/dev/null || true
-              udevadm settle --timeout=5 2>/dev/null || true
+              # NOTE: in-pod systemd-udevd + udevadm trigger REMOVED (was here
+              # for Steam Input's emulated pads). With the pod-private
+              # /dev/input (operator v0.1.3+) session input discovery is the
+              # wolf-agent's job alone: it writes the udev db entries and
+              # broadcasts the netlink events for THIS session's devices.
+              # The old `udevadm trigger` replayed HOST-wide sysfs, which
+              # re-created nodes for every other session's pads inside this
+              # pod (the exact leak the private /dev/input exists to stop).
+              # Steam Input's own uinput pads are kernel-global with no
+              # creator identity in their uevents, so they can never be
+              # scoped per session: they get no node here by design. Games
+              # must read the wolf pad directly -> set the game's controller
+              # override to "Disable Steam Input" (BPM: game > gear icon >
+              # Controller Options), otherwise Steam grabs the wolf pad and
+              # re-emits it as a pad this pod cannot see (menu works, game
+              # sees no controller).
 
               # Focus guard (sway only): Steam's steamwebhelper maps an invisible,
               # unnamed, class-less notification popup (role "popup",
