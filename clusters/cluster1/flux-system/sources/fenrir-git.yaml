@@ -15,4 +15,4 @@ spec:
     # controller in the operator v0.1.1.
     # 3cf5c34 adds status.ports.agent to the Session CRD (per-session
     # wolf-agent port), needed by the operator v0.1.2 concurrent-session fix.
-    commit: 3cf5c34
+    commit: 3cf5c348913d06e413ba55486e059e7ee5c3e6a6
