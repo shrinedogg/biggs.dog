@@ -13,4 +13,6 @@ spec:
     # Fork branch: multi-user pairing (username on the pin page) adds the
     # User CRD status subresource + publicPinURL, needed by the user
     # controller in the operator v0.1.1.
-    commit: 42474c47abf57687aba8934bf723a69f143189c7
+    # 3cf5c34 adds status.ports.agent to the Session CRD (per-session
+    # wolf-agent port), needed by the operator v0.1.2 concurrent-session fix.
+    commit: 3cf5c34
