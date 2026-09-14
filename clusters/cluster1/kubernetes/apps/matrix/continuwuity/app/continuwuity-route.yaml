@@ -25,3 +25,15 @@ spec:
       backendRefs:
         - name: continuwuity-service
           port: 8080
+    # Federation server-discovery: pinging/federating with matrix.biggs.dog does
+    # GET /.well-known/matrix/server on that hostname. Without this rule it 404s,
+    # discovery falls back to the host on 8448 (nothing listens) and the
+    # connection times out ("tcp connect error: deadline has elapsed").
+    # The homeserver serves this (same backend as the biggs.dog apex route).
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /.well-known/matrix
+      backendRefs:
+        - name: continuwuity-service
+          port: 8080
