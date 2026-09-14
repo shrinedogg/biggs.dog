@@ -48,6 +48,27 @@ spec:
             - port: "8448"
               protocol: TCP
 ---
+# Self-ping / server->own-domain federation. matrix.biggs.dog resolves to the
+# wildcard-biggs-dog agentgateway MetalLB VIP, a cluster endpoint (not world).
+# Without this, the homeserver's federation request to its own domain is policy
+# denied and `!admin debug ping matrix.biggs.dog` times out.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-gateway
+  namespace: matrix
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
