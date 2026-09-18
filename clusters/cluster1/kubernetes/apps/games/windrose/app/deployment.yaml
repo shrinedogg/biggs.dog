@@ -153,11 +153,11 @@ spec:
           resources:
             requests:
               # 4-player dedicated server needs ~12 GiB per the official guide;
-              # 15 GiB matches the prior HelmRelease. No CPU limit (repo policy:
+              # bumped to 20 Gi for a 6-player cap. No CPU limit (repo policy:
               # avoid CFS throttling on bursty game workloads).
-              memory: 15Gi
+              memory: 20Gi
             limits:
-              memory: 15Gi
+              memory: 20Gi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
