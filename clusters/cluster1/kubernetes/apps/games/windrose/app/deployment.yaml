@@ -39,6 +39,10 @@ spec:
       labels:
         app.kubernetes.io/name: windrose
     spec:
+      # The UE server flushes its RocksDB island stores on graceful exit; give
+      # the preStop hook time to signal the server and let it finish writing
+      # before the kubelet escalates to SIGKILL.
+      terminationGracePeriodSeconds: 120
       securityContext:
         # windroseserver/windroseserver runs as ue_user (uid/gid 1000,
         # confirmed from the image: useradd --uid 1000 ue_user). Match it so
@@ -56,18 +60,42 @@ spec:
         # generates), so it cannot live on the read-only Secret. Reusing the
         # server image avoids pulling a second image and guarantees the file is
         # owned by uid 1000 (same as the main container).
+        #
+        # Self-heal step: the server mints a NEW world island whenever the
+        # configured WorldIslandId has no store on the saves PVC (observed
+        # 2026-09: an unclean shutdown leaves stores flagged "Save is not
+        # checked", the island scan reports Worlds count: 0, and a fresh
+        # island replaces the old world from the players' perspective). Old
+        # stores are never deleted, so when the configured id is missing but
+        # other stores exist, adopt the most recently written one instead of
+        # letting the server fork an empty world. Normal path (configured id
+        # present on the PVC, or an empty/fresh PVC) is unchanged.
         - name: stage-config
           image: docker.io/windroseserver/windroseserver:0.10.0.9.32-22d39a16@sha256:2ccfe3319d0b4f9637ba08dbefb44f8c64c97309ba1b5e4c152e418ef63755d7
           command:
             - /bin/bash
             - -c
-            - "cp /secret-rendered/ServerDescription.json /config/ServerDescription.json"
+            - |
+              set -eu
+              cp /secret-rendered/ServerDescription.json /config/ServerDescription.json
+              CFG_ID=$(grep -oE '"WorldIslandId":[[:space:]]*"[^"]*"' /config/ServerDescription.json | cut -d'"' -f4)
+              WORLDS=/saved-worlds/SaveProfiles/Default/RocksDB_v2/0.10.0/Worlds
+              if [ -n "$CFG_ID" ] && [ ! -d "$WORLDS/$CFG_ID" ]; then
+                NEWEST=$(ls -1t "$WORLDS" 2>/dev/null | head -1 || true)
+                if [ -n "$NEWEST" ]; then
+                  echo "stage-config: WorldIslandId $CFG_ID has no store on the PVC; adopting $NEWEST"
+                  sed -i -E "s/\"WorldIslandId\":[[:space:]]*\"[^\"]*\"/\"WorldIslandId\": \"$NEWEST\"/" /config/ServerDescription.json
+                fi
+              fi
           volumeMounts:
             - name: secret-rendered
               mountPath: /secret-rendered
               readOnly: true
             - name: config
               mountPath: /config
+            - name: saved
+              mountPath: /saved-worlds
+              readOnly: true
       containers:
         - name: windrose
           # Pin by digest so Renovate can track and bump it. The tag is kept so
@@ -86,6 +114,30 @@ spec:
           # The UE dedicated server is slow to boot and exposes no HTTP health
           # endpoint; use a TCP socket probe against the game port. Mirrors the
           # chart's generous startup window (periodSeconds * failureThreshold).
+          lifecycle:
+            # PID 1 is `bash -c ./WindroseServer.sh`, which does NOT forward
+            # the kubelet's SIGTERM to the server process: a plain pod delete
+            # escalates to SIGKILL after the grace period and leaves the
+            # island stores dirty ("Save is not checked. Inconsistent version"
+            # at next boot, which previously forked the world). Signal the
+            # server binary directly and wait for it to flush and exit. If it
+            # has not exited after ~105s the hook ends and the kubelet's
+            # normal TERM/KILL sequence proceeds against the grace period.
+            preStop:
+              exec:
+                command:
+                  - /bin/bash
+                  - -c
+                  - |
+                    PID=$(pgrep -f WindroseServer-Linux-Shipping | head -1 || true)
+                    if [ -n "$PID" ]; then
+                      kill -TERM "$PID" 2>/dev/null || true
+                      for i in $(seq 1 105); do
+                        kill -0 "$PID" 2>/dev/null || exit 0
+                        sleep 1
+                      done
+                    fi
+                    exit 0
           startupProbe:
             tcpSocket:
               port: 28050
