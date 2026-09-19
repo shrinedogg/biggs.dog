@@ -243,7 +243,7 @@ spec:
       # v0.0.21 tag tracks the 0.0.21 control plane; do not let Renovate
       # split this group (renovate.json pins the whole substrate stack
       # together, automerge:false).
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21
+      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.30
       template:
         # Flat pod-template fragment (the chart pipes this verbatim into
         # WorkerPool.spec.template): nodeSelector sits DIRECTLY under
