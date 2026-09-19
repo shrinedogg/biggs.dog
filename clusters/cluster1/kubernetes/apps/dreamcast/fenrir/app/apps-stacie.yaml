@@ -58,7 +58,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: app
-          image: ghcr.io/games-on-whales/firefox:edge
+          image: ghcr.io/games-on-whales/firefox:edge@sha256:1ea7331934d31d346079fb67462b371586d65b5ebb792acee8c0e64e87c185b1
           resources:
             limits:
               nvidia.com/gpu: "1"
@@ -166,7 +166,7 @@ spec:
       # download happens at most once) and stages them for the app container.
       initContainers:
         - name: nvngx-bridge
-          image: ghcr.io/games-on-whales/steam:fedora-43
+          image: ghcr.io/games-on-whales/steam:fedora-43@sha256:4f88a5e363c783791fbbe432661d70d6775629fa8c74038b21622477cf20e0ab
           securityContext:
             # Write to the fresh cache PVC / scratch emptyDir (root-owned).
             runAsUser: 0
@@ -212,7 +212,7 @@ spec:
               mountPath: /work
       containers:
         - name: app
-          image: ghcr.io/games-on-whales/steam:fedora-43
+          image: ghcr.io/games-on-whales/steam:fedora-43@sha256:4f88a5e363c783791fbbe432661d70d6775629fa8c74038b21622477cf20e0ab
           # Without a GPU allocation the container gets no /dev/dri node and no
           # driver libs (CDI injection is per-allocated-container), so Sway and
           # Steam render nothing onto the Wayland display -> black video.
