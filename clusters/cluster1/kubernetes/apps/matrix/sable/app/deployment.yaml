@@ -45,7 +45,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: sable
-          image: ghcr.io/sableclient/sable:latest@sha256:a032868816e77231ba866c287f2addb3dbc27f9c07261543445d810ed9d23c0d
+          image: ghcr.io/sableclient/sable:latest@sha256:7a8224a998f3d8155161112f3df2581964365ad0b01d664329bb377af51e377f
           imagePullPolicy: Always
           ports:
             - name: http
