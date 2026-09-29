@@ -32,7 +32,7 @@ spec:
             claimName: image-factory-registry
       containers:
         - name: registry
-          image: registry:3.1.1
+          image: registry:3.1.2
           imagePullPolicy: Always
           env:
             - name: REGISTRY_HTTP_ADDR
