@@ -1,6 +1,7 @@
 ---
-# Minimal dedicated identity. No cluster RBAC: the server only reads a SQLite
-# DB and serves MCP tools over HTTP; it never touches the Kubernetes API.
+# Minimal dedicated identity. No cluster RBAC: the server only talks to the
+# Mindwtr Cloud API and serves MCP tools over HTTP; it never touches the
+# Kubernetes API.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -12,27 +13,22 @@ metadata:
 # Mindwtr MCP Server — self-hosted Model Context Protocol server for
 # GTD task management via mcp-proxy bridge (stdio → streamable HTTP).
 #
-# Uses the official mindwtr-mcp npm package (v1.1.3) in stdio mode, wrapped
+# Uses the official mindwtr-mcp npm package (v1.1.3) in Cloud mode, wrapped
 # by mcp-proxy so kagent can connect over the network. No custom container
 # image — a node:24-alpine init container installs the package from npm and
 # stages it into a shared emptyDir that mcp-proxy reads.
 #
-# Data seeding: the Mindwtr SQLite database is provided via a Kubernetes
-# Secret (mindwtr-db). A db-seed init container copies it into an emptyDir.
-# No host-path PVC — fully compatible with Talos.
+# Data source: the live Mindwtr Cloud sync endpoint
+# (http://mindwtr-cloud.mindwtr:8787, /v1 + /v1/data) — the same store the
+# desktop/mobile clients sync against. Read + write (--write). The bearer
+# token comes from the mindwtr-mcp-cloud-token ExternalSecret (same
+# 1Password item as the cloud deployment) and is injected as
+# MINDWTR_MCP_CLOUD_TOKEN; mcp-proxy forwards it to the node child via
+# --pass-environment. Plain HTTP is cluster-internal (LAN-only), so
+# --cloud-allow-insecure-http=true is required.
 #
-# To seed the DB:
-#   1. Export mindwtr.db from Mindwtr desktop (Settings → Advanced → Export)
-#   2. Run: sqlite3 mindwtr.db VACUUM
-#   3. Create the secret:
-#        kubectl create secret generic mindwtr-db \
-#          --from-file=mindwtr.db=./mindwtr.db \
-#          -n ai-system --dry-run=client -o yaml | kubectl apply -f -
-#   4. Pod auto-restarts and picks up the new DB
-#
-# To update the DB later, re-apply the secret (kubectl apply) and the pod
-# will restart automatically on secret change (RollingUpdate with
-# podReplacementPolicy=Always is default for Secrets).
+# Requires Cilium policy: ai-system mindwtr-mcp -> mindwtr mindwtr-cloud:8787
+# (see network-policies/policies/infra/ai-system.yaml + apps/mindwtr.yaml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -77,8 +73,8 @@ spec:
         # is musl-linked (matching the mcp-proxy base image) but still depends on
         # libstdc++.so.6 + libgcc_s.so.1 from the g++ apk; those are copied next
         # to the binary so the server container can run it via LD_LIBRARY_PATH.
-        # better-sqlite3 ships prebuilt binaries; if not available for node:24,
-        # compilation tools are installed by apk.
+        # better-sqlite3 is unused in Cloud mode but ships in the package; the
+        # build toolchain is kept so npm install never fails on the native addon.
         - name: mindwtr-install
           image: docker.io/library/node:24-alpine
           imagePullPolicy: IfNotPresent
@@ -113,46 +109,11 @@ spec:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
-        # Seed the Mindwtr SQLite database from the mindwtr-db Secret into the
-        # shared emptyDir. The Secret is created manually (see top comment).
-        # Kubernetes decodes the base64 Secret automatically when mounted.
-        - name: db-seed
-          image: docker.io/library/alpine:3.24
-          imagePullPolicy: IfNotPresent
-          command: ["/bin/sh", "-ec"]
-          args:
-            - |
-              set -eu
-              cp /secret/mindwtr.db /data/mindwtr.db
-              chmod 0444 /data/mindwtr.db
-              echo "seeded: $(ls -la /data/mindwtr.db)"
-          volumeMounts:
-            - name: mindwtr-db
-              mountPath: /secret
-              readOnly: true
-            - name: data
-              mountPath: /data
-          resources:
-            requests:
-              cpu: 10m
-              memory: 16Mi
-            limits:
-              memory: 64Mi
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-            seccompProfile:
-              type: RuntimeDefault
       containers:
         # stdio → streamable HTTP bridge. Spawns the mindwtr-mcp child process
-        # (node + mindwtr-mcp/dist/index.js) and serves it at :8080/mcp. This is
-        # the only network endpoint; the mindwtr-mcp process itself listens on
-        # nothing (pure stdio).
+        # (node + mindwtr-mcp/dist/index.js in Cloud mode) and serves it at
+        # :8080/mcp. This is the only network endpoint; the mindwtr-mcp process
+        # itself listens on nothing (pure stdio).
         #
         # Uses mcp-proxy (Python MCP SDK) instead of supergateway: mcp-proxy
         # answers the notifications/initialized 202 and its session layer
@@ -164,9 +125,9 @@ spec:
           # The image ENTRYPOINT is ["catatonit","--"] with CMD ["mcp-proxy"].
           # catatonit execs mcp-proxy (CMD) and appends these args. mcp-proxy's
           # argparse parses flags up to "--", then treats the rest as
-          # command_or_url + args. The node command + its --db-path flag must
-          # be wrapped in a single shell string so argparse sees only ONE
-          # positional (the shell), not a "--db-path" it tries to parse.
+          # command_or_url + args. The cloud flags are plain token args for the
+          # node child; the bearer token is NOT passed on the command line — it
+          # rides MINDWTR_MCP_CLOUD_TOKEN, which --pass-environment forwards.
           args:
             - --host=0.0.0.0
             - --port=8080
@@ -175,10 +136,20 @@ spec:
             - --
             - /staged/bin/node
             - /staged/node_modules/mindwtr-mcp/dist/index.js
-            - --db-path=/data/mindwtr.db
+            - --cloud-url=http://mindwtr-cloud.mindwtr:8787
+            - --cloud-allow-insecure-http=true
+            - --write
           env:
             - name: NODE_ENV
               value: "production"
+            # Cloud bearer token (same value the Mindwtr desktop/mobile clients
+            # use in Settings → Sync). Materialized by the
+            # mindwtr-mcp-cloud-token ExternalSecret.
+            - name: MINDWTR_MCP_CLOUD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: mindwtr-mcp-cloud-token
+                  key: token
             # node (copied from node:24-alpine) needs libstdc++.so.6 +
             # libgcc_s.so.1, which the init container stages next to the binary.
             - name: LD_LIBRARY_PATH
@@ -221,9 +192,6 @@ spec:
             - name: mindwtr-bin
               mountPath: /staged
               readOnly: true
-            - name: data
-              mountPath: /data
-              readOnly: true
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -232,17 +200,6 @@ spec:
         - name: mindwtr-bin
           emptyDir:
             sizeLimit: 200Mi
-        # Mindwtr SQLite database, seeded from the mindwtr-db Secret by the
-        # db-seed init container. Re-seeded on each pod restart.
-        - name: data
-          emptyDir:
-            sizeLimit: 100Mi
         - name: tmp
           emptyDir:
             sizeLimit: 100Mi
-        # Mindwtr database Secret — created manually via kubectl (see top comment).
-        # The init container reads this once at startup; subsequent updates
-        # require a pod restart (kubectl rollout restart or delete the pod).
-        - name: mindwtr-db
-          secret:
-            secretName: mindwtr-db

@@ -15,8 +15,9 @@ spec:
     GTD task management expert with full access to the Mindwtr task system.
     Creates, lists, updates, and completes tasks; processes inbox items with
     the 2-minute rule; manages projects with sections and next actions;
-    tracks Waiting For items; and runs weekly review workflows. Connects to
-    a local-first Mindwtr SQLite database — no external API calls.
+    tracks Waiting For items; and runs weekly review workflows. Reads and
+    writes the live self-hosted Mindwtr Cloud sync store — the same data the
+    desktop and mobile clients sync against.
   # Sandboxed execution: code the agent writes runs in an isolated env.
   # No outbound network needed — all tools are cluster-internal.
   sandbox:
@@ -151,16 +152,36 @@ spec:
           apiGroup: kagent.dev
           kind: RemoteMCPServer
           name: mindwtr-mcp
+          # Tool names as exposed by mindwtr-mcp v1.1.3 (Cloud mode, --write):
+          # the server prefixes every tool with "mindwtr_". An earlier revision
+          # of this list used the unprefixed names (create_task, list_tasks,
+          # ...) which do not exist — kagent matched nothing and the agent ran
+          # with zero tools.
           toolNames:
-            - create_task
-            - list_tasks
-            - update_task
-            - delete_task
-            - list_inbox_tasks
-            - complete_task
-            - list_projects
-            - create_project
-            - list_project_tasks
-            - list_next_actions
-            - list_scheduled_tasks
-            - search_tasks
+            - mindwtr_list_tasks
+            - mindwtr_get_task
+            - mindwtr_add_task
+            - mindwtr_update_task
+            - mindwtr_complete_task
+            - mindwtr_delete_task
+            - mindwtr_restore_task
+            - mindwtr_list_projects
+            - mindwtr_get_project
+            - mindwtr_add_project
+            - mindwtr_update_project
+            - mindwtr_delete_project
+            - mindwtr_list_sections
+            - mindwtr_get_section
+            - mindwtr_add_section
+            - mindwtr_update_section
+            - mindwtr_delete_section
+            - mindwtr_list_areas
+            - mindwtr_add_area
+            - mindwtr_update_area
+            - mindwtr_delete_area
+            - mindwtr_list_people
+            - mindwtr_get_person
+            - mindwtr_add_person
+            - mindwtr_update_person
+            - mindwtr_rename_person
+            - mindwtr_delete_person

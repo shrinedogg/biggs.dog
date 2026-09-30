@@ -284,6 +284,43 @@ spec:
             k8s:io.kubernetes.pod.namespace: networking
             gateway.networking.k8s.io/gateway-class-name: agentgateway
 ---
+# mindwtr-mcp drives the Mindwtr Cloud API (mindwtr namespace) in Cloud mode.
+# Like the flux-mcp path above, this is a cross-namespace ClusterIP Service:
+# the mindwtr-cloud Service VIP reverse-NATs SYN,ACK, so the return path must
+# be allowed as ingress here too, or the connection is dropped after the first
+# round-trip. (Ingress side lives in policies/apps/mindwtr.yaml.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-mindwtr-cloud
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: mindwtr-mcp
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: mindwtr
+            app.kubernetes.io/component: cloud
+      toPorts:
+        - ports:
+            - port: "8787"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-mindwtr-cloud
+  namespace: ai-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: mindwtr
+            app.kubernetes.io/component: cloud
+---
 # exa-mcp egress to Exa API. The server calls Exa's web search / fetch /
 # research endpoints over HTTPS. No special FQDN is needed -- the broad
 # internet egress with TLS allows exa.com and all its CDN hosts.

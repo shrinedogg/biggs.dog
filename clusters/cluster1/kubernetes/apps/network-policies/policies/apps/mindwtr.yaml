@@ -76,3 +76,25 @@ spec:
               protocol: TCP
             - port: "8787"
               protocol: TCP
+---
+# mindwtr-cloud: mindwtr-mcp (ai-system) polls /v1 and pushes /v1/data sync
+# with the same bearer token the desktop/mobile clients use. Scoped to the
+# mindwtr-mcp pod only; no other ai-system pod may reach the sync API.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-ai-system-mindwtr-mcp
+  namespace: mindwtr
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: cloud
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: mindwtr-mcp
+      toPorts:
+        - ports:
+            - port: "8787"
+              protocol: TCP
