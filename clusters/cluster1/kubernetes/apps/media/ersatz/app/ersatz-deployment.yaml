@@ -45,7 +45,7 @@ spec:
         # digest (see pinDigests rule in renovate.json) so updates land in-place
         # without rolling back to an older stable vXX.Y.Z build, which could downgrade
         # the database schema.
-        - image: ersatztv/legacy:develop@sha256:976a2d218a8e10b80caaf5b444539c2de068803c028505596c6488ab1cc2674b
+        - image: ersatztv/legacy:develop@sha256:048c2b8e9512e684e1a9f7d557a90502fe5daca3414dd8aa6fd6a0d1e1bec90c
           imagePullPolicy: Always
           name: ersatz
           securityContext:
