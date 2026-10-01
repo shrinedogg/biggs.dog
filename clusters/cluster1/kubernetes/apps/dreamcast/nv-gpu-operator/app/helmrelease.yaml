@@ -25,6 +25,18 @@ spec:
     # the operator cannot mutate the immutable Talos host, so keep it disabled.
     toolkit:
       enabled: false
+    # The operator's end-to-end CUDA workload validation (nvidia-cuda-validator
+    # running vectorAdd) can never pass on nv-01 while production vllm holds
+    # ~97.6% of both RTX 5090s (31824/32607 MiB; ~783 MiB free per card is less
+    # than a fresh CUDA context needs, so cudaMalloc fails with out-of-memory).
+    # WITH_WORKLOAD=false (nvidia-validator flag, default true) skips only this
+    # e2e workload; driver, toolkit, and device-plugin validations still run.
+    # See https://github.com/shrinedogg/biggs.dog/issues/554
+    validator:
+      cuda:
+        env:
+          - name: WITH_WORKLOAD
+            value: "false"
     operator:
       defaultRuntime: containerd
     # Time-slice each physical GPU into 4 schedulable nvidia.com/gpu replicas
