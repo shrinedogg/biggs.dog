@@ -42,7 +42,7 @@ spec:
   # the live kagent-controller already passes in its substrate config, so
   # existing snapshots stay restorable — do not "modernize" it to
   # registry.k8s.io/pause without a snapshot-migration story.
-  pauseImage: gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da
+  pauseImage: gcr.io/gke-release/pause@sha256:a78c2d6208eff9b672de43f880093100050983047b7b0afe0217d3656e1b0d5f
   assets:
     amd64:
       runsc:
