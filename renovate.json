@@ -130,7 +130,7 @@
       ]
     },
     {
-      "description": "Substrate stack must upgrade in lockstep — never automerge",
+      "description": "Substrate stack must upgrade in lockstep — never automerge. Pinned <0.0.22: 0.0.22+ re-architected the control plane (mTLS pod-identity only, WorkerPool ateomImage->workerImage, SandboxConfig spec.default removed) and no kagent stable speaks it — kagent 0.10.x vendors substrate v0.0.9 (jwt/insecure client), only kagent 1.0.0-alpha pairs (vendors v0.3.0-alpha3). Re-attempted 0.0.30 via #499, reverted, see #553. Unpin when kagent 1.0.0 stable lands, then upgrade kagent+substrate as a pair.",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
         "ghcr.io/kagent-dev/substrate/ateom-gvisor",
@@ -138,9 +138,10 @@
         "ghcr.io/kagent-dev/substrate/helm/substrate-crds"
       ],
       "groupName": "substrate-stack",
+      "allowedVersions": "<0.0.22",
       "automerge": false,
       "prBodyNotes": [
-        ":warning: The substrate stack upgrades only as a whole set: substrate + substrate-crds charts, the digest-pinned ateapi fork (apps/ai-system/substrate/app/helmrelease.yaml), and the ateom worker image (apps/ai-system/kagent/app/helmrelease.yaml). An ateom worker newer than the control plane CrashLoops with `atunnel: reading credential bundle: open /run/podidentity.podcert.ate.dev/credential-bundle.pem: no such file or directory` (worker mTLS needs PodCertificate projection; this cluster runs jwt mode and Talos lacks the feature gates). The 0.0.12 chart also fails server-side apply on a Role hardcoded to the `ate-system` namespace (substrate runs in ai-system here). Before merging: rebase the ateapi fork to the new version, work around the ate-system Role, add spec.pauseImage to apps/ai-system/substrate/app/sandboxconfig.yaml (required by 0.0.12 CRDs), and decide the worker pod-identity story."
+        ":warning: PINNED at 0.0.21 — do not merge bumps to >=0.0.22 (see #553 and the rule description). The 0.0.30 control plane drops the jwt client mode the digest-pinned ateapi fork and kagent 0.10.x rely on: ate-api-server is mTLS-only (PodCertificate cred bundle + authentication-config), CRDs renamed WorkerPool.spec.ateomImage -> workerImage and removed SandboxConfig.spec.default, and the chart ships its own gvisor-default SandboxConfig (conflicts with the git-managed one; its gs:// asset URL is unreachable from this cluster). Historical checklist for a paired kagent 1.0.0 + substrate >=0.3.0 upgrade: rebase or drop the ateapi fork (its --client-jwt-jwks-url flags no longer exist upstream), work around the Role hardcoded to the ate-system namespace, keep spec.pauseImage at sha256:bcbd57ba... (matches existing actor snapshots), and decide the worker pod-identity story."
       ]
     },
     {
