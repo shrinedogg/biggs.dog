@@ -267,10 +267,10 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 
 **Available agents** (`kubectl get agents,sandboxagents -n ai-system`):
 
-The 11 agents split across two deployment patterns:
+The 12 agents split across two deployment patterns:
 
 - **Classic `kind: Agent` CRs** (invocable via MCP): `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`, `mindwtr-agent`. The two cilium agents are defined statically in `clusters/cluster1/kubernetes/apps/ai-system/kagent/cilium-agents/` with generic `k8s_*` tools alongside Cilium tools. `codebase-agent` lives in `clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`.
-- **`kind: SandboxAgent` CRs on the substrate runtime** (`clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents/`): `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`. These are `READY=True` with golden actors built, but are not yet invocable via the MCP server due to an upstream kagent limitation (`listReadyAgents` lists only `v1alpha2.Agent` with `DeploymentReady`, while substrate agents report `WorkloadReady`). Use the fallbacks in [`.rules`](.rules) or direct `kubectl`.
+- **`kind: SandboxAgent` CRs on the substrate runtime** (`clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents/`): `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`. Currently `ReconcileFailed` (since 2026-09-11): kagent 0.10.x renders secret-backed env into ActorTemplates, an API substrate >= 0.0.15 removed, so the agents cannot be created until the paired kagent 1.0.0 + substrate upgrade (#553). Even when running, they are not invocable via the MCP server due to an upstream kagent limitation (`listReadyAgents` lists only `v1alpha2.Agent` with `DeploymentReady`, while substrate agents report `WorkloadReady`). Use the fallbacks in [`.rules`](.rules) or direct `kubectl`.
 - **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent` (the 5 substrate agents and 2 cilium agents are disabled in chart values to prevent duplicate classic Agent CRs).
 
 See [`.rules`](.rules) for agent selection by task domain and live invocability status.

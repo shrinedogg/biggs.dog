@@ -44,50 +44,49 @@ terse output.
 ## Current state (verify before relying)
 
 - **Invocable now (Declarative, stable):** `flux-agent`, `vm-agent`,
-  `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`.
-- **Substrate SandboxAgents: not MCP-invocable.** `k8s-agent`,
-  `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`.
-  Two stacked blockers — use the fallbacks below / direct `kubectl`:
+  `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`,
+  `mindwtr-agent`.
+- **Substrate SandboxAgents: blocked upstream (cannot be created).**
+  `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
+  `cilium-manager-agent` have been `ACCEPTED=False` / `READY=False`
+  (`ReconcileFailed`) since 2026-09-11. Use the classic-agent fallbacks or
+  direct `kubectl`:
 
-  1. **Version skew (resolved pending commit):** the substrate stack is at
-     upstream **`v0.0.10`**, whose ate-controller calls `CreateAtespace`; the
-     `ate-api-server` fork (`shrinedogg/ateapi`) was on older bases (first
-     `v0.0.7` → `CreateAtespace` Unimplemented, then `v0.0.9` → `ateletpb` proto
-     field-number skew vs the v0.0.10 ateom that surfaced as a cryptic
-     `"string field contains invalid UTF-8"` unmarshal error and pinned every
-     SandboxAgent at `Ready=ActorTemplateNotReady`). The fork is now rebased
-     onto **v0.0.10** as `shrinedogg/ateapi:v0.0.10-jwksurl` (built+pushed;
-     only the `--client-jwt-jwks-url` patch survives — v0.0.9 upstreamed the
-     atelet-namespace fix as `installdefaults.NamespaceFromPodEnv()` reading
-     `POD_NAMESPACE`). Pinned by digest in
-     `apps/ai-system/substrate/app/helmrelease.yaml` (a mutable tag let the
-     node cache serve stale builds). **Caveat:** the fork's base version MUST
-     track the substrate chart version — a version skew silently breaks the
-     golden-actor wire protocol. See
-     `.wip/substrate-utf8-bug-report.md` for the full postmortem.
-  2. **Upstream kagent MCP listing bug (blocks MCP invoke even when Ready):**
+  1. **ActorTemplate env incompatibility (the hard blocker):** kagent 0.10.x
+     always renders secret-backed env (`KAGENT_CONFIG_JSON`,
+     `KAGENT_AGENT_CARD_JSON`, `KAGENT_SRT_SETTINGS_JSON`, model API key) into
+     ActorTemplates, and substrate >= 0.0.15 removed `valueFrom` from the
+     ActorTemplate API (control-plane types, not just the CRD schema), so
+     creation is rejected with `spec.containers[0].env[N].value: Required
+     value`. No kagent 0.10.x + substrate >= 0.0.15 combo can run
+     SandboxAgents. The fix arrives with the paired kagent 1.0.0 + substrate
+     >= 0.3.0 upgrade (#553; renovate substrate-stack pinned `<0.0.22`). Do
+     NOT bump substrate on its own: 0.0.30 also renames WorkerPool /
+     SandboxConfig fields and drops the jwt client mode the digest-pinned
+     ateapi fork relies on (reverted #499).
+  2. **Upstream kagent MCP listing bug (dormant until the agents run again):**
      `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` (never
      `SandboxAgentList`) and hard-codes `condition.Reason == "DeploymentReady"`;
      substrate agents report Ready with reason `WorkloadReady`. Excluded twice
      (wrong CR type + wrong reason). The kagent REST API (`/agents`, kagent-ui)
-     DOES list them once Ready is restored; only the MCP tool omits them. Fix
-     needs a kagent change; bump kagent when it lands.
+     DOES list them once Ready is restored; only the MCP tool omits them.
+     Expected to be addressed in the kagent 1.0.0 line.
 
-  Also: a stuck `Accepted=False` (`ActorTemplate ... spec: Invalid value:
-  Spec is immutable`) can accumulate when a rendered ActorTemplate spec drifts;
+  Historical (kept for context): the golden-actor stack originally worked on
+  substrate <= 0.0.10 with the digest-pinned `shrinedogg/ateapi` fork
+  (v0.0.10 base + `--client-jwt-jwks-url` patch; the fork's base version MUST
+  track the control plane version, a skew silently corrupts the golden-actor
+  wire protocol, see `.wip/substrate-utf8-bug-report.md`). It was unblocked by
+  a series of `ate-system`-vs-`ai-system` fixes (upstream hard-codes
+  `ate-system`; this cluster runs `ai-system`) plus a Cilium egress gap. The
+  notable final fix was `allow-egress-atelet-registries` (CNP, `app=atelet` to
+  `world:443`) because the atelet pulls sandbox images in-process over the pod
+  network (does NOT reuse node containerd). ai-system is Cilium default-deny;
+  `world:443` egress is selectively allowed per labeled pod (kagent agents,
+  vllm, embeddings, atelet, codebase-memory git-sync), not cluster-wide.
+  If a rendered ActorTemplate spec drifts once agents run again,
   `kubectl delete actortemplate.ate.dev <name> -n ai-system` lets the
-  reconciler recreate it (fixes Accepted, but do NOT do this while the version
-  skew is unfixed — it triggers a golden rebuild that can't complete and flips
-  Ready False).
-
-  The substrate golden-actor stack was unblocked by a series of
-  `ate-system`-vs-`ai-system` fixes (upstream hard-codes `ate-system`; this
-  cluster runs `ai-system`) plus a Cilium egress gap. The notable final fix was
-  `allow-egress-atelet-registries` (CNP, `app=atelet` → `world:443`) because the
-  atelet pulls sandbox images in-process over the pod network (does NOT reuse
-  node containerd). ai-system is Cilium default-deny; `world:443` egress is
-  selectively allowed per labeled pod (kagent agents, vllm, embeddings, atelet,
-  codebase-memory git-sync) — not cluster-wide.
+  reconciler recreate it (fixes Accepted, but triggers a golden rebuild).
 
 To check live: `list_agents`, `kubectl get agents,sandboxagents -n ai-system`,
 `kubectl logs -n ai-system deploy/ate-controller | grep -i reconciler`.
@@ -108,7 +107,7 @@ To check live: `list_agents`, `kubectl get agents,sandboxagents -n ai-system`,
   `apps/ai-system/codebase-memory-mcp/` (see below).
 - `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`,
   `cilium-manager-agent` — `apps/ai-system/kagent/substrate-agents/`
-  (SandboxAgents; degraded — see above).
+  (SandboxAgents; blocked upstream, see above).
 
 Keep this list in sync with the live set.
 

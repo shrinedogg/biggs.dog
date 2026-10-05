@@ -256,7 +256,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### kagent Agents
 
-The 11 agents split across two deployment patterns: classic `kind: Agent` CRs (python runtime, each its own Deployment) and `kind: SandboxAgent` CRs on the substrate runtime (gVisor-sandboxed actors):
+The 12 agents split across two deployment patterns: classic `kind: Agent` CRs (python runtime, each its own Deployment) and `kind: SandboxAgent` CRs on the substrate runtime (gVisor-sandboxed actors):
 
 **Classic `kind: Agent` CRs** (invocable via MCP) - python runtime, each runs as its own Deployment:
 - `flux-agent` (read-only) - Flux GitOps inspection (custom, `clusters/cluster1/kubernetes/apps/ai-system/flux-mcp/`).
@@ -274,7 +274,7 @@ The 11 agents split across two deployment patterns: classic `kind: Agent` CRs (p
 - `helm-agent` - Helm release management.
 - `cilium-manager-agent` - Cilium install/config/upgrade.
 
-These five are `ACCEPTED=True` / `READY=True` (golden actors built; ActorTemplates in `Ready` phase, upserted into kagent Postgres `agents` table) and are listed by the kagent REST API (`/agents`, kagent-ui), but are not yet invocable via the MCP server (`list_agents` omits them; `invoke_agent` returns "not found"). See [Agent Sandbox and Code Execution](#agent-sandbox-and-code-execution) for the root cause and [`.rules`](.rules) fallbacks.
+These five are currently `ACCEPTED=False` / `READY=False` (`ReconcileFailed`, since 2026-09-11): the kagent controller cannot create their ActorTemplates at all. Root cause is an upstream API incompatibility between kagent 0.10.x and substrate >= 0.0.15, detailed under [Substrate Runtime](#substrate-runtime). The `READY=True` era (golden actors built, listed in kagent-ui) predates the 2026-09-11 clean reinstall; those ActorTemplates were created under substrate <= 0.0.10 CRDs. Even once they run again, they remain non-MCP-invocable until kagent lists v1alpha2 SandboxAgents (`list_agents` omits them; `invoke_agent` returns "not found").
 
 **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent` (plus the 5 substrate agents and 2 cilium agents are disabled in the chart to prevent duplicate classic Agent CRs).
 
@@ -288,11 +288,11 @@ There are two sandboxing mechanisms deployed in `ai-system`:
 **Two hard requirements**:
 
 1. **Ingress from the kube-apiserver to the conversion webhook (`:9443`) must be allowed.** `ai-system` runs implicit Cilium default-deny ingress (`allow-intra-namespace` selects `endpointSelector: {}`), and the apiserver runs host-network on a remote control-plane node, so it is not covered by Cilium's allow-localhost exemption. Without an explicit allow, every Sandbox conversion the apiserver issues is silently dropped: the controller crash-loops on cache-sync, `kubectl get sandboxes` hangs, and anything creating a `Sandbox` stalls to a 30s timeout. Handled by the `allow-ingress-apiserver-to-sandbox-webhook` CiliumNetworkPolicy in `clusters/cluster1/kubernetes/apps/network-policies/policies/infra/ai-system.yaml` (`fromEntities: [kube-apiserver]` -> `:9443`).
-2. **`SandboxAgent` agents run but are not yet MCP-invocable.** Upstream kagent's `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`. So substrate agents are excluded from `list_agents`, and `invoke_agent` returns "agent not found or not ready". Until upstream resolves this, use [`.rules`](.rules) fallbacks or direct `kubectl` for the 5 substrate agents.
+2. **`SandboxAgent` agents do not currently run (ActorTemplate incompatibility, see [Substrate Runtime](#substrate-runtime)), and were never MCP-invocable even when they did.** Upstream kagent's `MCPHandler.listReadyAgents` lists only `v1alpha2.AgentList` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`. So substrate agents are excluded from `list_agents`, and `invoke_agent` returns "agent not found or not ready". Until upstream resolves this, use [`.rules`](.rules) fallbacks or direct `kubectl` for the 5 substrate agents.
 
 ### Substrate Runtime
 
-The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1/kubernetes/apps/ai-system/substrate/` (+ `substrate-crds/`) and backs the 5 `SandboxAgent` agents.
+The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1/kubernetes/apps/ai-system/substrate/` (+ `substrate-crds/`) and is intended to back the 5 `SandboxAgent` agents (currently blocked, see below).
 - **Charts**: `substrate` and `substrate-crds` at `0.0.21` (`sources/substrate-oci.yaml`, `sources/substrate-crds-oci.yaml`).
 - **Worker pool**: `kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21` in kagent HelmRelease.
 - **Components**: `ate-controller`, `ate-api-server` (Deployment `ate-api-server-deployment`, running digest-pinned image `docker.io/shrinedogg/ateapi@sha256:78d90103f3054bf6544bf3726fa63800a47b970b3425a3e60f4efbfff9bbdad3` with `--client-jwt-jwks-url`), `atelet` worker DaemonSet, and `atenet-router`.
@@ -301,6 +301,22 @@ The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1
 - **Assets**: gVisor `runsc` (`20260622.0`) staged in rustfs and pre-cached per node via `runsc-cache` DaemonSet.
 
 **Drift correction (`driftDetection: {mode: enabled}`)**: the substrate `HelmRelease` runs Flux server-side dry-run drift detection on every reconcile, ensuring any out-of-band deletes or edits are reverted to git state.
+
+### Substrate and kagent ActorTemplate env incompatibility
+
+The 5 `SandboxAgent` CRs have been `ACCEPTED=False` (`ReconcileFailed`) since 2026-09-11. The kagent controller cannot create their ActorTemplates:
+
+```
+create ActorTemplate ai-system/k8s-agent-...: spec.containers[0].env[3..6].value: Required value
+```
+
+Root cause (verified at the Go type level, 2026-10-05):
+
+- kagent 0.10.x (checked 0.10.1/0.10.2/0.10.3, `go/core/pkg/sandboxbackend/substrate/agent_lifecycle.go`) ALWAYS renders secret-backed env entries into ActorTemplates: `KAGENT_CONFIG_JSON`, `KAGENT_AGENT_CARD_JSON`, `KAGENT_SRT_SETTINGS_JSON` via `secretKeyRef`, plus the model API key. Both the Declarative and BYO paths append them; there is no values knob to make them literal.
+- substrate removed `valueFrom` from the ActorTemplate API between 0.0.10 and 0.0.15. The v0.0.21 type states "envFrom and valueFrom are not supported" (`pkg/api/v1alpha1/actortemplate_types.go`), and the shipped CRD requires `env[].value` and drops `valueFrom`. Because the removal is in the control-plane types (not just the CRD schema), patching the CRD would not help: unknown fields get pruned and the runtime cannot resolve secrets.
+- Therefore no SandboxAgent can be created on any kagent 0.10.x + substrate >= 0.0.15 combination. This cluster's pin (kagent 0.10.2 + substrate 0.0.21, chosen in #485 as the last WorkerPool-compatible pair) sits inside the broken window; the WorkerPool check simply missed the ActorTemplate CRD.
+
+Resolution paths: (a) the planned paired upgrade to kagent 1.0.0 stable + substrate >= 0.3.0 (#553; renovate substrate-stack pinned `<0.0.22`), then re-check how kagent 1.0.0 materializes actor config; (b) downgrade the whole substrate stack to <= 0.0.10 (last valueFrom-capable release; matches the v0.0.10-based ateapi fork), viable but a helm-release wipe/reinstall, not pursued; (c) even after the agents run again, the MCP-listing gap in [Agent Sandbox and Code Execution](#agent-sandbox-and-code-execution) still applies until kagent lists v1alpha2 SandboxAgents.
 
 ### Long-Term Memory
 
@@ -400,7 +416,8 @@ Things that worked on the old cluster only because objects already existed, fixe
 
 ### Agents and MCP
 
-- **The `SandboxAgent` MCP-listing gap is upstream, not config** - substrate `kind: SandboxAgent` agents run, build golden actors, and are listed by the kagent REST API (`/agents`), but `MCPHandler.listReadyAgents` lists only `v1alpha2.Agent` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`, so they are excluded from `list_agents` and `invoke_agent` returns "not found". This requires an upstream kagent change.
+- **The `SandboxAgent` MCP-listing gap is upstream, not config** - when substrate `kind: SandboxAgent` agents run (currently blocked, see Substrate Runtime), they build golden actors and are listed by the kagent REST API (`/agents`), but `MCPHandler.listReadyAgents` lists only `v1alpha2.Agent` and hard-codes `condition.Reason == "DeploymentReady"`; substrate agents report `WorkloadReady`, so they are excluded from `list_agents` and `invoke_agent` returns "not found". This requires an upstream kagent change.
+- **substrate >= 0.0.15 dropped ActorTemplate `valueFrom`; kagent 0.10.x requires it** - declarative SandboxAgents can never reconcile on that pairing, so the pin window has no mutually compatible kagent 0.10.x + substrate >= 0.0.15. When judging version compatibility, check the controller-rendered fields against the CRD schema of the pinned control plane, not the vendored Go types.
 - **The apiserver->webhook netpol is critical** - Cilium's implicit default-deny dropped all apiserver traffic to the conversion webhook because the apiserver runs on a remote control-plane node. Fixed by explicit ingress rule (`allow-ingress-apiserver-to-sandbox-webhook`) in `clusters/cluster1/kubernetes/apps/network-policies/policies/infra/ai-system.yaml`.
 - **Git history is the source of truth for restoration** - when rolling back from partial deployment state, the backup YAML contains generated objects. Restoring from git history (`git checkout <commit> -- <file>`) recovers canonical source manifests.
 - **A stdio-only MCP image needs a spec-strict bridge** - codebase-memory-mcp is stdio-only; `supergateway` failed on `notifications/initialized`, while `mcp-proxy` answered 202 and registered cleanly with kagent.
@@ -412,5 +429,5 @@ Things that worked on the old cluster only because objects already existed, fixe
 - **Cilium Egress Gateway** - route outbound traffic through a dedicated node to stabilize external IPs.
 - **Distributed Tracing** - add Jaeger or Tempo for end-to-end tracing across game streaming and agent operations.
 - **GPU Metrics Dashboard** - Grafana dashboard for DCGM metrics, game session lifecycle, vLLM scaling events.
-- **Substrate agents via MCP** - bump kagent once upstream lists `SandboxAgent` CRs and accepts `WorkloadReady` in `listReadyAgents`, so substrate agents become MCP-invocable.
+- **Substrate agents via MCP** - needs the paired kagent 1.0.0 + substrate >= 0.3.0 upgrade (#553): kagent 1.0.0 speaks the new substrate protocol and is the line expected to list `SandboxAgent` CRs / accept `WorkloadReady` in `listReadyAgents`. Only then re-test MCP invocability.
 - **Agent hardening** - de-privilege and add `securityContext` to remaining classic agents.
