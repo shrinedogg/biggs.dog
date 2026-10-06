@@ -145,6 +145,12 @@
       ]
     },
     {
+      "description": "Do NOT track gcr.io/gke-release/pause. It is digest-pinned in apps/ai-system/substrate/app/sandboxconfig.yaml under a CEL rule: changing the image invalidates actor snapshots, so the pin must stay put. Renovate tracks it by digest, but the upstream `latest`/`go` tags point at a deprecated 2014 pause 1.0 image (single-arch amd64), so digest tracking keeps proposing an 11-year downgrade to that image (PR #559; an earlier identical bump was merged as 083842da and reverted as 89f9a725). Keep the pin manual: exclude it from all updates. When the substrate stack is upgraded to a new pause, bump the digest by hand in the same PR.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["gcr.io/gke-release/pause"],
+      "enabled": false
+    },
+    {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
