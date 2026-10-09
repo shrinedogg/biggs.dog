@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: dex
-          image: ghcr.io/dexidp/dex:v2.45.1
+          image: ghcr.io/dexidp/dex:v2.46.0
           # The dexidp image entrypoint (docker-entrypoint) expects the full
           # command; dex serve takes the config path positionally.
           args:
