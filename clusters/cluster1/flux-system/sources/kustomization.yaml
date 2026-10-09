@@ -27,7 +27,9 @@ resources:
   - fenrir-oci.yaml
   - kagent-crds-oci.yaml
   - kagent-oci.yaml
-  - substrate-crds-oci.yaml
+  # substrate-crds-oci.yaml removed 2026-10-09 with the substrate teardown;
+  # substrate-oci.yaml is kept (suspended) as the migration workstream's chart
+  # source. Re-add substrate-crds-oci.yaml as part of the migration.
   - substrate-oci.yaml
   - agent-sandbox-git.yaml
   - oauth2-proxy-repo.yaml

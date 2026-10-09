@@ -1,4 +1,11 @@
 ---
+# SUSPENDED pending the substrate-stack migration (see the migration
+# workstream issue). The HelmRelease substrate + the ate.dev CRDs
+# (substrate-crds) were removed from cluster1 on 2026-10-09. This KS and the
+# manifests in ./app are kept as the re-enable starting point: they must be
+# re-listed in apps/ai-system/kustomization.yaml and the KS unsuspended only
+# after the newer substrate/substrate-crds chart versions, the rebased ateapi
+# fork, and the kagent 1.0 workerImage pin are in place.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:

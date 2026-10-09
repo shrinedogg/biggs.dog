@@ -207,8 +207,14 @@ spec:
       # cluster template (apiServer extraArgs + runtime-config on the control
       # plane, kubelet extraArgs on all nodes).
       # ------------------------------------------------------------------
+      # DISABLED: agent-substrate was removed from cluster1 on 2026-10-09
+      # (substrate HelmRelease uninstalled, and the ate.dev CRDs from
+      # substrate-crds removed). Re-enabling requires the full substrate-stack
+      # migration (newer substrate charts + rebased ateapi fork + kagent 1.0
+      # workerImage) — see the substrate migration workstream issue.
+      # The fields below are kept as the re-enable starting point.
       substrate:
-        enabled: true
+        enabled: false
         ateApiEndpoint: "dns:///api.ai-system.svc:443"
         ateApiInsecure: true
         # The chart's substrate-ate-api-rbac template binds the env-source
@@ -223,7 +229,7 @@ spec:
         ateApiServer:
           namespace: ai-system
     substrateWorkerPool:
-      create: true
+      create: false
       replicas: 1
       # PINNED to the substrate control-plane version. The ateom worker image
       # MUST move in lockstep with ate-controller/atelet/atenet-router and the
