@@ -1,0 +1,150 @@
+# Namespace: lightdash  (Lightdash BI, enterprise license)
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          # L7 DNS proxy — Cilium injects replies directly to the pod, avoiding
+          # the conntrack reply-drop that breaks Go resolvers behind default-deny
+          # ingress (see auth.yaml), and enables toFQDNs.
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# Intra-namespace: backend <-> worker pods (graphile worker, health probes).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: lightdash
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: lightdash
+---
+# lightdash backend/worker -> cnpg-lightdash Postgres
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-postgres
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-lightdash
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+# CNPG's -rw Service is a ClusterIP; with bpf-LB + default-deny ingress the
+# Postgres reply arrives reverse-NAT'd from the VIP and misses egress conntrack,
+# so it's dropped as new ingress. Allow the DB return path (see media.yaml).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-postgres
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-lightdash
+---
+# External traffic in from the wildcard gateway (agentgateway dataplane pods).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-class-name: agentgateway
+---
+# VictoriaMetrics scraping (vmagent selectAllByDefault; no Prometheus CRDs here).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
+---
+# Lightdash object store: Backblaze B2 (s3.eu-central-003), shared with the
+# CNPG/Barman object store. The chart has no per-connection S3 config beyond
+# the endpoint host, so a toFQDNs rule on the B2 endpoint is sufficient.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-b2
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: s3.eu-central-003.backblazeb2.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Enterprise license validation: the backend POSTs the license key to Keygen
+# (cached 24h) and, when validation-proxy is enabled, to Lightdash's proxy.
+# Without egress the enterprise feature flags degrade (community LicenseService
+# reports valid: false) but the app still boots.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-license-validation
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: api.keygen.sh
+        - matchName: roadmap.lightdash.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

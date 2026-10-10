@@ -34,6 +34,7 @@ resources:
   - substrate-podcert-oci.yaml
   - substrate-oci.yaml
   - agent-sandbox-git.yaml
+  - lightdash-repo.yaml
   - oauth2-proxy-repo.yaml
   - flux-operator-repo.yaml
   - flux-operator-mcp-oci.yaml

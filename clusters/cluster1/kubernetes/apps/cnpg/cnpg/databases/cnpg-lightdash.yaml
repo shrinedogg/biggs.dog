@@ -1,0 +1,36 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-lightdash
+  namespace: cnpg-system
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      database: lightdash
+      owner: lightdash
+      dataChecksums: true
+      secret:
+        name: lightdash-user-password
+  # Minimal trixie operand + extension images from the official CNPG 1.29 catalog
+  # (../secrets/postgresql-minimal-trixie-catalog.yaml). Lightdash's migrations
+  # require the vector extension (enterprise AI embeddings + verified answers).
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 150m
+    limits:
+      memory: 300Mi
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  postgresql:
+    extensions:
+      - name: pgvector
+    parameters:
+      archive_mode: "off"

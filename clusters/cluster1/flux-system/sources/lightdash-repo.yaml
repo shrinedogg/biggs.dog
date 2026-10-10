@@ -1,0 +1,9 @@
+---
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: lightdash
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://lightdash.github.io/helm-charts

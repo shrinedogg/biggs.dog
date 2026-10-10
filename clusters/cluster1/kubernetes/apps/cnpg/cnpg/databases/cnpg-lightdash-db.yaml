@@ -1,0 +1,18 @@
+# Declaratively enable pgvector in the lightdash database. The Cluster mounts the
+# extension binaries (via image catalog + postgresql.extensions), but
+# CREATE EXTENSION requires superuser; lightdash's knex migrations run as the
+# app user and fail with 'extension "vector" is not available' otherwise.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-lightdash-db
+  namespace: cnpg-system
+spec:
+  name: lightdash
+  owner: lightdash
+  cluster:
+    name: cnpg-lightdash
+  extensions:
+    - name: vector
+      version: "0.8.2"
+      ensure: present

@@ -1,0 +1,100 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+# Lightdash (BI tooling, enterprise license) on the cluster1 wildcard edge:
+# lightdash.biggs.dog -> wildcard-biggs-dog -> lightdash.lightdash.svc:8080.
+#
+# Chart: lightdash from https://lightdash.github.io/helm-charts (HelmRepository
+# lightdash). Version pinned here; Renovate's flux manager (helm datasource)
+# opens chart-bump PRs.
+#
+# Postgres: external, CNPG cluster cnpg-lightdash (3 replicas, host-path,
+# pgvector enabled) - see clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/.
+# Credentials arrive via 1P item lightdash-user-password (CES in cnpg-system)
+# and are read by the pods straight from the CNPG-provisioned secret.
+#
+# S3: the shared Backblaze B2 biggs-dog bucket (same key as the CNPG/Barman
+# object store). Lightdash keys are org-UUID prefixed, so they cannot collide
+# with barman/ or substrate/ prefixes.
+#
+# Secrets are external (secretRefs strict mode) via 1Password items
+# lightdash-license (LIGHTDASH_SECRET + LIGHTDASH_LICENSE_KEY) and
+# b2-object-store-keys (S3_ACCESS_KEY/S3_SECRET_KEY); see
+# app/external-secrets.yaml. The chart creates NO application secrets.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: lightdash
+  namespace: lightdash
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: lightdash
+      version: 2.16.1076
+      sourceRef:
+        kind: HelmRepository
+        name: lightdash
+        namespace: flux-system
+  install:
+    createNamespace: false
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    # External DB: the CNPG cluster (read-write service hostname; CNPG exposes
+    # both -rw and -ro, Lightdash needs the RW one for migrations).
+    postgresql:
+      enabled: false
+    externalDatabase:
+      host: cnpg-lightdash-rw.cnpg-system.svc.cluster.local
+      port: 5432
+      user: lightdash
+      database: lightdash
+      existingSecret: lightdash-user-password
+      secretKeys:
+        passwordKey: password
+    # Strict, least-privilege secret wiring: the chart skips all of its own
+    # Secret creation and reads only the keys it needs from the ESO-managed
+    # Secrets below.
+    secretRefs:
+      enabled: true
+      application:
+        name: lightdash-app-secret   # LIGHTDASH_SECRET, LIGHTDASH_LICENSE_KEY
+      database:
+        name: lightdash-app-secret
+        passwordKey: PGPASSWORD
+      s3:
+        name: lightdash-s3-secret
+        accessKey: S3_ACCESS_KEY
+        secretKey: S3_SECRET_KEY
+    s3:
+      # Backblaze B2 is S3-compatible but only over path-style URLs.
+      endpoint: https://s3.eu-central-003.backblazeb2.com
+      publicEndpoint: https://s3.eu-central-003.backblazeb2.com
+      bucket: biggs-dog
+      region: eu-central-003
+      forcePathStyle: "true"
+    image:
+      tag: "2.547.0"
+    configMap:
+      # Public URL (links in emails/exported assets) + cookie/proxy hardening
+      # for the HTTPS-terminating wildcard gateway.
+      SITE_URL: "https://lightdash.biggs.dog"
+      SECURE_COOKIES: "true"
+      TRUST_PROXY: "true"
+    # Headless browser (image previews, PDF export, Slack unfurls) is a second
+    # container fleet that needs its own tuning + egress; off for the first
+    # bring-up, flip to enabled once lightdash.biggs.dog is verified.
+    browserless-chrome:
+      enabled: false
+    migrationJob:
+      # Backend runs its own boot-time migrations (first install: single
+      # writer, no race). The hook Job would need the app Secret env (see the
+      # chart's inheritGlobalEnv note) - unnecessary while the backend is the
+      # sole migrator.
+      enabled: false
