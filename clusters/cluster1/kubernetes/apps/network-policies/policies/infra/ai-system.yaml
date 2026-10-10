@@ -252,6 +252,30 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# substrate ate-api-server manages actor snapshots over S3 (issue #598):
+# with rustfs disabled it talks to the durable B2 endpoint (same as Barman
+# and volsync). S3-compatible traffic is a single FQDN (bucket-in-path, no
+# rotating CDN hosts), so a toFQDNs allow is the tight form. The atelet
+# DaemonSet needs no new rule: allow-egress-atelet-registries already gives
+# app=atelet world:443. DNS is already allowed by allow-egress-dns (the
+# toFQDNs rule relies on that L7 DNS rule).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-substrate-b2
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: ate-api-server
+  egress:
+    - toFQDNs:
+        - matchName: s3.eu-central-003.backblazeb2.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # Infinity embedding server needs internet access to download model weights
 # (~2.4GB bge-m3) from Hugging Face on first boot. HF serves weights from
 # rotating Xet/LFS CDN hosts (*.xethub.hf.co, CloudFront, etc.) with no

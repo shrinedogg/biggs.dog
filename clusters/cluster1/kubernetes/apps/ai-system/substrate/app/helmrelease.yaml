@@ -14,11 +14,12 @@ spec:
   postRenderers:
     - kustomize:
         patches:
-          # Pin every substrate Deployment to the GPU node (nv-01). The 6
+          # Pin every substrate Deployment to the GPU node (nv-01). The
           # Deployments rendered by the 0.5.0-alpha2 chart (ate-api-server,
           # ate-controller, atenet-router, atenet-egress,
-          # k8s-credential-provider, rustfs) set neither nodeSelector nor
-          # tolerations (verified by helm template), so op: add is safe.
+          # k8s-credential-provider; rustfs is disabled below) set neither
+          # nodeSelector nor tolerations (verified by helm template), so
+          # op: add is safe.
           - target:
               kind: Deployment
             patch: |-
@@ -35,20 +36,51 @@ spec:
                   - key: nvidia.com/gpu
                     operator: Exists
                     effect: NoSchedule
-          # The chart has no storageClass knob: the rustfs-data PVC sets only
-          # `storage`, relying on a cluster default StorageClass. The rebuilt
-          # cluster has no default SC (2026-09-08), so the PVC sat Pending
-          # with 'no storage class is set'. host-path (OpenEBS local) matches
-          # the ai-system convention in AGENTS.md. PVC spec is immutable:
-          # delete the pre-existing empty PVC once by hand before the first
-          # apply if it exists.
+          # B2 object store for substrate snapshots + the gVisor asset
+          # (issue #598). With rustfs disabled the chart renders NO AWS env
+          # for either S3 reader, and the ate-api-server Deployment has no
+          # extraEnv value hook (only atelet does), so pin the endpoint here.
+          # Path style is required (B2's S3 API wants bucket-in-path). The
+          # key pair comes from the substrate-b2-object-store Secret
+          # (app/external-secrets.yaml, same 1Password item as Barman's
+          # object-store-secret in cnpg-system). The atelet DaemonSet gets
+          # the identical five vars via values.atelet.extraEnv below -- the
+          # two components must agree, or snapshot reads fail at restore.
           - target:
-              kind: PersistentVolumeClaim
-              name: rustfs-data
+              kind: Deployment
+              name: ate-api-server
             patch: |-
               - op: add
-                path: /spec/storageClassName
-                value: host-path
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AWS_REGION
+                  value: us-east-1
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AWS_ENDPOINT_URL
+                  value: "https://s3.eu-central-003.backblazeb2.com"
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AWS_S3_USE_PATH_STYLE
+                  value: "true"
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AWS_ACCESS_KEY_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: substrate-b2-object-store
+                      key: AWS_ACCESS_KEY_ID
+              - op: add
+                path: /spec/template/spec/containers/0/env/-
+                value:
+                  name: AWS_SECRET_ACCESS_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: substrate-b2-object-store
+                      key: AWS_SECRET_ACCESS_KEY
           # Tolerate the nv-01 GPU taint for the atelet DaemonSet. The chart
           # already sets one toleration (ate.dev/sandboxClass Exists), so
           # APPEND instead of replacing the whole list.
@@ -63,10 +95,10 @@ spec:
                   effect: NoSchedule
           # The chart always renders the cluster-scoped gvisor-default
           # SandboxConfig with an unreachable gs://gvisor asset URL and a
-          # registry.k8s.io pause image. Retarget the asset at the rustfs
-          # bucket (the post-merge staging step uploads the unmodified
-          # upstream tarball there; the sha256 is the chart's own pin, so the
-          # bytes must be the upstream nightly 2026-09-02 tarball). The
+          # registry.k8s.io pause image. Retarget the asset at the durable
+          # B2 store (issue #598) under the substrate/ prefix; the
+          # sha256 is the chart's own pin, so the bytes must be the
+          # upstream nightly 2026-09-02 tarball (seeded once into B2). The
           # pause digest stays at the proven gcr.io pin (renovate.json
           # excludes gcr.io/gke-release/pause from updates): all old actor
           # snapshots were deleted in the 2026-10-09 teardown, so there is
@@ -78,7 +110,7 @@ spec:
             patch: |-
               - op: replace
                 path: /spec/assets/amd64/gvisor/url
-                value: "s3://ate-snapshots/gvisor.tar.zstd"
+                value: "s3://biggs-dog/substrate/gvisor.tar.zstd"
               - op: replace
                 path: /spec/pauseImage
                 value: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
@@ -124,6 +156,16 @@ spec:
         enabled: false
       logs:
         enabled: false
+    # Disable the in-cluster rustfs object store (issue #598). Substrate's
+    # S3 backend (ATE_STORAGE_BACKEND=s3, already the chart default) is
+    # pointed at the durable Backblaze B2 endpoint via the AWS_* env below
+    # (atelet.extraEnv) and the postRenderer patch on the ate-api-server
+    # Deployment. Disabling rustfs removes its Deployment, ephemeral
+    # host-path PVC, Service, and bucket-init Job -- the 1Gi PVC on the
+    # shared OpenEBS local store and the manual asset upload it implied
+    # both go away.
+    rustfs:
+      enabled: false
     # The atelet binary defaults --ateapi-address/--ateapi-server-name to
     # api.ate-system.svc (the substrate canonical namespace). Substrate is
     # installed in ai-system here, so the node-local atelet (which brokers the
@@ -138,3 +180,25 @@ spec:
       extraArgs:
         - --ateapi-address=dns:///api.ai-system.svc:443
         - --ateapi-server-name=api.ai-system.svc
+      # B2 object store (issue #598): the node daemon reads/writes sandbox
+      # assets + snapshots, so it needs the same five AWS_* vars the
+      # postRenderer pins on ate-api-server (the chart's rustfs.enabled
+      # branch is the only other place these are set, and it is disabled).
+      # extraEnv is appended verbatim to the DaemonSet container env.
+      extraEnv:
+        - name: AWS_REGION
+          value: us-east-1
+        - name: AWS_ENDPOINT_URL
+          value: "https://s3.eu-central-003.backblazeb2.com"
+        - name: AWS_S3_USE_PATH_STYLE
+          value: "true"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: substrate-b2-object-store
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: substrate-b2-object-store
+              key: AWS_SECRET_ACCESS_KEY
