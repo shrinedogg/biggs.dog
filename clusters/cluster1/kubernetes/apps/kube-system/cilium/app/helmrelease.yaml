@@ -180,4 +180,12 @@ spec:
           - SYS_RESOURCE
     socketLB:
       enabled: true
-      hostNamespaceOnly: true
+      # hostNamespaceOnly: true keeps pod traffic on the 1.20 per-packet
+      # client-side LB path, where a same-node backend's reply is
+      # reverse-NATed before the caller-side conntrack/policy hook and is
+      # then dropped by the caller's ingress policy as CT_NEW
+      # (cilium/cilium#47913, biggs.dog#595; datapath fix proposed in
+      # cilium/cilium#47914). false runs socket LB in the
+      # pod netns (upstream default): connect()-time translation, whose
+      # conntrack matches the reply correctly.
+      hostNamespaceOnly: false
