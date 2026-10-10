@@ -13,6 +13,10 @@ spec:
     - name: agent-sandbox
     # The local model endpoint + shared API key secret must be ready.
     - name: vllm
+    # The substrate control plane (ate-api-server) must be up before the
+    # controller's substrate wiring (KAGENT_SUBSTRATE_ATE_API_ENDPOINT) and
+    # the kagent-default WorkerPool CR it creates.
+    - name: substrate
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app

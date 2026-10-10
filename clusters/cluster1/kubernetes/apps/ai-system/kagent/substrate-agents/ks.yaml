@@ -1,0 +1,24 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app kagent-substrate-agents
+  namespace: flux-system
+spec:
+  dependsOn:
+    # The Agent CRs need the kagent 1.0 controller (which renders the
+    # kagent-tool-server RemoteMCPServer) and the substrate WorkerPool.
+    - name: kagent
+    - name: substrate
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: false
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m

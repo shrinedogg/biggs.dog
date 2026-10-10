@@ -3,8 +3,11 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  # HelmRelease (renders the kagent controller + chart-managed Agents)
+  # HelmRelease (renders the kagent controller + chart-managed CRs)
   - ./helmrelease.yaml
+  # Shared Harnesses (golang-adk runtimes on the substrate WorkerPool) that
+  # the rewritten v1alpha3 Agent CRs reference via spec.harnessRef.
+  - ./harnesses.yaml
   # Standalone resources (not Helm-managed)
   - ./grafana-mcp-token-secret.yaml
   - ./kagent-database-url.yaml

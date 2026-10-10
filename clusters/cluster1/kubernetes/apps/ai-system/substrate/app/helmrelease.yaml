@@ -14,7 +14,11 @@ spec:
   postRenderers:
     - kustomize:
         patches:
-          # Pin every substrate Deployment to the GPU node (nv-01).
+          # Pin every substrate Deployment to the GPU node (nv-01). The 6
+          # Deployments rendered by the 0.5.0-alpha2 chart (ate-api-server,
+          # ate-controller, atenet-router, atenet-egress,
+          # k8s-credential-provider, rustfs) set neither nodeSelector nor
+          # tolerations (verified by helm template), so op: add is safe.
           - target:
               kind: Deployment
             patch: |-
@@ -31,42 +35,13 @@ spec:
                   - key: nvidia.com/gpu
                     operator: Exists
                     effect: NoSchedule
-          # The chart has no storageClass knob: the postgres StatefulSet
-          # volumeClaimTemplate and the rustfs-data PVC set only `storage`,
-          # relying on a cluster default StorageClass. The rebuilt cluster has
-          # no default SC (2026-09-08), so both PVCs sat Pending with
-          # 'no storage class is set'. host-path (OpenEBS local) matches the
-          # ai-system convention in AGENTS.md. volumeClaimTemplates/PVC spec
-          # are immutable, so the pre-existing empty sts and PVCs were deleted
-          # once by hand when this landed.
-          - target:
-              kind: StatefulSet
-              name: postgres
-            patch: |-
-              - op: add
-                path: /spec/volumeClaimTemplates/0/spec/storageClassName
-                value: host-path
-          # Tolerate the nv-01 GPU taint for the chart-managed
-          # postgres StatefulSet and the atelet DaemonSet.
-          - target:
-              kind: StatefulSet
-              name: postgres
-            patch: |-
-              - op: add
-                path: /spec/template/spec/tolerations
-                value:
-                  - key: nvidia.com/gpu
-                    operator: Exists
-                    effect: NoSchedule
-          - target:
-              kind: DaemonSet
-            patch: |-
-              - op: add
-                path: /spec/template/spec/tolerations
-                value:
-                  - key: nvidia.com/gpu
-                    operator: Exists
-                    effect: NoSchedule
+          # The chart has no storageClass knob: the rustfs-data PVC sets only
+          # `storage`, relying on a cluster default StorageClass. The rebuilt
+          # cluster has no default SC (2026-09-08), so the PVC sat Pending
+          # with 'no storage class is set'. host-path (OpenEBS local) matches
+          # the ai-system convention in AGENTS.md. PVC spec is immutable:
+          # delete the pre-existing empty PVC once by hand before the first
+          # apply if it exists.
           - target:
               kind: PersistentVolumeClaim
               name: rustfs-data
@@ -74,122 +49,46 @@ spec:
               - op: add
                 path: /spec/storageClassName
                 value: host-path
-          # STEP 1 (connection): the chart does NOT pass --ateapi-conn-spec, so
-          # the ate-controller binary dials its hardcoded default
-          # dns:///api.ate-system.svc:443 (upstream's namespace). This cluster
-          # runs substrate in ai-system, so that name is NXDOMAIN and every
-          # golden-actor RPC failed with "name resolver error: produced zero
-          # addresses". The chart sets --ateapi-server-name (TLS SNI) with the
-          # namespace but omits the dial address.
+          # Tolerate the nv-01 GPU taint for the atelet DaemonSet. The chart
+          # already sets one toleration (ate.dev/sandboxClass Exists), so
+          # APPEND instead of replacing the whole list.
           - target:
-              kind: Deployment
-              name: ate-controller
+              kind: DaemonSet
             patch: |-
               - op: add
-                path: /spec/template/spec/containers/0/args/-
-                value: "--ateapi-conn-spec=dns:///api.ai-system.svc:443"
-          # STEP 2 (auth): the kube-apiserver --service-account-issuer is Omni's
-          # KubeSpan/SideroLink ULA (IPv6, unreachable from the IPv4-only pod
-          # network), and SA tokens carry it as `iss`. ateapi checks `iss` against
-          # --client-jwt-issuer and fetches keys via OIDC discovery from that
-          # issuer host. We (a) set issuer=ULA below so the `iss` check passes,
-          # and (b) run a forked ateapi that adds --client-jwt-jwks-url to fetch
-          # the identical keys directly from the reachable in-cluster API instead
-          # of doing unreachable discovery against the ULA.
-          #
-          # STEP 3 (atelet discovery): in v0.0.7, controlapi.AteletInformer()
-          # scoped its SharedInformerFactory to a hard-coded
-          # `ateletNamespace = "ate-system"` const
-          # (cmd/ateapi/internal/controlapi/informer.go) with no flag/override,
-          # so it never saw the atelet DaemonSet pods this chart runs in
-          # ai-system — the fork carried an ATELET_NAMESPACE patch for this.
-          # v0.0.9 UPSTREAMED the fix: AteletInformer now takes the namespace
-          # as a parameter and main.go resolves it via
-          # installdefaults.NamespaceFromPodEnv(), which reads the standard
-          # POD_NAMESPACE downward-API env var (fallback ate-system). The
-          # chart already injects POD_NAMESPACE via the downward API, so no
-          # override is needed here.
-          # VERSION-SKEW (v0.0.9 bump): the rest of the substrate stack
-          # (ate-controller, atenet-router, atelet, ateom) is at v0.0.9,
-          # whose ate-controller calls CreateAtespace on the Control service.
-          # The v0.0.7 fork returned `rpc error: code = Unimplemented desc =
-          # unknown method CreateAtespace`, so golden snapshots couldn't be
-          # rebuilt and SandboxAgents stuck at Ready=ActorTemplateNotReady.
-          # The fork image below is now rebased onto v0.0.9.
-          #
-          # The old ATELET_NAMESPACE patch is GONE: v0.0.9 upstream replaced
-          # the hard-coded `ateletNamespace = "ate-system"` const with
-          # installdefaults.NamespaceFromPodEnv(), which reads the standard
-          # POD_NAMESPACE downward-API env var (fallback ate-system). The
-          # chart already injects POD_NAMESPACE via fieldRef metadata.namespace
-          # (ate-api-server.yaml), so it resolves to ai-system automatically —
-          # NO env override is needed here.
-          #
-          # The --client-jwt-jwks-url patch is retained (upstream v0.0.9 still
-          # does OIDC discovery against the issuer host, which is Omni's
-          # IPv6 ULA, unreachable from the IPv4 pod network). Built from the
-          # kagent-dev/substrate v0.0.9 tag + the patches in
-          # .wip/substrate-jwks-url/, image build is out of this repo's scope
-          # (shrinedogg/ateapi fork).
+                path: /spec/template/spec/tolerations/-
+                value:
+                  key: nvidia.com/gpu
+                  operator: Exists
+                  effect: NoSchedule
+          # The chart always renders the cluster-scoped gvisor-default
+          # SandboxConfig with an unreachable gs://gvisor asset URL and a
+          # registry.k8s.io pause image. Retarget the asset at the rustfs
+          # bucket (the post-merge staging step uploads the unmodified
+          # upstream tarball there; the sha256 is the chart's own pin, so the
+          # bytes must be the upstream nightly 2026-09-02 tarball). The
+          # pause digest stays at the proven gcr.io pin (renovate.json
+          # excludes gcr.io/gke-release/pause from updates): all old actor
+          # snapshots were deleted in the 2026-10-09 teardown, so there is
+          # no snapshot-compatibility constraint, and gcr.io is the
+          # pullable registry on these nodes.
           - target:
-              kind: Deployment
-              name: ate-api-server-deployment
+              kind: SandboxConfig
+              name: gvisor-default
             patch: |-
-              # Pinned by DIGEST, not tag: the node image cache serves stale
-              # content under a mutable tag (imagePullPolicy is IfNotPresent),
-              # so a tag reference can run an older build even after the tag is
-              # re-pushed. The digest is immutable and forces the correct build.
-              # IMPORTANT: the fork MUST track the same substrate version as the
-              # ateom/atelet/controller (currently v0.0.10). A v0.0.9 fork against
-              # a v0.0.10 ateom corrupts the ateletpb RunRequest/RestoreRequest on
-              # the wire (the v0.0.10 proto renumbered fields — added actor_uid=4,
-              # shifting spec/sandbox_assets/etc.), which surfaces as
-              # "error unmarshalling request: string field contains invalid UTF-8"
-              # and pins every SandboxAgent at Ready=ActorTemplateNotReady.
-              # Update this digest when the fork image is rebuilt.
               - op: replace
-                path: /spec/template/spec/containers/0/image
-                value: docker.io/shrinedogg/ateapi@sha256:78d90103f3054bf6544bf3726fa63800a47b970b3425a3e60f4efbfff9bbdad3
-              - op: add
-                path: /spec/template/spec/containers/0/args/-
-                value: "--client-jwt-jwks-url=https://kubernetes.default.svc.cluster.local/openid/v1/jwks"
-          # VALKEY cluster-announce-ip: the chart's valkey.conf has NO
-          # cluster-announce-* and the StatefulSet has no downward-API env, so
-          # each node persists its cluster topology in /data/nodes.conf (PVC)
-          # and, on a pod restart that yields a new podIP, re-adopts the STALE
-          # persisted address. Every client then dials a dead IP -> i/o timeout,
-          # which crashes ate-api-server on startup (eager 'Failed to seed
-          # worker cache') and breaks the whole substrate data layer. Setting
-          # cluster-announce-ip to the current podIP (downward API) makes nodes
-          # always advertise their reachable address, overriding nodes.conf.
-          # NOTE: committing this triggers a rolling restart of all 6 valkey
-          # pods (podManagementPolicy: Parallel) — do it in a window that
-          # tolerates a brief Valkey outage. The one-time operational fix is
-          # `CONFIG SET cluster-announce-ip <podIP>` on each node (no restart).
-          - target:
-              kind: StatefulSet
-              name: valkey-cluster
-            patch: |-
-              - op: add
-                path: /spec/template/spec/containers/0/env
-                value:
-                  - name: POD_IP
-                    valueFrom:
-                      fieldRef:
-                        fieldPath: status.podIP
-              - op: add
-                path: /spec/template/spec/containers/0/args
-                value:
-                  - "--cluster-announce-ip"
-                  - "$(POD_IP)"
+                path: /spec/assets/amd64/gvisor/url
+                value: "s3://ate-snapshots/gvisor.tar.zstd"
+              - op: replace
+                path: /spec/pauseImage
+                value: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
   # Drift correction: when the chart/values are unchanged, Flux no-ops the helm
-  # upgrade, so out-of-band changes (a deleted resource, a `kubectl edit`) silently
-  # persist while status stays Ready=True. This is exactly how the valkey-cluster
-  # StatefulSet stayed gone after an out-of-band delete, leaving ate-api-server
-  # with no Valkey backing. `enabled` makes the controller detect AND correct such
-  # drift on every reconcile via a server-side dry-run apply (recreating deleted
-  # resources, reverting edits to git state). Aligns with this repo's rule that
-  # persistent changes are made in YAML here, not by mutating the cluster.
+  # upgrade, so out-of-band changes (a deleted resource, a `kubectl edit`)
+  # silently persist while status stays Ready=True. `enabled` makes the
+  # controller detect AND correct such drift on every reconcile via a
+  # server-side dry-run apply (recreating deleted resources, reverting edits
+  # to git state). Aligns with this repo's rule that persistent changes are
+  # made in YAML here, not by mutating the cluster.
   driftDetection:
     mode: enabled
   install:
@@ -200,10 +99,16 @@ spec:
     remediation:
       retries: 3
   values:
-    auth:
-      jwt:
-        # Equal to the kube-apiserver --service-account-issuer (the Omni ULA) so
-        # projected SA tokens' `iss` claim matches. Key fetch is redirected via
-        # --client-jwt-jwks-url (forked ateapi). Audience is left at the chart
-        # default (api.ate-system.svc), which both sides agree on.
-        issuer: "https://[fdae:41e4:649b:9303::1]:10000"
+    # BYO postgres (the 0.5.0 chart has no bundled postgres and FAILS render
+    # without these refs). The two Secrets are ExternalSecrets over 1Password
+    # (app/external-secrets.yaml); the database itself is cnpg-substrate
+    # (clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/cnpg-substrate.yaml).
+    # Names match the chart defaults; set explicitly for readability.
+    postgres:
+      readWriteConnectionStringSecretRef:
+        name: substrate-postgres-readwrite
+        key: readWriteConnectionString
+      ownerConnectionStringSecretRef:
+        name: substrate-postgres-owner
+        key: ownerConnectionString
+      schema: substrate

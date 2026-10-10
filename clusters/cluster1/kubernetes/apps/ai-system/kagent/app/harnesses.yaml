@@ -1,0 +1,88 @@
+---
+# Shared Harnesses for the v1alpha3 agent fleet (kagent 1.0.0).
+#
+# A Harness bundles the runtime workload image, the substrate
+# WorkerPool placement, the snapshot location, and the kagent runtime
+# options (compaction / memory). Agents reference one via
+# spec.harnessRef; the per-agent prompt + tools live in the Agent CR's
+# spec.template.
+#
+# All three run on the kagent-default WorkerPool (gVisor actors,
+# pinned to the GPU node via the WorkerPool template) with snapshots in
+# the rustfs bucket ate-snapshots (s3:// URL: host=bucket via the
+# substrate parseGCSURL semantics).
+#
+# workload.image is DIGEST-pinned to the kagent 1.0.0-alpha11 build
+# (the kagent-dev/kagent/golang-adk:1.0.0-alpha11 tag has NO v prefix).
+# Bump it in lockstep with the kagent chart (renovate.json
+# substrate-stack group) — kagent vendors a specific substrate and the
+# ADK image must match the chart's expectations.
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: golang-adk
+  namespace: ai-system
+spec:
+  kagent: {}
+  workload:
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+    snapshotPolicy:
+      location: "s3://ate-snapshots/kagent/"
+---
+# Same runtime with session compaction: when a call's prompt tokens hit
+# tokenThreshold, the kagent runtime summarizes older events (via the
+# summarizer ModelConfig) and drops the originals, keeping the session
+# bounded toward the served context window (262K). eventRetentionSize is
+# REQUIRED with tokenThreshold at v1alpha3 (CEL rule); 50 is a starting
+# value, tune later.
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: golang-adk-compaction
+  namespace: ai-system
+spec:
+  kagent:
+    compaction:
+      tokenThreshold: 80000
+      eventRetentionSize: 50
+      summarizer:
+        modelConfigRef:
+          name: default-model-config
+  workload:
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+    snapshotPolicy:
+      location: "s3://ate-snapshots/kagent/"
+---
+# Compaction + long-term (cross-session) vector memory via the in-cluster
+# Infinity embedding server (ModelConfig embedding-model) + pgvector
+# (kagent database, vectorSchema public).
+apiVersion: api.kagent.dev/v1alpha3
+kind: Harness
+metadata:
+  name: golang-adk-memory
+  namespace: ai-system
+spec:
+  kagent:
+    compaction:
+      tokenThreshold: 80000
+      eventRetentionSize: 50
+      summarizer:
+        modelConfigRef:
+          name: default-model-config
+    memory:
+      modelConfigRef:
+        name: embedding-model
+      ttlDays: 30
+  workload:
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+  substrate:
+    workerPoolRef:
+      name: kagent-default
+    snapshotPolicy:
+      location: "s3://ate-snapshots/kagent/"
