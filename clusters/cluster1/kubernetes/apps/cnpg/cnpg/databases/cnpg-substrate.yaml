@@ -6,8 +6,7 @@
 # substrate-postgres-owner; see ai-system/substrate/app/external-secrets.yaml)
 # and FAILS to render without them. This cluster provisions that database.
 #
-# Mirrors cnpg-kagent (single instance instead of three: substrate needs one
-# control-plane DB, not a replicated fleet). The `substrate` login (from the
+# Mirrors cnpg-kagent (three instances). The `substrate` login (from the
 # substrate-user-password ClusterExternalSecret) is created by CNPG as a
 # LOGIN INHERIT role; the init.sql ConfigMap below then carves out the two
 # NOLOGIN roles the substrate pools SET ROLE to and wires ownership.
@@ -27,7 +26,7 @@ metadata:
   name: cnpg-substrate
   namespace: cnpg-system
 spec:
-  instances: 1
+  instances: 3
   bootstrap:
     initdb:
       database: substrate
