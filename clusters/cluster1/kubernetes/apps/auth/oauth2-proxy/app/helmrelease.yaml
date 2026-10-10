@@ -68,6 +68,27 @@ spec:
         clientType: standalone
         standalone:
           connectionUrl: redis://dragonfly-db.dragonfly.svc.cluster.local:6379
+    # Cluster-wide Cilium hairpin bug: a pod cannot reach its own Service's
+    # ClusterIP when the endpoint sits on the same node (verified 3/3 dial
+    # timeouts from worker-03 to the dragonfly-db ClusterIP 10.99.95.103
+    # while the pod-IP and cross-node dials PONG; reproduced from worker-04
+    # against cert-manager). The dragonfly-db Service only carries the
+    # role=master endpoint, so an oauth2 pod co-located with the master
+    # cannot reach its redis session store and exits on boot. This is why
+    # the v7.15.5 rollout repeatedly failed on worker-03 (exit 2, no logs).
+    # Keep oauth2 off the dragonfly master's node until the hairpin is fixed
+    # at the Cilium layer (tracked as a separate workstream).
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: role
+                  operator: In
+                  values: ["master"]
+            namespaces:
+              - dragonfly
+            topologyKey: kubernetes.io/hostname
     # The chart's built-in waitForRedis init container only renders for the
     # bundled redis subchart (it watches the redis master pod via the API), so
     # it does nothing for our external Dragonfly. Keep it disabled.
