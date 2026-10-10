@@ -7,6 +7,10 @@ metadata:
   namespace: auth
 spec:
   interval: 3m
+  # v7.15.5 is a cold image on the worker nodes; the default 5m Helm timeout is
+  # too short for the first pull and left the 10.7.1 upgrade stuck at
+  # RetriesExceeded (rolled back to 10.7.0 / v7.15.3) on 2026-10-06.
+  timeout: 10m
   chart:
     spec:
       chart: oauth2-proxy

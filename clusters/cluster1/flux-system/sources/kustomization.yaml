@@ -4,7 +4,7 @@ resources:
   - cnpg-repo.yaml
   - victoria-metrics-repo.yaml
   - nfd-repo.yaml
-  - k8s-gateway-repo.yaml
+  - k8s-gateway-oci.yaml
   - cert-manager-repo.yaml
   - external-secrets-repo.yaml
   - onepass-repo.yaml

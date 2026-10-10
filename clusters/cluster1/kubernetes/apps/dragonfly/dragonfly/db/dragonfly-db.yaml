@@ -12,11 +12,7 @@ metadata:
 spec:
   replicas: 2
   # Network access is governed centrally by CiliumNetworkPolicies in
-  # network-policies/policies/apps/dragonfly.yaml. Disable the operator-managed
-  # NetworkPolicy so the Cilium layer is the single source of truth (the
-  # operator's policy only allowed in-namespace 6379 ingress, which conflicts
-  # conceptually with our cross-namespace allow rules).
-  networkPolicyEnabled: false
+  # network-policies/policies/apps/dragonfly.yaml.
   args:
     - "--default_lua_flags=allow-undeclared-keys"
     # Cap io threads. Dragonfly defaults to one proactor per CPU core, and each
