@@ -112,3 +112,15 @@ spec:
         name: substrate-postgres-owner
         key: ownerConnectionString
       schema: substrate
+    # OTLP export: disable. With no endpoint configured the Go OTel SDK
+    # falls back to the SDK default (localhost:4317) and retries forever,
+    # spamming "OpenTelemetry SDK error ... connection refused" WARNs from
+    # ate-api-server (traces) and ate-controller (metrics). ai-system has no
+    # OTLP collector; signals that matter (actor events) already go to stdout.
+    otel:
+      traces:
+        enabled: false
+      metrics:
+        enabled: false
+      logs:
+        enabled: false
