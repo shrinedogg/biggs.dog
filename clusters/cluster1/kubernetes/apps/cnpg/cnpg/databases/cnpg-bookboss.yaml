@@ -5,6 +5,9 @@ metadata:
   namespace: cnpg-system
 spec:
   instances: 3
+  # Temporary drain override (#604): accept full DB downtime during maintenance.
+  # Re-enable after API readiness, CNPG recovery, and replication are verified.
+  enablePDB: false
   bootstrap:
     initdb:
       database: bookboss
