@@ -1,66 +1,55 @@
-# agent-substrate (cluster1, ai-system) — suspended pending migration
+# agent-substrate (cluster1, ai-system)
 
-agent-substrate was torn down from cluster1 on 2026-10-09:
+The substrate control plane (kagent-dev substrate) runs in `ai-system` on
+cluster1, deployed by the `substrate` HelmRelease (chart v0.5.0-alpha2) with
+kagent 1.0.0-alpha11. Re-enabled by the substrate-stack migration (issue
+#594, PR #597) on 2026-10-10.
 
-- HelmRelease `substrate` uninstalled (no orphans; postgres + rustfs data
-  deleted by hand).
-- The four `ate.dev` CRDs (`workerpools`, `sandboxconfigs`, `actortemplates`,
-  `csidriverconfigs`) removed with the `substrate-crds` release.
-- kagent substrate wiring disabled (`controller.substrate.enabled: false`,
-  `substrateWorkerPool.create: false`); the `kagent-default` WorkerPool and the
-  `kagent-ate-api-env-sources` RBAC were pruned by the kagent upgrade.
-- `kagent/substrate-agents` (5 dead SandboxAgent CRs) removed.
-- `csi-driver/app/clusterissuer.yaml` (`substrate-podcert-selfsigned`) removed;
-  nothing consumed it after the WorkerPool went away.
+## Layout
 
-This directory (`substrate/app`) + the `substrate` OCIRepository
-(`clusters/cluster1/flux-system/sources/substrate-oci.yaml`) are kept as the
-re-enable starting point for the substrate-stack migration workstream.
+- `app/helmrelease.yaml` — the release. PostRenderers pin the Deployments to
+  the GPU node, point the node-local atelet at the release-local api Service
+  (the chart defaults to the canonical `ate-system` namespace), and pin the
+  B2 object-store env on `ate-api-server`. `values` disables the bundled
+  rustfs and points `atelet.extraEnv` at B2.
+- `app/external-secrets.yaml` — BYO postgres connection strings
+  (cnpg-substrate) + `substrate-b2-object-store` (S3 key pair).
+- OCIRepository: `clusters/cluster1/flux-system/sources/substrate-oci.yaml`.
 
-## Re-enable procedure (the migration)
+## Snapshot storage: Backblaze B2 (issue #598)
 
-The substrate stack upgrades only as a whole set (renovate group
-`substrate-stack`, automerge:false). To bring it back:
+The substrate S3 backend is pointed at the durable B2 endpoint shared with
+CNPG/Barman and volsync (`s3.eu-central-003.backblazeb2.com`), not the chart's
+default in-cluster rustfs (disabled via `values.rustfs.enabled: false`). The
+`b2-object-store-keys` 1Password item is scoped to the `biggs-dog` bucket, so
+all substrate objects live under a dedicated prefix:
 
-1. Choose the target version. As of 2026-10-09:
-   - substrate (kagent-dev) latest = `v0.5.0-alpha2` (2026-10-08); last of the
-     0.0.x line = `v0.0.30`; live before teardown was `v0.0.21`.
-   - kagent latest = `v1.0.0-alpha10` (2026-10-09); this cluster ran
-     `v0.10.3`. kagent 1.0.0-alpha renamed `substrateWorkerPool.ateomImage`
-     to `workerImage` and the CRDs renamed `WorkerPool.spec.ateomImage` to
-     `spec.workerImage` (from substrate 0.0.22), so a kagent chart bump is
-     part of this migration, not just the substrate charts.
-2. Rebuild the digest-pinned `shrinedogg/ateapi` fork against the target
-   substrate version (the `--client-jwt-jwks-url` patch set, see
-   `.wip/substrate-jwks-url/`). The fork MUST track the control-plane version
-   or the ateletpb RunRequest wire breaks ("string field contains invalid
-   UTF-8").
-3. Re-create `clusters/cluster1/flux-system/sources/substrate-crds-oci.yaml`
-   (tag = target version) and re-list it in `flux-system/sources/
-   kustomization.yaml`.
-4. Bump `substrate-oci.yaml` tag to the target version; recreate
-   `clusters/cluster1/kubernetes/apps/ai-system/substrate-crds/` (KS + Helm
-   Release) and re-list it in `apps/ai-system/kustomization.yaml`.
-5. Recreate this directory's `ks.yaml` (path `./app`, dependsOn
-   `substrate-crds`) and re-list it in `apps/ai-system/kustomization.yaml`.
-   Re-verify the `app/helmrelease.yaml` postRenderers against the new chart:
-   the `ate-system` namespace Role workaround, the `--ateapi-conn-spec` dial
-   address, the valkey `cluster-announce-ip` fix, and the ateapi fork digest
-   all need re-checking per version.
-6. Bump kagent to the matching 1.0.0-alpha chart (new `kagent-oci.yaml` tag),
-   set `substrateWorkerPool.workerImage` (renamed from `ateomImage`) to the
-   matching ateom-gvisor tag, and flip `controller.substrate.enabled: true`
-   + `substrateWorkerPool.create: true` in `kagent/app/helmrelease.yaml`.
-   Re-add the `substrate-crds` dependsOn to `kagent/ks.yaml`.
-7. Recreate `kagent/substrate-agents/` (the 5 SandboxAgent CRs) + its KS and
-   re-list it in `apps/ai-system/kustomization.yaml`.
-8. Decide the worker pod-identity story: v0.0.12+ workers hard-require an
-   atunnel credential bundle at
-   `/run/podidentity.podcert.ate.dev/credential-bundle.pem` (PodCertificate
-   projection, mtls mode); this cluster ran jwt-mode on Talos, which lacks
-   the ClusterTrustBundle/PodCertificateRequest gates. Either run the new
-   version in jwt mode if still supported, or re-add the
-   cert-manager-CSI-based podidentity init-container patch (formerly
-   `kagent-podcert-patch`) against the new mechanism.
-9. Commit to main; Flux reconciles substrate-crds -> substrate -> kagent ->
-   substrate-agents (dependsOn ordering).
+- `biggs-dog/substrate/gvisor.tar.zstd` — the gVisor runtime asset the golden
+  actors download. Seeded once from the upstream nightly 2026-09-02 tarball;
+  the pinned sha256 is the chart's own, so a re-seed must be the same bytes.
+  Durable, so it survives cluster rebuilds (no re-upload step).
+- `biggs-dog/substrate/kagent/atespaces/...` — golden actor snapshots, written
+  by the node-local atelet. The location is set per-Harness in
+  `kagent/app/harnesses.yaml` (`snapshotPolicy.location`).
+
+Both S3 readers need the same five AWS_* env (endpoint, region, path-style,
+key pair): the atelet DaemonSet via `atelet.extraEnv`, the ate-api-server
+Deployment via a postRenderer patch (the chart has no env value hook for it).
+They are pinned identically in `app/helmrelease.yaml`; if they drift, snapshot
+reads fail at restore.
+
+Egress: `allow-egress-atelet-registries` (world:443) covers the atelet;
+`allow-egress-substrate-b2` (toFQDNs the S3 endpoint) covers ate-api-server.
+Both in `network-policies/policies/infra/ai-system.yaml`.
+
+## History
+
+Torn down on 2026-10-09, re-enabled 2026-10-10 (issue #594):
+
+- substrate v0.5.0-alpha2 + kagent 1.0.0-alpha11 (API group
+  `kagent.dev/v1alpha2` -> `api.kagent.dev/v1alpha3`; `SandboxAgent` ->
+  `Agent` + `Harness`).
+- The pre-migration re-enable procedure (rebuild the digest-pinned `ateapi`
+  fork, recreate the CRD sources + KSs, re-enable the kagent substrate
+  wiring, worker pod-identity story) is preserved in this file's git
+  history.
