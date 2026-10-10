@@ -37,10 +37,16 @@ spec:
         namespace: flux-system
   install:
     createNamespace: false
+    # The pre-install migration hook Job runs inside the install action and
+    # inherits this timeout. A cold first-run migration set needs more than the
+    # default 5m.
+    timeout: 10m
     crds: CreateReplace
     remediation:
       retries: 3
   upgrade:
+    # The pre-upgrade migration hook Job runs inside the upgrade action too.
+    timeout: 10m
     crds: CreateReplace
     cleanupOnFail: true
     remediation:
@@ -68,6 +74,11 @@ spec:
       database:
         name: lightdash-app-secret
         passwordKey: PGPASSWORD
+      # The migration hook Job envFrom's this Secret (needs LIGHTDASH_SECRET to
+      # load its config); same Secret as the application ref, per the chart's
+      # documented default.
+      migration:
+        name: lightdash-app-secret
       s3:
         name: lightdash-s3-secret
         accessKey: S3_ACCESS_KEY
@@ -118,8 +129,34 @@ spec:
     browserless-chrome:
       enabled: false
     migrationJob:
-      # Backend runs its own boot-time migrations (first install: single
-      # writer, no race). The hook Job would need the app Secret env (see the
-      # chart's inheritGlobalEnv note) - unnecessary while the backend is the
-      # sole migrator.
-      enabled: false
+      # Migrations run in a dedicated pre-install/pre-upgrade hook Job, not
+      # in the backend's startup-probe budget. Lightdash's full migration set
+      # against a fresh 0-table database exceeds the backend's ~185s startup
+      # window, so the backend-as-migrator path (enabled: false) crash-looped
+      # through Knex pool timeouts. The Job is the sole migrator; the backend
+      # starts without migrating (image.command override in the chart), so the
+      # install readiness gate (Deployment) is what the 10m install timeout
+      # below waits on, not the migration itself.
+      enabled: true
+      # Same hairpin workaround as the backend/workers: the Job pod also dials
+      # the -rw ClusterIP, so it must not land on the primary's node.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: cnpg.io/cluster
+                    operator: In
+                    values:
+                      - cnpg-lightdash
+                  - key: cnpg.io/instanceRole
+                    operator: In
+                    values:
+                      - primary
+              namespaces:
+                - cnpg-system
+              topologyKey: kubernetes.io/hostname
+      # The hook Job runs inside the install action, which inherits this
+      # timeout. A full cold first-run migration set can exceed the default
+      # 5m; 10m is headroom (not a measurement) for the 0-table DB.
+      backoffLimit: 10
