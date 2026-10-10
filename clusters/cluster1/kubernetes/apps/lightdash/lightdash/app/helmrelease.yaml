@@ -81,6 +81,31 @@ spec:
       forcePathStyle: "true"
     image:
       tag: "2.547.0"
+    # cluster1 same-node ClusterIP hairpin workaround (cilium/cilium#47913):
+    # a pod cannot reach a ClusterIP when a selected endpoint of that Service
+    # sits on its own node. The lightdash backend/worker dials the -rw ClusterIP
+    # of cnpg-lightdash, whose single endpoint is the CNPG primary pod. Keep the
+    # lightdash callers off whichever node hosts the primary so the dial always
+    # goes cross-node. Label-based (cnpg.io/instanceRole=primary), so it tracks
+    # failovers automatically. The chart renders top-level affinity onto both
+    # the backend and every worker Deployment. Drop once the Cilium socketLB
+    # hostNamespaceOnly fix lands and its probes pass.
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - labelSelector:
+              matchExpressions:
+                - key: cnpg.io/cluster
+                  operator: In
+                  values:
+                    - cnpg-lightdash
+                - key: cnpg.io/instanceRole
+                  operator: In
+                  values:
+                    - primary
+            namespaces:
+              - cnpg-system
+            topologyKey: kubernetes.io/hostname
     configMap:
       # Public URL (links in emails/exported assets) + cookie/proxy hardening
       # for the HTTPS-terminating wildcard gateway.
