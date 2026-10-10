@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: substrate-podcert
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/kagent-dev/substrate/helm/substrate-podcert
+  ref:
+    # Paired with substrate-oci.yaml (lockstep substrate-stack group,
+    # renovate.json). The PodCertificate signer (podcertificate-controller)
+    # that signs servicedns/podidentity/postgres .podcert.ate.dev/identity
+    # certs for every substrate control-plane and worker pod.
+    tag: "0.5.0-alpha2"

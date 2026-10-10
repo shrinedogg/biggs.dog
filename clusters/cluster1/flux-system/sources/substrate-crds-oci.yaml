@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://kubernetes-schemas.pages.dev/source.toolkit.fluxcd.io/ocirepository_v1.json
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: substrate-crds
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/kagent-dev/substrate/helm/substrate-crds
+  ref:
+    # Paired with substrate-oci.yaml (lockstep substrate-stack group,
+    # renovate.json). At 0.5.x this chart ships only csidriverconfigs +
+    # sandboxconfigs + workerpools (the actortemplates CRD is gone).
+    tag: "0.5.0-alpha2"

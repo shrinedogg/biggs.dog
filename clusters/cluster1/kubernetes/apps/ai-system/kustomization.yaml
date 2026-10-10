@@ -7,16 +7,19 @@ resources:
   # Flux-Kustomizations (CRDs must come before agents that depend on them)
   - ./vllm/ks.yaml
   - ./kagent-crds/ks.yaml
-  # agent-substrate was torn down from cluster1 on 2026-10-09 (substrate
-  # HelmRelease, the substrate-crds ate.dev CRDs, and kagent/substrate-agents
-  # removed). The substrate/ dir + substrate-oci.yaml source are kept as the
-  # re-enable starting point; the substrate-stack migration workstream
-  # re-adds ./substrate/ks.yaml, ./substrate-crds/ks.yaml, and
-  # ./kagent/substrate-agents/ks.yaml once the newer charts + rebased ateapi
-  # fork + kagent 1.0 workerImage pin are in place.
+  # The substrate-stack migration (2026-10-10, issue #594) re-added the
+  # substrate control plane: CRDs first, then the podcertificate signer,
+  # then the control plane itself (dependsOn substrate-crds,
+  # substrate-podcert, cnpg-databases).
+  - ./substrate-crds/ks.yaml
+  - ./substrate-podcert/ks.yaml
+  - ./substrate/ks.yaml
   - ./csi-driver/ks.yaml
   - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
+  # v1alpha3 Agent CRs for the 5 former SandboxAgents; dependsOn kagent +
+  # substrate (see ks.yaml inside the dir).
+  - ./kagent/substrate-agents/ks.yaml
   - ./kagent/cilium-agents/ks.yaml
   - ./victoria-metrics-mcp/ks.yaml
   - ./flux-mcp/ks.yaml

@@ -11,31 +11,16 @@ spec:
     kind: OCIRepository
     name: kagent
     namespace: flux-system
-  # Enable agent-sandbox code execution (executeCodeBlocks) on every
-  # chart-managed Agent AND de-privilege the runner pods. The chart's agent
-  # templates default to `runtime: python` but don't expose
-  # executeCodeBlocks/sandbox values, and they schedule the pod privileged;
-  # we strategic-merge both fixes onto the rendered Agent CRs here. The
-  # securityContext mirrors the static vm-agent/cilium agents (runAsNonRoot,
-  # drop ALL, privileged: false) -- without it, kagent schedules these pods
-  # privileged, too large a blast radius for executeCodeBlocks code.
-  # Egress from each sandbox is locked to in-cluster services; the vm-agent
-  # and the two static cilium agents set the same fields directly in their
-  # own manifests. A nodeSelector also pins every chart-managed agent to the
-  # GPU node (nv-01, via nvidia.com/gpu.present=true); the static
-  # vm-agent/cilium agents set the same selector in their own manifests.
-  # Post-renderer patches — only Deployment-level patches remain.
-  # The 5 chart-managed agents (k8s-agent, helm-agent, promql-agent,
-  # observability-agent, cilium-manager-agent) are now deployed as
-  # SandboxAgents on substrate (kagent/substrate-agents/) and disabled
-  # in the chart values, so no Agent patches are needed here.
+  # 1.0.0-alpha11 renders 5 Deployments (kagent-controller, kagent-ui,
+  # kagent-tools, kagent-kmcp-controller-manager, kagent-grafana-mcp); none
+  # set nodeSelector or tolerations (verified by helm template), so op: add
+  # is safe. Agents are no longer chart-managed (the built-in agent values
+  # are gone from the 1.0 schema) — the fleet lives in git as v1alpha3 Agent
+  # CRs on shared Harnesses (see harnesses.yaml), gVisor-sandboxed on the
+  # substrate WorkerPool, so no per-agent scheduling patches are needed.
   postRenderers:
     - kustomize:
         patches:
-          # Pin every chart-managed Deployment (kagent-controller, kagent-ui,
-          # kagent-tools, kagent-grafana-mcp, kagent-querydoc,
-          # kagent-kmcp-controller-manager) to the GPU node (nv-01) via a JSON
-          # 6902 patch. op: add is safe: the chart's Deployments set no nodeSelector.
           - target:
               kind: Deployment
             patch: |-
@@ -52,43 +37,6 @@ spec:
                   - key: nvidia.com/gpu
                     operator: Exists
                     effect: NoSchedule
-          # ----------------------------------------------------------------
-          # Grafana MCP — mount the service account token so the mcp/grafana
-          # server can authenticate against Grafana. The ExternalSecret
-          # (grafana-mcp-token-secret.yaml) creates the secret and the env
-          # var is picked up by the container.
-          # Also add -allowed-hosts=* so the MCP server accepts requests
-          # from the kagent controller via the Service DNS (not just loopback).
-          # ----------------------------------------------------------------
-          - target:
-              kind: Deployment
-              name: kagent-grafana-mcp
-            patch: |-
-              # The chart defaults to --transport sse, but the RemoteMCPServer
-              # CR uses protocol STREAMABLE_HTTP. Override the command to use
-              # Streamable HTTP so the controller can actually connect.
-              # Also pin address to 0.0.0.0 so the pod listens on all interfaces
-              # (the chart default only sets localhost).
-              - op: replace
-                path: /spec/template/spec/containers/0/command
-                value:
-                  - /app/mcp-grafana
-                  - --transport
-                  - streamable-http
-                  - --address
-                  - 0.0.0.0:8000
-              - op: add
-                path: /spec/template/spec/containers/0/args
-                value:
-                - "-allowed-hosts=*"
-              - op: add
-                path: /spec/template/spec/containers/0/env
-                value:
-                - name: GRAFANA_SERVICE_ACCOUNT_TOKEN
-                  valueFrom:
-                    secretKeyRef:
-                      name: kagent-grafana-mcp-token
-                      key: GRAFANA_SERVICE_ACCOUNT_TOKEN
   install:
     remediation:
       retries: 3
@@ -98,63 +46,34 @@ spec:
       retries: 3
   values:
     # Override registry from chart default (cr.kagent.dev) to ghcr.io.
-    # All kagent images (controller, agent runtime, skills-init) are available
-    # at ghcr.io/kagent-dev/kagent/.* and are mirrored in the cluster's OCI
-    # source. This avoids pulling from the external cr.kagent.dev registry.
+    # All kagent images (controller, agent runtime, skills-init) are
+    # available at ghcr.io/kagent-dev/kagent/.* and are mirrored in the
+    # cluster's OCI source. This avoids pulling from the external
+    # cr.kagent.dev registry.
     registry: ghcr.io
     # ------------------------------------------------------------------
-    # Built-in agents we don't use. Disabling here (rather than
-    # `kubectl delete`) is the durable removal: the Agent CRs are owned by
-    # this HelmRelease, so Flux re-creates anything deleted out-of-band.
-    # ------------------------------------------------------------------
-    argo-rollouts-agent:
-      enabled: false
-    cilium-debug-agent:
-      enabled: false
-    cilium-policy-agent:
-      enabled: false
-    # ------------------------------------------------------------------
-    # These agents are now deployed as SandboxAgents on substrate
-    # (kagent/substrate-agents/) with Go runtime. Disable them here
-    # to avoid conflicts — the chart can only render Python Agent CRs.
-    # ------------------------------------------------------------------
-    k8s-agent:
-      enabled: false
-    helm-agent:
-      enabled: false
-    promql-agent:
-      enabled: false
-    observability-agent:
-      enabled: false
-    cilium-manager-agent:
-      enabled: false
-    istio-agent:
-      enabled: false
-    kgateway-agent:
-      enabled: false
-    # ------------------------------------------------------------------
-    # Grafana MCP subchart. The chart defaults GRAFANA_URL to
-    # `grafana.kagent:3000/api`, which is broken here on two counts: no
-    # http:// scheme, and Grafana lives in the observability namespace
-    # (Service `grafana` on port 80 -> targetPort `grafana`/3000), not a
-    # `kagent` namespace. Point it at the real Service. Egress from
-    # ai-system to observability is already allowed by the CNP
-    # `allow-egress-to-observability` (namespace-wide, any port).
-    # ------------------------------------------------------------------
-    # ------------------------------------------------------------------
-    # Grafana MCP — the apiKey is NOT stored in git (GitHub secret
-    # scanning would block the push). Instead the runtime token is
-    # injected via the post-renderer env patch from the cluster Secret
-    # kagent-grafana-mcp-token (created manually via kubectl, synced
-    # by ExternalSecret once the 1Password item exists).
+    # Grafana MCP subchart (mcp-grafana). The subchart already runs
+    # --transport streamable-http with a correct -allowed-hosts list and
+    # injects the token via envFrom secretRef, and renders its own
+    # api.kagent.dev/v1alpha3 RemoteMCPServer (kagent-grafana-mcp).
+    # Point it at the real Grafana Service (observability ns, port 80 ->
+    # targetPort grafana/3000); egress from ai-system to observability is
+    # allowed by the CNP 'allow-egress-to-observability'.
+    #
+    # The apiKey is NOT stored in git (GitHub secret scanning would block
+    # the push): the runtime token is injected from the existing cluster
+    # Secret kagent-grafana-mcp-token via grafana.secretRef (the subchart
+    # skips creating its own secret when secretRef is set).
     # ------------------------------------------------------------------
     grafana-mcp:
       grafana:
         url: "http://grafana.observability:80/api"
+        secretRef: kagent-grafana-mcp-token
     # ------------------------------------------------------------------
     # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
-    # The chart renders a ModelConfig named "default-model-config" that
-    # the built-in agents use. Pointing it at vLLM keeps everything local.
+    # The chart renders a ModelConfig named "default-model-config"
+    # (api.kagent.dev/v1alpha3) that the agents use. Pointing it at vLLM
+    # keeps everything local.
     # ------------------------------------------------------------------
     providers:
       default: openAI
@@ -167,95 +86,78 @@ spec:
         apiKeySecretKey: OPENAI_API_KEY
         config:
           baseUrl: "http://vllm.ai-system.svc.cluster.local:8000/v1"
-    # Use the cluster's CNPG operator (cnpg-kagent) instead of the bundled
-    # dev Postgres. The full connection URL (incl. password) is provided at
-    # runtime from a mounted secret file, so no credentials live in git.
+    # ------------------------------------------------------------------
+    # Use the cluster's CNPG operator (cnpg-kagent) instead of a bundled
+    # dev Postgres. The full connection URL (incl. password) comes from the
+    # existing ExternalSecret kagent-database-url (key: url) — no
+    # credentials live in git.
     #
-    # vectorEnabled=true: long-term (cross-session) vector memory via pgvector.
-    # NOTE: the model's NATIVE window is 262K and vLLM now SERVES the full
-    # 262K (vllm/app/deployment.yaml --max-model-len=262144 across both
-    # 5090s). The input_tokens=131073 overflow on flux-agent was against the
-    # OLD 131K cap; memory stays disabled per-agent on flux-agent
-    # (flux-mcp/app/agent.yaml) pending a deliberate re-test. The other
-    # agents have no per-agent memory block and remain well under the cap.
+    # role: "" — cnpg-kagent has no kagent_owner role; an empty role skips
+    # SET ROLE after connecting (kagent connect.go).
+    # schema: kagent — the controller runs CREATE SCHEMA IF NOT EXISTS at
+    # migration. Clean 1.0 schema: 0.10.3's tables stay orphaned in the
+    # public schema, untouched but unread by 1.0.
+    # vectorEnabled=true + vectorSchema=public — long-term vector memory.
+    # The Database CR cnpg-kagent-db installs pgvector in `public` (it has
+    # no schema key), so the extensions schema must not be used.
+    # ------------------------------------------------------------------
     database:
       postgres:
-        bundled:
-          enabled: false
+        connectionStringSecretRef:
+          name: kagent-database-url
+          key: url
+        role: ""
+        schema: kagent
         vectorEnabled: true
-        urlFile: /etc/kagent-db/url
+        vectorSchema: public
     controller:
       resources:
         limits:
           memory: "1024Mi"
-      volumes:
-        - name: database-url
-          secret:
-            secretName: kagent-database-url
-      volumeMounts:
-        - name: database-url
-          mountPath: /etc/kagent-db
-          readOnly: true
       # ------------------------------------------------------------------
-      # Agent Substrate integration. Enables the substrate controller wiring
-      # so the kagent controller can schedule SandboxAgent actors on
-      # substrate workers. The substrate HelmRelease (ai-system/substrate/)
-      # deploys the substrate control plane in the same ai-system namespace.
-      #
-      # Requires the PodCertificateRequest/ClusterTrustBundle feature gates
-      # (beta, default-off in K8s 1.36), enabled 2026-09-08 via the Omni
-      # cluster template (apiServer extraArgs + runtime-config on the control
-      # plane, kubelet extraArgs on all nodes).
+      # Agent Substrate integration. The controller dials ate-api-server
+      # with an mTLS PodCertificate bundle (substrate-podidentity volume)
+      # plus the servicedns ClusterTrustBundle CA (substrate-servicedns
+      # volume) — both mounted by the chart when controller.substrate is
+      # enabled. Requires the PodCertificateRequest/ClusterTrustBundle
+      # feature gates (beta, default-off in K8s 1.36), enabled 2026-09-08
+      # via the Omni cluster template, and the substrate-podcert signer
+      # (the CA/JWT pools are bootstrapped imperatively — see the PR's
+      # "User-gated follow-ups").
       # ------------------------------------------------------------------
-      # DISABLED: agent-substrate was removed from cluster1 on 2026-10-09
-      # (substrate HelmRelease uninstalled, and the ate.dev CRDs from
-      # substrate-crds removed). Re-enabling requires the full substrate-stack
-      # migration (newer substrate charts + rebased ateapi fork + kagent 1.0
-      # workerImage) — see the substrate migration workstream issue.
-      # The fields below are kept as the re-enable starting point.
       substrate:
-        enabled: false
+        enabled: true
         ateApiEndpoint: "dns:///api.ai-system.svc:443"
-        ateApiInsecure: true
-        # The chart's substrate-ate-api-rbac template binds the env-source
-        # Role/RoleBinding (secrets+configmaps:get, so ate-api-server can resolve
-        # agent KAGENT_CONFIG_JSON secretKeyRefs during CallAteletRestore) to the
-        # ate-api-server ServiceAccount in `ateApiServer.namespace`. The chart
-        # default is "ate-system" (upstream's namespace) — same hard-coding bug
-        # class as substrate/app STEP 1/2/3. We run ate-api-server in ai-system,
-        # so override here, else the RoleBinding subject points at a nonexistent
-        # ate-system SA and CallAteletRestore fails env resolution with
-        # "secrets ... is forbidden".
-        ateApiServer:
-          namespace: ai-system
+        # Required: the atenet-router Service in ai-system, port 80.
+        atenetRouterURL: "http://atenet-router.ai-system.svc:80"
+      sandbox:
+        guestImage:
+          # kagent-dev/kagent/sandbox-guest:1.0.0-alpha11 (verified digest).
+          # Without it KAGENT_SANDBOX_GUEST_IMAGE renders "" and standalone
+          # sandbox prep is silently broken.
+          digest: "sha256:fb1218d5bdc397ecb514c5aa81d7958843635ca090c1419b191051f7bb01a3e2"
+    # ------------------------------------------------------------------
+    # The kagent-default WorkerPool: substrate workers (gVisor actors)
+    # that run the Harness workloads. The chart FAILS render if
+    # workerImage is empty when create=true.
+    #
+    # PINNED to the substrate control-plane version (0.5.0-alpha2). The
+    # ateom worker image MUST move in lockstep with
+    # ate-controller/atelet/atenet-router (renovate.json groups the whole
+    # substrate stack, automerge:false). Workers get their mTLS
+    # credentials (atunnel credential bundle) projected automatically by
+    # the ate-controller into every worker pod.
+    # ------------------------------------------------------------------
     substrateWorkerPool:
-      create: false
+      create: true
+      name: kagent-default
       replicas: 1
-      # PINNED to the substrate control-plane version. The ateom worker image
-      # MUST move in lockstep with ate-controller/atelet/atenet-router and the
-      # digest-pinned ateapi fork above (currently all v0.0.10). v0.0.12+
-      # workers hard-require an atunnel pod-identity credential bundle at
-      # /run/podidentity.podcert.ate.dev/credential-bundle.pem (PodCertificate
-      # projection, mtls mode); the v0.0.10 jwt-mode control plane never
-      # provisions it and Talos lacks the ClusterTrustBundle/PodCertificateRequest
-      # feature gates — the worker CrashLoops with "atunnel: reading credential
-      # bundle: ... no such file or directory". Renovate bumps for the whole
-      # substrate stack are grouped + automerge:false (see renovate.json).
-      # PINNED to substrate 0.0.21 — the LAST version whose CRDs keep
-      # WorkerPool.spec.ateomImage and SandboxConfig.spec.default (0.0.22
-      # renamed ateomImage -> workerImage, which the kagent 0.10.1 chart
-      # does not speak; kagent is the latest that exists). MUST move in
-      # lockstep with the substrate/substrate-crds OCI source tags. The
-      # v0.0.21 tag tracks the 0.0.21 control plane; do not let Renovate
-      # split this group (renovate.json pins the whole substrate stack
-      # together, automerge:false).
-      ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21
+      workerImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.5.0-alpha2
+      sandboxClass: gvisor
       template:
         # Flat pod-template fragment (the chart pipes this verbatim into
-        # WorkerPool.spec.template): nodeSelector sits DIRECTLY under
-        # `template`, not under template.spec — the CRD has no `spec` level
-        # here and the SSA typed-patch rejects it (".spec.template.spec:
-        # field not declared in schema", which broke the 0.10.1 install).
+        # WorkerPool.spec.template; the CRD takes nodeSelector/tolerations
+        # directly under template).
         nodeSelector:
           nvidia.com/gpu.present: "true"
         tolerations:

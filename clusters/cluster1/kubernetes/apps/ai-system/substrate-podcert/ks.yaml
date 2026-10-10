@@ -1,0 +1,25 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app substrate-podcert
+  namespace: flux-system
+spec:
+  dependsOn:
+    # Orderliness only: the signer has no CRD dependency on substrate-crds.
+    # The CA-pool Secrets it mounts (service-dns-ca-pool,
+    # pod-identity-ca-pool, postgres-ca-pool) are bootstrapped imperatively
+    # by the user (see the substrate migration PR "User-gated follow-ups").
+    - name: substrate-crds
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/substrate-podcert/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m

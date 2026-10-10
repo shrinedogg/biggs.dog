@@ -130,22 +130,26 @@
       ]
     },
     {
-      "description": "Substrate stack must upgrade in lockstep — never automerge. Pinned <0.0.22: 0.0.22+ re-architected the control plane (mTLS pod-identity only, WorkerPool ateomImage->workerImage, SandboxConfig spec.default removed) and no kagent stable speaks it — kagent 0.10.x vendors substrate v0.0.9 (jwt/insecure client), only kagent 1.0.0-alpha pairs (vendors v0.3.0-alpha3). Re-attempted 0.0.30 via #499, reverted, see #553. Unpin when kagent 1.0.0 stable lands, then upgrade kagent+substrate as a pair.",
+      "description": "Substrate stack must upgrade in lockstep; never automerge. substrate chart + substrate-crds + substrate-podcert + kagent + kagent-crds + ateom-gvisor worker image + golang-adk workload image move as one group because kagent vendors a specific kagent-dev/substrate (check go/go.mod replace at the kagent tag before merging). Paired at 1.0.0-alpha11 + 0.5.0-alpha2 (alpha11 vendors substrate v0.5.0-alpha2).",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
         "ghcr.io/kagent-dev/substrate/ateom-gvisor",
         "ghcr.io/kagent-dev/substrate/helm/substrate",
-        "ghcr.io/kagent-dev/substrate/helm/substrate-crds"
+        "ghcr.io/kagent-dev/substrate/helm/substrate-crds",
+        "ghcr.io/kagent-dev/substrate/helm/substrate-podcert",
+        "ghcr.io/kagent-dev/kagent/helm/kagent",
+        "ghcr.io/kagent-dev/kagent/helm/kagent-crds",
+        "ghcr.io/kagent-dev/kagent/golang-adk",
+        "ghcr.io/kagent-dev/kagent/sandbox-guest"
       ],
       "groupName": "substrate-stack",
-      "allowedVersions": "<0.0.22",
       "automerge": false,
       "prBodyNotes": [
-        ":warning: PINNED at 0.0.21 — do not merge bumps to >=0.0.22 (see #553 and the rule description). The 0.0.30 control plane drops the jwt client mode the digest-pinned ateapi fork and kagent 0.10.x rely on: ate-api-server is mTLS-only (PodCertificate cred bundle + authentication-config), CRDs renamed WorkerPool.spec.ateomImage -> workerImage and removed SandboxConfig.spec.default, and the chart ships its own gvisor-default SandboxConfig (conflicts with the git-managed one; its gs:// asset URL is unreachable from this cluster). Historical checklist for a paired kagent 1.0.0 + substrate >=0.3.0 upgrade: rebase or drop the ateapi fork (its --client-jwt-jwks-url flags no longer exist upstream), work around the Role hardcoded to the ate-system namespace, keep spec.pauseImage at sha256:bcbd57ba... (matches existing actor snapshots), and decide the worker pod-identity story."
+        ":warning: Lockstep group. Before merging: (1) read go/go.mod at the new kagent tag and confirm the replace github.com/agent-substrate/substrate => github.com/kagent-dev/substrate <version> matches the substrate chart version in this PR; if it does not, do NOT merge and re-pin. (2) Bump the Harness workload.image digest (kagent/app/harnesses.yaml) and controller.sandbox.guestImage.digest (kagent HelmRelease values) to the same kagent tag. (3) The gcr.io/gke-release/pause digest in the substrate HelmRelease SandboxConfig postRenderer is intentionally static (separate exclusion rule)."
       ]
     },
     {
-      "description": "Do NOT track gcr.io/gke-release/pause. It is digest-pinned in apps/ai-system/substrate/app/sandboxconfig.yaml under a CEL rule: changing the image invalidates actor snapshots, so the pin must stay put. Renovate tracks it by digest, but the upstream `latest`/`go` tags point at a deprecated 2014 pause 1.0 image (single-arch amd64), so digest tracking keeps proposing an 11-year downgrade to that image (PR #559; an earlier identical bump was merged as 083842da and reverted as 89f9a725). Keep the pin manual: exclude it from all updates. When the substrate stack is upgraded to a new pause, bump the digest by hand in the same PR.",
+      "description": "Do NOT track gcr.io/gke-release/pause. It is digest-pinned in the substrate HelmRelease's SandboxConfig postRenderer (apps/ai-system/substrate/app/helmrelease.yaml): changing the image invalidates actor snapshots, so the pin must stay put. Renovate tracks it by digest, but the upstream `latest`/`go` tags point at a deprecated 2014 pause 1.0 image (single-arch amd64), so digest tracking keeps proposing an 11-year downgrade to that image (PR #559; an earlier identical bump was merged as 083842da and reverted as 89f9a725). Keep the pin manual: exclude it from all updates. When the substrate stack is upgraded to a new pause, bump the digest by hand in the same PR.",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["gcr.io/gke-release/pause"],
       "enabled": false

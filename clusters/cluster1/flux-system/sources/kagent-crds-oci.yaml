@@ -8,4 +8,9 @@ spec:
   interval: 1h
   url: oci://ghcr.io/kagent-dev/kagent/helm/kagent-crds
   ref:
-    tag: "0.10.3"
+    # Must move with kagent-oci.yaml (same chart line). At 1.0.0-alpha11
+    # this chart ships the api.kagent.dev/v1alpha3 CRDs (agents,
+    # agenttemplates, harnesses, modelconfigs, modelproviderconfigs,
+    # remotemcpservers, sandboxtemplates) plus the retained kmcp
+    # mcpservers.kagent.dev — no kagent.dev/v1alpha2 CRDs.
+    tag: "1.0.0-alpha11"

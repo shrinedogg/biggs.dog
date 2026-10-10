@@ -5,128 +5,31 @@
 #
 # Not chart-managed (like flux-agent and vm-agent): owned by this
 # Kustomization.
-apiVersion: kagent.dev/v1alpha2
+#
+# v1alpha3 (substrate-stack migration, issue #594): runtime + compaction +
+# vector memory moved to the golang-adk-memory Harness
+# (kagent/app/harnesses.yaml). Code execution is now gVisor at the
+# WorkerPool level — the old executeCodeBlocks/sandbox.network and the
+# per-agent pod hardening have no v1alpha3 equivalent.
+apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata:
   name: exa-agent
   namespace: ai-system
 spec:
-  type: Declarative
-  description: >-
-    Exa expert for web search, code discovery, and company research.
-    Use for finding code examples, researching companies/competitors,
-    discovering technical documentation, and gathering web intelligence.
-  # Sandboxed execution: code the agent writes runs in an isolated env.
-  sandbox:
-    network:
-      allowedDomains:
-        - "*.svc.cluster.local"
-        - "exa.com"
-        - "exa.ai"
-  declarative:
-    modelConfig: default-model-config
-    runtime: python
-    # Allow the agent to write and execute Python code blocks in the
-    # agent-sandbox.
-    executeCodeBlocks: true
-    context:
-      # Bound session growth so large tool results (search results,
-      # research dumps) can't accumulate unboundedly toward the served context
-      # window (262K since the FP8 TP=2 swap).
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    # Per-agent vector memory is enabled. The earlier overflow on exa was NOT
-    # caused by memory (the pgvector `memory` table had 0 rows); it was from
-    # Exa search results (~38KB/result) ballooning session history past the
-    # THEN-current 131K vLLM cap (one session hit ~164K tokens). The fix was
-    # raising vLLM --max-model-len; the window is now the full 262K native
-    # (vllm/app/deployment.yaml), and memory stays on. If overflow recurs,
-    # prune the kagent pgvector store.
-    memory:
-      # Long-term (cross-session) vector memory via the in-cluster
-      # Infinity embedding server (ModelConfig `embedding-model`) + pgvector.
-      modelConfig: embedding-model
-      ttlDays: 30
-    deployment:
-      nodeSelector:
-        nvidia.com/gpu.present: "true"
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
-      resources:
-        requests:
-          cpu: 50m
-          memory: 256Mi
-        limits:
-          memory: 512Mi
-      podSecurityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
-      securityContext:
-        privileged: false
-        allowPrivilegeEscalation: false
-        runAsNonRoot: true
-        runAsUser: 1001
-        capabilities:
-          drop:
-            - ALL
+  template:
+    description: >-
+      Exa expert for web search, code discovery, and company research.
+      Use for finding code examples, researching companies/competitors,
+      discovering technical documentation, and gathering web intelligence.
+    modelConfig:
+      name: default-model-config
     promptTemplate:
       dataSources:
         - alias: builtin
           kind: ConfigMap
           name: kagent-builtin-prompts
-    a2aConfig:
-      skills:
-        - id: web-search
-          name: Web Search
-          description: >-
-            Perform web searches using Exa's clean search results.
-            Find articles, documentation, tutorials, and current information.
-          tags:
-            - search
-            - web
-            - exa
-          examples:
-            - Search for the latest Kubernetes security best practices
-            - Find documentation on Rust async patterns
-            - Search for AI model benchmarks
-        - id: code-search
-          name: Code Search
-          description: >-
-            Search for code examples from GitHub, StackOverflow, and
-            technical documentation. Find code snippets, library usage,
-            and API syntax examples.
-          tags:
-            - code
-            - github
-            - stackoverflow
-            - search
-          examples:
-            - Find Go examples of using context cancellation
-            - Search for Kubernetes CRD validation patterns
-            - Find Python async/await examples
-        - id: company-research
-          name: Company Research
-          description: >-
-            Research companies, find competitor information, analyze
-            funding, discover team members, and gather market intelligence.
-          tags:
-            - research
-            - companies
-            - market
-            - competitors
-          examples:
-            - Research an AI infrastructure startup
-            - Find competitors to Anthropic
-            - Discover funding rounds for a company
-    systemMessage: |
+    systemPrompt: |
       # Exa Search Expert
 
       You are a search and research expert with access to Exa's AI-native
@@ -178,12 +81,13 @@ spec:
 
       {{include "builtin/safety-guardrails"}}
     tools:
-      - type: McpServer
-        mcpServer:
-          apiGroup: kagent.dev
-          kind: RemoteMCPServer
-          name: exa-mcp
-          toolNames:
+      - mcp:
+          server:
+            kind: RemoteMCPServer
+            name: exa-mcp
+          tools:
             - web_search_exa
             - web_fetch_exa
             - web_search_advanced_exa
+  harnessRef:
+    name: golang-adk-memory
