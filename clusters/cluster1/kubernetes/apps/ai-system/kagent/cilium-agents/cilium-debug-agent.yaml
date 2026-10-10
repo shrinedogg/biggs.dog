@@ -1,92 +1,32 @@
 ---
 # Cilium debug agent — standalone Kustomization manifest (not Helm-managed).
 # Includes k8s_get_resources and k8s_describe_resource for cluster inspection.
-apiVersion: kagent.dev/v1alpha2
+#
+# v1alpha3 (substrate-stack migration, issue #594): runtime moved to the
+# golang-adk Harness (kagent/app/harnesses.yaml). Code execution is now
+# gVisor at the WorkerPool level — the old executeCodeBlocks/sandbox.network
+# knobs have no v1alpha3 equivalent. (The v1alpha2 compaction
+# tokenThreshold: 60000 was intentionally NOT carried over — see issue #594
+# migration notes; re-add by switching to golang-adk-compaction if
+# cilium/Hubble output bloats sessions again.)
+apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata:
   name: cilium-debug-agent
   namespace: ai-system
 spec:
-  type: Declarative
-  description: >-
-    Cilium debug agent that helps debug, troubleshoot, and perform advanced
-    diagnostics on Cilium installations in Kubernetes clusters.
-  # Sandboxed code execution (agent-sandbox). Egress limited to in-cluster
-  # services so prompt-injected code can't phone out to the internet.
-  sandbox:
-    network:
-      allowedDomains:
-        - "*.svc.cluster.local"
-  declarative:
-    modelConfig: default-model-config
-    runtime: python
-    # Let the agent write/run Python (e.g. to parse cilium/Hubble output,
-    # correlate flows, or summarize diagnostics) in the agent-sandbox.
-    executeCodeBlocks: true
-    context:
-      # Bound session growth so large tool results (cilium/Hubble output) can't
-      # accumulate unboundedly toward the served context window (262K since
-      # the FP8 TP=2 swap). At tokenThreshold ADK
-      # summarizes older events (via the local model) and drops the originals.
-      # See flux-mcp/app/agent.yaml for full rationale.
-      compaction:
-        tokenThreshold: 60000
-        summarizer:
-          modelConfig: default-model-config
-    deployment:
-      nodeSelector:
-        nvidia.com/gpu.present: "true"
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
-      resources:
-        requests:
-          cpu: 50m
-          memory: 256Mi
-        limits:
-          memory: 512Mi
-      podSecurityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
-      securityContext:
-        privileged: false
-        allowPrivilegeEscalation: false
-        runAsNonRoot: true
-        runAsUser: 1001
-        capabilities:
-          drop:
-            - ALL
+  template:
+    description: >-
+      Cilium debug agent that helps debug, troubleshoot, and perform advanced
+      diagnostics on Cilium installations in Kubernetes clusters.
+    modelConfig:
+      name: default-model-config
     promptTemplate:
       dataSources:
         - alias: builtin
           kind: ConfigMap
           name: kagent-builtin-prompts
-    a2aConfig:
-      skills:
-        - id: cilium-debugging
-          name: Advanced Cilium Debugging
-          description: >-
-            Diagnose and troubleshoot Cilium endpoint, policy, BPF map,
-            connectivity, and performance issues using advanced debugging tools.
-          tags: []
-        - id: cilium-troubleshooting
-          name: Cilium Debugging and Troubleshooting
-          description: >-
-            Systematic debugging workflow for Cilium issues including endpoint
-            health checks, log analysis, and policy validation.
-          tags: []
-        - id: cilium-monitoring
-          name: Cilium Advanced Monitoring and Diagnostics
-          description: >-
-            Monitor Cilium cluster health, BPF maps, encryption state, PCAP
-            recordings, and cluster-wide diagnostics.
-          tags: []
-    systemMessage: |
+    systemPrompt: |
       # Cilium Debug Agent
 
       You are a Cilium debugging expert. You have access to Cilium CLI tools
@@ -130,12 +70,11 @@ spec:
 
       {{include "builtin/safety-guardrails"}}
     tools:
-      - type: McpServer
-        mcpServer:
-          apiGroup: kagent.dev
-          kind: RemoteMCPServer
-          name: kagent-tool-server
-          toolNames:
+      - mcp:
+          server:
+            kind: RemoteMCPServer
+            name: kagent-tool-server
+          tools:
             - cilium_manage_endpoint_config
             - cilium_get_endpoint_health
             - cilium_get_endpoint_logs
@@ -158,3 +97,5 @@ spec:
             - cilium_delete_pcap_recorder
             - k8s_get_resources
             - k8s_describe_resource
+  harnessRef:
+    name: golang-adk

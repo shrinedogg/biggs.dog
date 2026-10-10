@@ -1,0 +1,84 @@
+---
+# cnpg-substrate: BYO postgres for the v0.5.0 substrate control plane (issue #594).
+#
+# The 0.5.0 substrate chart no longer bundles postgres. It takes BYO postgres
+# as two connection-string Secrets (substrate-postgres-readwrite /
+# substrate-postgres-owner; see ai-system/substrate/app/external-secrets.yaml)
+# and FAILS to render without them. This cluster provisions that database.
+#
+# Mirrors cnpg-kagent (single instance instead of three: substrate needs one
+# control-plane DB, not a replicated fleet). The `substrate` login (from the
+# substrate-user-password ClusterExternalSecret) is created by CNPG as a
+# LOGIN INHERIT role; the init.sql ConfigMap below then carves out the two
+# NOLOGIN roles the substrate pools SET ROLE to and wires ownership.
+#
+# Single-login design (docs/postgres.md "one login may be a member of both
+# roles"): `substrate` is a member of BOTH substrate_owner and
+# substrate_readwrite, so the same 1Password login backs both pool
+# connection strings. The schema `substrate` is owned by substrate_owner so
+# the owner connection (migrations) can create objects and the readwrite
+# connection (runtime) can read/write via the default privileges.
+#
+# No pgvector here: that extension is for kagent's vector memory (cnpg-kagent
+# + cnpg-kagent-db), not the substrate control plane.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-substrate
+  namespace: cnpg-system
+spec:
+  instances: 1
+  bootstrap:
+    initdb:
+      database: substrate
+      owner: substrate
+      dataChecksums: true
+      secret:
+        name: substrate-user-password
+      # Runs once as the postgres superuser in the substrate DB, right after
+      # cluster creation. Literal expansion of substrate pkg/postgressetup/
+      # setup.sql for the single-login design (roles are NOLOGIN and the
+      # pre-existing LOGIN `substrate` is granted into both).
+      postInitApplicationSQLRefs:
+        configMapRefs:
+          - name: cnpg-substrate-init
+            key: init.sql
+  # Minimal trixie operand + extension images from the official CNPG 1.29
+  # catalog (../app/postgresql-minimal-trixie-catalog.yaml), same as cnpg-kagent.
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 150m
+    limits:
+      memory: 300Mi
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  postgresql:
+    parameters:
+      archive_mode: "off"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-substrate-init
+  namespace: cnpg-system
+data:
+  init.sql: |
+    CREATE ROLE substrate_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+    CREATE ROLE substrate_readwrite NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+    GRANT substrate_owner TO substrate;
+    GRANT substrate_readwrite TO substrate;
+    CREATE SCHEMA IF NOT EXISTS substrate AUTHORIZATION substrate_owner;
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    REVOKE ALL ON SCHEMA substrate FROM PUBLIC;
+    GRANT USAGE ON SCHEMA substrate TO substrate_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE substrate_owner IN SCHEMA substrate GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO substrate_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE substrate_owner IN SCHEMA substrate GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO substrate_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE substrate_owner IN SCHEMA substrate GRANT EXECUTE ON ROUTINES TO substrate_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE substrate_owner IN SCHEMA substrate GRANT USAGE ON TYPES TO substrate_readwrite;

@@ -4,115 +4,34 @@
 # management, Waiting For tracking, and weekly review workflows.
 #
 # Not chart-managed: owned by this Kustomization.
-apiVersion: kagent.dev/v1alpha2
+#
+# v1alpha3 (substrate-stack migration, issue #594): runtime + compaction +
+# vector memory moved to the golang-adk-memory Harness
+# (kagent/app/harnesses.yaml). Code execution is now gVisor at the
+# WorkerPool level — the old executeCodeBlocks/sandbox.network and the
+# per-agent pod hardening have no v1alpha3 equivalent.
+apiVersion: api.kagent.dev/v1alpha3
 kind: Agent
 metadata:
   name: mindwtr-agent
   namespace: ai-system
 spec:
-  type: Declarative
-  description: >-
-    GTD task management expert with full access to the Mindwtr task system.
-    Creates, lists, updates, and completes tasks; processes inbox items with
-    the 2-minute rule; manages projects with sections and next actions;
-    tracks Waiting For items; and runs weekly review workflows. Reads and
-    writes the live self-hosted Mindwtr Cloud sync store — the same data the
-    desktop and mobile clients sync against.
-  # Sandboxed execution: code the agent writes runs in an isolated env.
-  # No outbound network needed — all tools are cluster-internal.
-  sandbox:
-    network:
-      allowedDomains:
-        - "*.svc.cluster.local"
-  declarative:
-    modelConfig: default-model-config
-    runtime: python
-    executeCodeBlocks: true
-    context:
-      compaction:
-        tokenThreshold: 80000
-        summarizer:
-          modelConfig: default-model-config
-    memory:
-      modelConfig: embedding-model
-      ttlDays: 30
-    deployment:
-      nodeSelector:
-        nvidia.com/gpu.present: "true"
-      tolerations:
-        - key: nvidia.com/gpu
-          operator: Exists
-          effect: NoSchedule
-      resources:
-        requests:
-          cpu: 50m
-          memory: 256Mi
-        limits:
-          memory: 512Mi
-      podSecurityContext:
-        runAsNonRoot: true
-        runAsUser: 1001
-        runAsGroup: 1001
-        fsGroup: 1001
-        seccompProfile:
-          type: RuntimeDefault
-      securityContext:
-        privileged: false
-        allowPrivilegeEscalation: false
-        runAsNonRoot: true
-        runAsUser: 1001
-        capabilities:
-          drop:
-            - ALL
+  template:
+    description: >-
+      GTD task management expert with full access to the Mindwtr task system.
+      Creates, lists, updates, and completes tasks; processes inbox items with
+      the 2-minute rule; manages projects with sections and next actions;
+      tracks Waiting For items; and runs weekly review workflows. Reads and
+      writes the live self-hosted Mindwtr Cloud sync store — the same data the
+      desktop and mobile clients sync against.
+    modelConfig:
+      name: default-model-config
     promptTemplate:
       dataSources:
         - alias: builtin
           kind: ConfigMap
           name: kagent-builtin-prompts
-    a2aConfig:
-      skills:
-        - id: task-management
-          name: Task Management
-          description: >-
-            Create, list, update, and complete tasks in the Mindwtr system.
-            Process inbox items, schedule tasks, and manage task properties.
-          tags:
-            - tasks
-            - gtd
-            - mindwtr
-            - inbox
-          examples:
-            - What is in my inbox?
-            - Create a task to review the quarterly budget
-            - Complete the task "Update deployment docs"
-        - id: project-management
-          name: Project Management
-          description: >-
-            Manage projects with sections, set next actions, and organize
-            multi-step outcomes.
-          tags:
-            - projects
-            - gtd
-            - mindwtr
-          examples:
-            - Show me all active projects and their next actions
-            - Create a project for the home renovation
-            - What are the next actions for the migration project?
-        - id: review-workflow
-          name: Review & Focus
-          description: >-
-            Run daily focus checks, weekly reviews, and summarize pending
-            Waiting For items.
-          tags:
-            - review
-            - focus
-            - gtd
-            - waiting-for
-          examples:
-            - What should I focus on today?
-            - Run a weekly review of my tasks
-            - What am I waiting on from others?
-    systemMessage: |
+    systemPrompt: |
       # Mindwtr GTD Agent
 
       You are a GTD (Getting Things Done) expert with full access to the
@@ -147,17 +66,16 @@ spec:
 
       {{include "builtin/safety-guardrails"}}
     tools:
-      - type: McpServer
-        mcpServer:
-          apiGroup: kagent.dev
-          kind: RemoteMCPServer
-          name: mindwtr-mcp
+      - mcp:
+          server:
+            kind: RemoteMCPServer
+            name: mindwtr-mcp
           # Tool names as exposed by mindwtr-mcp v1.1.3 (Cloud mode, --write):
           # the server prefixes every tool with "mindwtr_". An earlier revision
           # of this list used the unprefixed names (create_task, list_tasks,
           # ...) which do not exist — kagent matched nothing and the agent ran
           # with zero tools.
-          toolNames:
+          tools:
             - mindwtr_list_tasks
             - mindwtr_get_task
             - mindwtr_add_task
@@ -185,3 +103,5 @@ spec:
             - mindwtr_update_person
             - mindwtr_rename_person
             - mindwtr_delete_person
+  harnessRef:
+    name: golang-adk-memory

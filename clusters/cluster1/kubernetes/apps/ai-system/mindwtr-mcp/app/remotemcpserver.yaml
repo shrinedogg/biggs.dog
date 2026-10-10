@@ -1,7 +1,7 @@
 ---
 # Registers the in-cluster mindwtr-mcp server as a kagent tool source.
 # Mirrors the pattern established by exa-mcp and victoria-metrics-mcp.
-apiVersion: kagent.dev/v1alpha2
+apiVersion: api.kagent.dev/v1alpha3
 kind: RemoteMCPServer
 metadata:
   name: mindwtr-mcp
