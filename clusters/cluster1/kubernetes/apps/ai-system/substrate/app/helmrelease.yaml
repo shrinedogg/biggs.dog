@@ -124,3 +124,17 @@ spec:
         enabled: false
       logs:
         enabled: false
+    # The atelet binary defaults --ateapi-address/--ateapi-server-name to
+    # api.ate-system.svc (the substrate canonical namespace). Substrate is
+    # installed in ai-system here, so the node-local atelet (which brokers the
+    # workers' capacity reports to ateapi) dials a service that does not exist
+    # and never reports capacity; every golden ActorTemplate then fails with
+    # "no worker has room for the actor" and agents stay
+    # Ready=False/ActorTemplatePending. Point the atelet at the release-local
+    # api Service, mirroring the chart's own override for ate-controller
+    # (dns:///api.<ns>.svc:443 + the same servicedns CA bundle it already
+    # mounts).
+    atelet:
+      extraArgs:
+        - --ateapi-address=dns:///api.ai-system.svc:443
+        - --ateapi-server-name=api.ai-system.svc
