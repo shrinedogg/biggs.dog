@@ -41,7 +41,6 @@ spec:
     promptTemplate:
       dataSources:
         - alias: builtin
-          kind: ConfigMap
           name: kagent-builtin-prompts
     systemPrompt: |
       # Flux CD Agent System Prompt

@@ -25,7 +25,6 @@ spec:
     promptTemplate:
       dataSources:
         - alias: builtin
-          kind: ConfigMap
           name: kagent-builtin-prompts
     systemPrompt: |
       # Cilium Policy Agent
