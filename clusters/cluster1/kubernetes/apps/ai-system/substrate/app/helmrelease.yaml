@@ -14,6 +14,20 @@ spec:
   postRenderers:
     - kustomize:
         patches:
+          # Both API replicas are pinned to the single GPU node (nv-01).
+          # The chart's maxUnavailable: 1 blocks the final eviction after
+          # cordon because its replacement cannot schedule anywhere else.
+          # Accept full Substrate API downtime during node maintenance;
+          # revisit this budget if placement expands to multiple nodes.
+          - target:
+              group: policy
+              version: v1
+              kind: PodDisruptionBudget
+              name: ate-api-server
+            patch: |-
+              - op: replace
+                path: /spec/maxUnavailable
+                value: "100%"
           # Pin every substrate Deployment to the GPU node (nv-01). The
           # Deployments rendered by the 0.5.0-alpha2 chart (ate-api-server,
           # ate-controller, atenet-router, atenet-egress,
