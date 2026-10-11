@@ -239,27 +239,24 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           env:
-            # Sway, not Gamescope: gamescope does its own Vulkan compositing on
-            # the dGPU, and under UE5/DX12 load that extra GPU work triggers
-            # NVRM Xid 109 (CTX SWITCH TIMEOUT) -> vkd3d-proton VK_ERROR_DEVICE_LOST
-            # -> UE5 GPU crash (Fatal error!) every launch. Under Sway the game
-            # runs without that crash (the original symptom was a display/tiling
-            # issue, not a GPU fault), so Sway gets further than gamescope.
-            # Sway's wl_drm abort under stock wolf is fixed by the patched
-            # shrinedogg/wolf image (see helmrelease.yaml WOLF_IMAGE). The
-            # tiling/display behavior is then troubleshot separately.
+            # RUN_SWAY disabled 2026-10-11: on driver 615.78.08 every Vulkan
+            # game presents black under Sway/wlroots (desktop/2D unaffected).
+            # Widespread 615-branch regression (vkAcquireNextImageKHR failures
+            # under Wayland; fixed for others by reverting to 610.57.04).
+            # Trying Gamescope per user decision; Xid 109 risk on the dGPU is
+            # known (see git history) and accepted for this test.
             - name: RUN_SWAY
-              value: "true"
+              value: "false"
             # Gamescope env kept commented for easy re-enable; unused while
             # RUN_SWAY=true (launch-comp.sh only honors GAMESCOPE_* when
             # RUN_GAMESCOPE is set). GAMESCOPE_MODE pins gamescope to the dGPU
             # via --prefer-vk-device (vendor:device PCI ids) because the
             # privileged container sees nv-01's AMD iGPU too and gamescope picks
             # it first otherwise -> CVulkanTexture::BInit assertion.
-            # - name: RUN_GAMESCOPE
-            #   value: "true"
-            # - name: GAMESCOPE_MODE
-            #   value: "-b --prefer-vk-device 10de:2b85"
+            - name: RUN_GAMESCOPE
+              value: "true"
+            - name: GAMESCOPE_MODE
+              value: "-b --prefer-vk-device 10de:2b85"
             - name: PROTON_LOG
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
