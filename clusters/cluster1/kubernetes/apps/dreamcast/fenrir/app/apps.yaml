@@ -163,7 +163,7 @@ spec:
               set -euo pipefail
               # Must match the host NVIDIA driver shipped by the Talos extension.
               # Bump this when the node's nvidia driver/extension is upgraded.
-              VER=595.71.05
+              VER=615.78.08
               DEST=/cache
               mkdir -p "$DEST"
               if [ -f "$DEST/_nvngx.dll" ] && [ -f "$DEST/nvngx.dll" ] \
