@@ -9,7 +9,7 @@ This is a mono repository for home infrastructure and Kubernetes clusters, follo
 The homelab is split across **two clusters**:
 
 - **`cluster0`** - an on-prem single-node [Talos Linux](https://www.talos.dev/) management cluster (LAN IP `192.168.2.31`) acting as the **management plane**: the Talos management plane ([Omni](https://omni.siderolabs.io/)), Talos Image Factory, root identity ([Dex](https://dexidp.io/)), [OpenEBS](https://openebs.io/) storage, the Cluster API (CAPI) management subtree, cert-manager, external-secrets, and Cilium CNI. Remote access uses the UniFi Dream Machine (UDM) built-in VPN.
-- **`cluster1`** - the **on-prem bare-metal workload cluster** (6 nodes: `control-01`, `nv-01`, `worker-01` through `worker-04`) running Talos Linux `v1.13.8` with Kubernetes `v1.36.3`: all applications, Rook-Ceph distributed storage, OpenEBS storage, GPU/AI workloads (dual RTX 5090s on `nv-01`, 64 GB VRAM), media, communication, and observability.
+- **`cluster1`** - the **on-prem bare-metal workload cluster** (6 nodes: `control-01`, `nv-01`, `worker-01` through `worker-04`) running Talos Linux `v1.14.2` with Kubernetes `v1.37.1`: all applications, Rook-Ceph distributed storage, OpenEBS storage, GPU/AI workloads (dual RTX 5090s on `nv-01`, 64 GB VRAM), media, communication, and observability.
 
 ## Architecture
 
@@ -76,7 +76,7 @@ clusters/
 
 ### `cluster1` - on-prem bare metal
 
-Six bare-metal nodes managed via self-hosted [Omni](https://omni.siderolabs.io/) running on `cluster0` (`omni.biggs.dog`, context `self-hosted`, cluster `biggs-dog`), all running **Talos Linux v1.13.8** with Kubernetes **v1.36.3**. This is where workloads and the GPU reside.
+Six bare-metal nodes managed via self-hosted [Omni](https://omni.siderolabs.io/) running on `cluster0` (`omni.biggs.dog`, context `self-hosted`, cluster `biggs-dog`), all running **Talos Linux v1.14.2** with Kubernetes **v1.37.1**. This is where workloads and the GPU reside.
 
 | Hostname | Role | CPU | RAM | GPU |
 | --- | --- | --- | --- | --- |
@@ -91,7 +91,7 @@ Six bare-metal nodes managed via self-hosted [Omni](https://omni.siderolabs.io/)
 
 A single-node Talos management cluster (`talos-mgmt-01` / `cluster0-cp-01`) on the LAN at `192.168.2.31`, running **Talos Linux v1.14** with Kubernetes **v1.36.0**. Bootstrapped using `knr-bootstrap` (knr-ops `local-talos` pattern) via Cluster API (CAPI) with Tinkerbell and Talos providers (`bootstrap.toml`). It hosts the Talos management plane (Omni), Talos Image Factory, root identity (Dex), and OpenEBS storage. Cilium advertises the node IP (`192.168.2.31/32`) via an L2 announcement policy shared between `cluster0-gateway` and `omni-siderolink`.
 
-> **GPU notes (`cluster1`):** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01` carries **dual NVIDIA GeForce RTX 5090 dGPUs** (64 GB total GDDR7 VRAM across an ASUS TUF in PCIe slot 1 and a Zotac AMP Extreme Infinity on a 900mm riser in PCIe slot 2, hosted on an ASRock X870E Taichi Lite with PCIe 5.0 x8/x8 bifurcation in a Lian Li O11D EVO XL chassis powered by a 1600W PSU). The NVIDIA GPU Operator slices each card into 4 replicas (8 schedulable `nvidia.com/gpu` replicas total). The `nvidia-gpu-tuning` DaemonSet (which capped clocks at 2600 MHz and board power at 550 W) has been removed; both RTX 5090s now run at stock settings (3105 MHz max boost, 600 W TDP). vLLM and the [Dreamcast game streaming stack](#dreamcast-game-streaming-stack) are arbitrated by the [GPU Arbiter](#gpu-arbiter) during gaming sessions to manage peak dual-card power draw and thermal headroom. `nv-01` runs a Samsung 9100 PRO 1TB install disk, a Realtek RTL8126 5GbE NIC (`enp9s0`), and Sidero Talos kernel-signed open GPU modules (`595.71.05`). The AMD integrated graphics on the Ryzen 7800X3D CPU is bypassed via `VK_DRIVER_FILES` so rendering and compute target the NVIDIA hardware exclusively.
+> **GPU notes (`cluster1`):** The Intel iGPUs are exposed to workloads via the Intel GPU device plugin for media transcoding. `nv-01` carries **dual NVIDIA GeForce RTX 5090 dGPUs** (64 GB total GDDR7 VRAM across an ASUS TUF in PCIe slot 1 and a Zotac AMP Extreme Infinity on a 900mm riser in PCIe slot 2, hosted on an ASRock X870E Taichi Lite with PCIe 5.0 x8/x8 bifurcation in a Lian Li O11D EVO XL chassis powered by a 1600W PSU). The NVIDIA GPU Operator slices each card into 4 replicas (8 schedulable `nvidia.com/gpu` replicas total). The `nvidia-gpu-tuning` DaemonSet (which capped clocks at 2600 MHz and board power at 550 W) has been removed; both RTX 5090s now run at stock settings (3105 MHz max boost, 600 W TDP). vLLM and the [Dreamcast game streaming stack](#dreamcast-game-streaming-stack) are arbitrated by the [GPU Arbiter](#gpu-arbiter) during gaming sessions to manage peak dual-card power draw and thermal headroom. `nv-01` runs a Samsung 9100 PRO 1TB install disk, a Realtek RTL8126 5GbE NIC (`enp9s0`), and a custom NVIDIA Talos build: the [shrinedogg/talos-nvidia-open-extension](https://github.com/shrinedogg/talos-nvidia-open-extension) system extensions (`nvidia-open-modules` / `-firmware` / `-toolkit`, driver `615.78.08`) on a matching custom Talos kernel published by the same repo (repo-signed so the kernel and modules share one signing key), factory-built via the schematic `b7513305...aab7`. The AMD integrated graphics on the Ryzen 7800X3D CPU is bypassed via `VK_DRIVER_FILES` so rendering and compute target the NVIDIA hardware exclusively.
 
 > **Storage disk selection notes (`cluster1`):** Workers carry two NVMe drives. Linux NVMe drive enumeration order (`/dev/nvme0n1` vs `/dev/nvme1n1`) is unstable across reboots on multi-drive hosts. Talos install drives are pinned by hardware serial via `machine.install.diskSelector` in the Omni cluster template. Rook-Ceph OSDs (one Micron 7450 960 GB NVMe per worker) are pinned by persistent by-id paths (`/dev/disk/by-id/nvme-Micron_7450_..._<serial>`).
 
@@ -182,7 +182,7 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | --- | --- |
 | [Node Feature Discovery](https://kubernetes-sigs.github.io/node-feature-discovery/) | Hardware feature detection. |
 | Intel GPU Plugin | Intel GPU device plugin for hardware media transcoding acceleration. |
-| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | NVIDIA device plugin with GPU time-slicing (chart `v26.7.0`; driver and toolkit provided by Talos system extensions). |
+| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | NVIDIA device plugin with GPU time-slicing (chart `v26.7.1`; driver and toolkit provided by Talos system extensions). |
 
 ### Management Plane (`cluster0`)
 
@@ -224,8 +224,8 @@ The `dreamcast` namespace is an on-demand, GPU-accelerated game-streaming platfo
 
 | Component | Description |
 | --- | --- |
-| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | `gpu-operator` Helm chart (`v26.7.0`) with `driver` and `toolkit` disabled. On Talos the driver ships via the `nonfree-kmod-nvidia` system extension and the container toolkit via system extension + machine config, so the operator only runs NFD + device plugin. The dual physical RTX 5090 GPUs are **time-sliced into 4 replicas each (8 total `nvidia.com/gpu` replicas)**. vLLM requests five replicas (tensor-parallel 2 across both cards) and two replicas serve an active session's Wolf sidecar + game container. vLLM is scaled to 0 during gaming sessions by the [GPU Arbiter](#gpu-arbiter) to maintain thermal and power stability across the dual-card chassis. |
-| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`. Forked as `docker.io/shrinedogg/operator` (v0.1.1, multi-user pairing) and `docker.io/shrinedogg/moonlight-proxy` (v0.1.2). |
+| [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | `gpu-operator` Helm chart (`v26.7.1`) with `driver` and `toolkit` disabled. On Talos the driver ships via the custom `nvidia-open-modules` system extension (from [shrinedogg/talos-nvidia-open-extension](https://github.com/shrinedogg/talos-nvidia-open-extension)) and the container toolkit via the matching `nvidia-open-toolkit` extension + machine config, so the operator only runs NFD + device plugin (its end-to-end CUDA workload validation is skipped: production vLLM holds nearly all VRAM, so the `vectorAdd` check cannot pass). The dual physical RTX 5090 GPUs are **time-sliced into 4 replicas each (8 total `nvidia.com/gpu` replicas)**. vLLM requests five replicas (tensor-parallel 2 across both cards) and two replicas serve an active session's Wolf sidecar + game container. vLLM is scaled to 0 during gaming sessions by the [GPU Arbiter](#gpu-arbiter) to maintain thermal and power stability across the dual-card chassis. |
+| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`. Forked as `docker.io/shrinedogg/operator` (v0.1.3: multi-user pairing, per-session RTP port blocks so concurrent sessions share the `direwolf` VIP, and reconciliation retries) and `docker.io/shrinedogg/moonlight-proxy` (v0.1.2: multi-user pairing, 120s `/launch` wait). Session pods get a pod-private `/dev/input` populated per-session by `docker.io/shrinedogg/wolf-agent` (v0.1.3), so concurrent sessions never see each other's controllers. |
 | [Wolf](https://games-on-whales.github.io/wolf/) | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input. Forked as `docker.io/shrinedogg/wolf:v0.1.0` (wl_drm patch). |
 | [gpu-arbiter-operator](https://github.com/shrinedogg/gpu-arbiter-operator) (custom) | controller-runtime operator (`docker.io/shrinedogg/gpu-arbiter-operator:v0.1.1`) that reconciles a cluster-scoped `GPUArbiter` CR: scales the `vllm` Deployment to 0 whenever a `direwolf-worker` session pod appears in `dreamcast`, and back to 1 when idle, then lifts the `gpu.biggs.dog/await-vram` scheduling gate once VRAM is free. See [GPU Arbiter](#gpu-arbiter). |
 
@@ -240,11 +240,11 @@ The [`gpu-arbiter-operator`](https://github.com/shrinedogg/gpu-arbiter-operator)
 
 ### Defined Apps
 
-Three gaming apps under `fenrir/app/apps.yaml`: **Firefox** (reference app), **Test Ball** (synthetic videotestsrc), **Steam** (Big Picture + persistent 250Gi `/home/retro` PVC + DLSS). See [NOTES.md](docs/NOTES.md#dreamcast-engineering-notes) for details.
+Three gaming apps per user under `fenrir/app/apps.yaml` (user `joey`) and `fenrir/app/apps-stacie.yaml` (user `stacie`), each with its own `User` CR and pin URL: **Firefox** (reference app), **Test Ball** (synthetic videotestsrc), and **Steam** (Big Picture under Sway + persistent 200Gi `/home/retro` PVC + DLSS via an `nvngx-bridge` initContainer). The fenrir `GitRepository` is pinned to a full commit SHA (`flux-system/sources/fenrir-git.yaml`). See [NOTES.md](docs/NOTES.md#dreamcast-engineering-notes) for details.
 
 ### Forked Images
 
-See [NOTES.md](docs/NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream.
+See [NOTES.md](docs/NOTES.md#forked-images) for the list of patched Dreamcast images (direwolf-operator, moonlight-proxy, wolf-agent, wolf, gpu-arbiter-operator) and why they diverge from upstream. Session pods tolerate the `nv-01` GPU taint (`nvidia.com/gpu=true:NoSchedule`); App CRs deliberately omit `/dev/input` because it is populated per-session by the wolf-agent.
 
 ## AI and Agents
 
