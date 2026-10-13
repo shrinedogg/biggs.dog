@@ -155,9 +155,9 @@ spec:
               # 4-player dedicated server needs ~12 GiB per the official guide;
               # bumped to 20 Gi for a 6-player cap. No CPU limit (repo policy:
               # avoid CFS throttling on bursty game workloads).
-              memory: 20Gi
+              memory: 15Gi
             limits:
-              memory: 20Gi
+              memory: 15Gi
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
