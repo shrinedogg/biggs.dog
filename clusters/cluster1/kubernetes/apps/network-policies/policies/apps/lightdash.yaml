@@ -148,3 +148,31 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# Snowflake data source: the Snowflake driver dials the account endpoint for
+# auth, metadata and queries. Three verified endpoints for this account
+# (eu-north-1): the short account domain the driver builds from the account
+# id, the region-qualified account domain, and the physical account host the
+# login flow redirects to (mp81978, from the OAuth state). Small query
+# results (the demo's aggregates over 1000 rows) are inlined in the API
+# response; a full-table scan would additionally download result chunks from
+# the account's S3 gateway, whose exact bucket host has not surfaced yet —
+# add it here (exact FQDN; this CRD version rejects toFQDNs wildcards) if a
+# large query errors on a chunk download.
+# DNS for these names is already allowed by allow-egress-dns (matchPattern "*").
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-snowflake
+  namespace: lightdash
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: cuervpz-cc17546.snowflakecomputing.com
+        - matchName: cuervpz-cc17546.eu-north-1.aws.snowflakecomputing.com
+        - matchName: mp81978.eu-north-1.aws.snowflakecomputing.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
