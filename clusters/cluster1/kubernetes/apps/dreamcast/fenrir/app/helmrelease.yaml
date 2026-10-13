@@ -39,9 +39,13 @@ spec:
               # longer deletes other sessions' Services (that livelock was
               # tearing two streams down). Single-session setups are
               # unchanged: the first session keeps the original ports.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.3).
+              # v0.1.4 sends client_settings.motion_controller_override, which
+              # wolf v0.2.0 requires (strict parse; without it every AddSession
+              # fails and the 1-minute reaper kills the session pod). Keep the
+              # operator at >= v0.1.4 while WOLF_IMAGE is v0.2.0 or newer.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.4).
               repository: docker.io/shrinedogg/operator
-              tag: v0.1.3
+              tag: v0.1.4
             # The operator's --lb-sharing-key defaults to POD_NAMESPACE
             # ("dreamcast"), but the chart's moonlight-proxy Service is
             # annotated with sharing-key "direwolf". Mismatched keys make
