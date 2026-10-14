@@ -100,9 +100,12 @@ spec:
               # username (posted with the PIN) and the pairing is bound to
               # that User CR. The hardcoded-alex pin page is gone, so every
               # pairing from now on must enter a username.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.2).
+              # v0.1.6 advertises HEVC Main10 in ServerCodecModeSupport
+              # (66305) so Moonlight clients will negotiate HDR; actual
+              # 10-bit encoding stays gated on WOLF_ENABLE_HDR per session.
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.6).
               repository: docker.io/shrinedogg/moonlight-proxy
-              tag: v0.1.2
+              tag: v0.1.6
     # Pin the shared moonlight-proxy LoadBalancer VIP. The chart's service.app
     # already carries lbipam.cilium.io/sharing-key: direwolf (and the per-session
     # RTP Services share this IP via that key); Helm merges this annotation in,
