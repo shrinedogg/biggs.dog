@@ -432,7 +432,12 @@ spec:
                   if not isinstance(node, dict):
                       return
                   props = node.get("window_properties") or {}
-                  if node.get("type") == "con" and (props.get("class") or "").startswith("steam"):
+                  cls = props.get("class") or ""
+                  appid = node.get("app_id") or ""
+                  # X11 games carry WM_CLASS (steam_app_*). PROTON_ENABLE_WAYLAND
+                  # games are native xdg_shell clients whose app_id is the .exe
+                  # name and have NO window_properties at all.
+                  if node.get("type") == "con" and (cls.startswith("steam") or appid.endswith(".exe")):
                       found = True
                   for key in ("nodes", "floating_nodes"):
                       for child in node.get(key) or []:
@@ -449,6 +454,14 @@ spec:
                        python3 /tmp/sway-has-steam.py; then
                       SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam_app_*"] fullscreen enable' >/dev/null 2>&1 || true
                       SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam"] fullscreen enable' >/dev/null 2>&1 || true
+                      # Wayland-native games (PROTON_ENABLE_WAYLAND): match by
+                      # app_id and keep the game focused -- an occluded Wayland
+                      # game pauses rendering (DXGI occlusion), which reads as a
+                      # black/frozen stream. sway 1.11 has no color management
+                      # (no wp_color_management_v1), so these games stay SDR even
+                      # with PROTON_ENABLE_HDR set.
+                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[app_id=".*\.exe"] fullscreen enable' >/dev/null 2>&1 || true
+                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[app_id=".*\.exe"] focus' >/dev/null 2>&1 || true
                     fi
                     sleep 2
                   done
