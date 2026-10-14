@@ -60,6 +60,11 @@ spec:
         # the session still logs "[ENET] Sending HDR mode (enabled=0)".
         - name: WOLF_ENABLE_HDR
           value: "TRUE"
+        # TEMP debug (gamescope --hdr-enabled EGL_BAD_ALLOC crashloop,
+        # 2026-10-14): raise the waylanddisplaysrc category so the smithay
+        # dmabuf import path logs the failing buffer. Remove after diagnosis.
+        - name: GST_DEBUG
+          value: "waylanddisplaysrc:5"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
@@ -165,6 +170,11 @@ spec:
         # the session still logs "[ENET] Sending HDR mode (enabled=0)".
         - name: WOLF_ENABLE_HDR
           value: "TRUE"
+        # TEMP debug (gamescope --hdr-enabled EGL_BAD_ALLOC crashloop,
+        # 2026-10-14): raise the waylanddisplaysrc category so the smithay
+        # dmabuf import path logs the failing buffer. Remove after diagnosis.
+        - name: GST_DEBUG
+          value: "waylanddisplaysrc:5"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh

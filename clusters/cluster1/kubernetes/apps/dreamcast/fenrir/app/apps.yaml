@@ -261,6 +261,11 @@ spec:
             # the 2026-10-11 test.
             - name: GAMESCOPE_MODE
               value: "--hdr-enabled -b --prefer-vk-device 10de:2b85"
+            # TEMP debug (2026-10-14 EGL_BAD_ALLOC crashloop): log gamescope's
+            # wayland traffic so the failing dmabuf fourcc/modifier is visible
+            # in the app container log. Remove after diagnosis.
+            - name: WAYLAND_DEBUG
+              value: "1"
             - name: PROTON_LOG
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
