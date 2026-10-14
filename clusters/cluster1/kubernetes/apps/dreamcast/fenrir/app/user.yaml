@@ -53,6 +53,13 @@ spec:
         # DMA-BUFs ("Failed to create GsCUDABuf" panic -> no video stream).
         - name: GBM_BACKENDS_PATH
           value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+        # HDR/HEVC Main10 chain (wolf v0.2.0) stays dormant unless this env is
+        # the exact string "TRUE" (configTOML.cpp string compare); quoted so
+        # YAML does not coerce unquoted TRUE to boolean true -> "true". The
+        # client must also negotiate BT2020 (Moonlight HDR toggle), otherwise
+        # the session still logs "[ENET] Sending HDR mode (enabled=0)".
+        - name: WOLF_ENABLE_HDR
+          value: "TRUE"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
@@ -151,6 +158,13 @@ spec:
         # DMA-BUFs ("Failed to create GsCUDABuf" panic -> no video stream).
         - name: GBM_BACKENDS_PATH
           value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+        # HDR/HEVC Main10 chain (wolf v0.2.0) stays dormant unless this env is
+        # the exact string "TRUE" (configTOML.cpp string compare); quoted so
+        # YAML does not coerce unquoted TRUE to boolean true -> "true". The
+        # client must also negotiate BT2020 (Moonlight HDR toggle), otherwise
+        # the session still logs "[ENET] Sending HDR mode (enabled=0)".
+        - name: WOLF_ENABLE_HDR
+          value: "TRUE"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
