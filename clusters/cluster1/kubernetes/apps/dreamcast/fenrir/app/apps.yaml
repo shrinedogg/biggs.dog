@@ -239,20 +239,28 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           env:
-            # Sway, not Gamescope (gamescope re-test failed 2026-10-11): on
-            # driver 615.78.08 EVERY Vulkan client presents black - all 3D
-            # games black under Sway (window mapped/focused, grim capture of
-            # the sway output 100% black, 99% GPU util, no Xid, no wlroots
-            # import errors), and gamescope itself rendered black including
-            # Steam BPM. Vulkan presentation is broken on the 615 branch
-            # (widespread upstream regression; others fixed by reverting to
-            # 610.57.04). GLES2/desktop paths still work, so Sway stays the
-            # compositor until the driver moves (610 rollback or fixed 615.x).
-            # Older context: gamescope's own Vulkan compositing on the dGPU
-            # triggered NVRM Xid 109 (CTX SWITCH TIMEOUT) -> UE5 GPU crash
-            # under the pre-615 driver; Sway avoids that path.
+            # Gamescope re-test 2026-10-14 for in-game HDR: gamescope's WSI
+            # layer offers the game an HDR10 swapchain directly, bypassing the
+            # compositor color management that sway 1.11 lacks (no
+            # wp_color_management_v1 -- verified live with wayland-info). The
+            # 2026-10-11 gamescope rejection ("rendered black incl. BPM") was
+            # the same missing /dev/nvidia-modeset root cause fixed the same
+            # day (node present, durable udev rule); the older Xid 109
+            # CTX_SWITCH_TIMEOUT risk under the pre-615 driver is what the
+            # gpu-arbiter mitigates (vLLM to 0 during sessions). Watch for Xid
+            # and black frames during the test; revert RUN_GAMESCOPE to return
+            # to Sway.
             - name: RUN_SWAY
+              value: "false"
+            - name: RUN_GAMESCOPE
               value: "true"
+            # --hdr-enabled: offer an HDR10 swapchain to the game (needs
+            # gamescope 3.14+ in the image). -b: borderless (the game's own
+            # exclusive-fullscreen path is what stalled under Xwayland).
+            # --prefer-vk-device: pin the slot-1 5090 (10de:2b85), kept from
+            # the 2026-10-11 test.
+            - name: GAMESCOPE_MODE
+              value: "--hdr-enabled -b --prefer-vk-device 10de:2b85"
             - name: PROTON_LOG
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
