@@ -85,9 +85,10 @@ spec:
               # workaround, opt-back via GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1)
               # and adds the upstream stable fixes (RTSP crash on client reset,
               # resume instead of relaunch, input isolation).
-              # v0.2.2: gst-wayland-display a019902 adds dmabuf-rejection
-              # diagnostics (gamescope EGL_BAD_ALLOC investigation).
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.2
+              # v0.2.3: gst-wayland-display 4d672d5 adds dmabuf-rejection
+              # diagnostics + A/B self-alloc import probe (gamescope
+              # EGL_BAD_ALLOC investigation).
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.3
       moonlight_proxy:
         containers:
           proxy:
