@@ -61,10 +61,11 @@ spec:
         - name: WOLF_ENABLE_HDR
           value: "TRUE"
         # TEMP debug (gamescope --hdr-enabled EGL_BAD_ALLOC crashloop,
-        # 2026-10-14): raise the waylanddisplaysrc category so the smithay
-        # dmabuf import path logs the failing buffer. Remove after diagnosis.
-        - name: GST_DEBUG
-          value: "waylanddisplaysrc:5"
+        # 2026-10-14): RUST_LOG raises the smithay/wayland-display-core
+        # stderr tracing (the compositor thread uses fmt::try_init, which
+        # reads RUST_LOG, default ERROR). Remove after diagnosis.
+        - name: RUST_LOG
+          value: "debug"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
@@ -171,10 +172,11 @@ spec:
         - name: WOLF_ENABLE_HDR
           value: "TRUE"
         # TEMP debug (gamescope --hdr-enabled EGL_BAD_ALLOC crashloop,
-        # 2026-10-14): raise the waylanddisplaysrc category so the smithay
-        # dmabuf import path logs the failing buffer. Remove after diagnosis.
-        - name: GST_DEBUG
-          value: "waylanddisplaysrc:5"
+        # 2026-10-14): RUST_LOG raises the smithay/wayland-display-core
+        # stderr tracing (the compositor thread uses fmt::try_init, which
+        # reads RUST_LOG, default ERROR). Remove after diagnosis.
+        - name: RUST_LOG
+          value: "debug"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
