@@ -252,9 +252,9 @@ spec:
             # rejection was the missing /dev/nvidia-modeset root cause; Xid 109
             # risk under the pre-615 driver is what the gpu-arbiter mitigates.
             - name: RUN_SWAY
-              value: "false"
-            - name: RUN_GAMESCOPE
               value: "true"
+            - name: RUN_GAMESCOPE
+              value: "false"
             # --hdr-enabled: offer an HDR10 swapchain to the game (needs
             # gamescope 3.14+ in the image). -b: borderless (the game's own
             # exclusive-fullscreen path is what stalled under Xwayland).
