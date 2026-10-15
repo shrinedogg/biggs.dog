@@ -312,11 +312,11 @@ spec:
             # with this pinned value instead of creating a duplicate env key.
             - name: NVIDIA_VISIBLE_DEVICES
               value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
-            # TEMP diag v3 (VK_LAYER_LUNARG_api_dump from the baked-in
-            # validation-layers package; logs every vulkan call with full
-            # params to stderr). Remove after diagnosis.
-            - name: VK_INSTANCE_LAYERS
-              value: "VK_LAYER_LUNARG_api_dump"
+            # TEMP diag v4: LD_PRELOAD shim intercepting gpa-resolved vulkan
+            # calls (vkCreateImage/AllocateMemory/GetMemoryFdKHR params to
+            # stderr). Remove after diagnosis.
+            - name: LD_PRELOAD
+              value: "/tmp/.X11-unix/vkshim.so"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
