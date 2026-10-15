@@ -259,8 +259,12 @@ spec:
             # exclusive-fullscreen path is what stalled under Xwayland).
             # --prefer-vk-device: pin the slot-1 5090 (10de:2b85), kept from
             # the 2026-10-11 test.
+            # TEST 2026-10-14: --hdr-enabled removed to isolate the XB30 import
+            # failure. gamescope's Wayland backend picks XBGR2101010 output
+            # whenever the host compositor advertises it, independent of
+            # --hdr-enabled, so the crash should reproduce without the flag.
             - name: GAMESCOPE_MODE
-              value: "--hdr-enabled -b --prefer-vk-device 10de:2b85"
+              value: "-b --prefer-vk-device 10de:2b85"
             # TEMP debug (2026-10-14 EGL_BAD_ALLOC crashloop): log gamescope's
             # wayland traffic so the failing dmabuf fourcc/modifier is visible
             # in the app container log. Remove after diagnosis.
