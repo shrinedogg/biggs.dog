@@ -99,7 +99,7 @@ spec:
               # now sends XR24, which ALSO fails import on 615.78.08 (EGL
               # advertises the modifier but rejects Vulkan-allocated buffers;
               # its GBM-allocated equivalents import fine).
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.6
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.7
       moonlight_proxy:
         containers:
           proxy:

@@ -310,11 +310,6 @@ spec:
             # with this pinned value instead of creating a duplicate env key.
             - name: NVIDIA_VISIBLE_DEVICES
               value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
-            # TEMP diag: VK layer logging gamescope's real vkCreateImage /
-            # vkAllocateMemory / vkGetMemoryFdKHR params (layer .so + manifest
-            # staged in the shared /tmp/.X11-unix volume). Remove after diagnosis.
-            - name: VK_LAYER_PATH
-              value: "/tmp/.X11-unix"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
