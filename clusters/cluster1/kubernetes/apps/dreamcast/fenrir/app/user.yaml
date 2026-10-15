@@ -59,7 +59,7 @@ spec:
         # client must also negotiate BT2020 (Moonlight HDR toggle), otherwise
         # the session still logs "[ENET] Sending HDR mode (enabled=0)".
         - name: WOLF_ENABLE_HDR
-          value: "TRUE"
+          value: "FALSE"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
@@ -164,7 +164,7 @@ spec:
         # client must also negotiate BT2020 (Moonlight HDR toggle), otherwise
         # the session still logs "[ENET] Sending HDR mode (enabled=0)".
         - name: WOLF_ENABLE_HDR
-          value: "TRUE"
+          value: "FALSE"
       volumeMounts:
         - name: wolf-root-entrypoint
           mountPath: /entrypoint.sh
