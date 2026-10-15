@@ -198,9 +198,7 @@ spec:
               mountPath: /work
       containers:
         - name: app
-          # TEMP diag: steam image + vulkan-validation-layers for
-          # VK_LAYER_LUNARG_api_dump (revert to steam:fedora-43 after).
-          image: docker.io/shrinedogg/steam-apidump:latest
+          image: ghcr.io/games-on-whales/steam:fedora-43
           # Without a GPU allocation the container gets no /dev/dri node and no
           # driver libs (CDI injection is per-allocated-container), so Sway and
           # Steam render nothing onto the Wayland display -> black video.
@@ -241,17 +239,18 @@ spec:
             runAsUser: 0
             runAsGroup: 0
           env:
-            # Gamescope re-test 2026-10-14 for in-game HDR: gamescope's WSI
-            # layer offers the game an HDR10 swapchain directly, bypassing the
-            # compositor color management that sway 1.11 lacks (no
-            # wp_color_management_v1 -- verified live with wayland-info). The
-            # 2026-10-11 gamescope rejection ("rendered black incl. BPM") was
-            # the same missing /dev/nvidia-modeset root cause fixed the same
-            # day (node present, durable udev rule); the older Xid 109
-            # CTX_SWITCH_TIMEOUT risk under the pre-615 driver is what the
-            # gpu-arbiter mitigates (vLLM to 0 during sessions). Watch for Xid
-            # and black frames during the test; revert RUN_GAMESCOPE to return
-            # to Sway.
+            # Gamescope on driver 615.78.08 is BROKEN (biggs.dog#622): every
+            # gamescope output buffer fails EGL import in wolf's compositor
+            # (EGL_BAD_ALLOC, app crashloop, black stream). Not 10-bit, not
+            # cross-GPU; driver rejects gamescope's exact Vulkan allocation
+            # (physically 12288-pitch, declared 12096). Kept enabled only for
+            # re-testing when the driver moves; revert to RUN_SWAY for a
+            # working stream.
+            # Older context: gamescope's WSI offers games an HDR10 swapchain
+            # directly, bypassing the compositor color management sway 1.11
+            # lacks (no wp_color_management_v1). The 2026-10-11 gamescope
+            # rejection was the missing /dev/nvidia-modeset root cause; Xid 109
+            # risk under the pre-615 driver is what the gpu-arbiter mitigates.
             - name: RUN_SWAY
               value: "false"
             - name: RUN_GAMESCOPE
@@ -306,17 +305,6 @@ spec:
               value: "1"
             - name: DXVK_ENABLE_NVAPI
               value: "1"
-            # TEST 2026-10-15 (cross-GPU dmabuf import): pin the app container
-            # to GPU 0 (01:00.0 = renderD129, wolf's compositor/NVENC node).
-            # Requires operator >= v0.1.7, which overwrites its default "all"
-            # with this pinned value instead of creating a duplicate env key.
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
-            # TEMP diag v4: LD_PRELOAD shim intercepting gpa-resolved vulkan
-            # calls (vkCreateImage/AllocateMemory/GetMemoryFdKHR params to
-            # stderr). Remove after diagnosis.
-            - name: LD_PRELOAD
-              value: "/tmp/.X11-unix/vkshim.so"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply

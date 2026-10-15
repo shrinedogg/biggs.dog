@@ -91,15 +91,9 @@ spec:
               # workaround, opt-back via GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1)
               # and adds the upstream stable fixes (RTSP crash on client reset,
               # resume instead of relaunch, input isolation).
-              # v0.2.5: DIAG BUILD - gst-wayland-display 2a39bbd carries
-              # DEBUG_ACCEPT: dmabuf import failures are logged but reported
-              # successful so gamescope stays alive for live introspection
-              # (frames may be garbled/black). REVERT after diagnosis.
-              # Also keeps v0.2.4's client-facing 10-bit RGB hide: gamescope
-              # now sends XR24, which ALSO fails import on 615.78.08 (EGL
-              # advertises the modifier but rejects Vulkan-allocated buffers;
-              # its GBM-allocated equivalents import fine).
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.8
+              # v0.2.4-v0.2.8 were diag builds for biggs.dog#622 (gamescope
+              # EGL import crashloop on 615.78.08); evidence trail in the issue.
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.0
       moonlight_proxy:
         containers:
           proxy:
