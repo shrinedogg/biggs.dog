@@ -315,8 +315,6 @@ spec:
             # staged in the shared /tmp/.X11-unix volume). Remove after diagnosis.
             - name: VK_LAYER_PATH
               value: "/tmp/.X11-unix"
-            - name: VK_INSTANCE_LAYERS
-              value: "VK_LAYER_FDGRAB_dump"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
