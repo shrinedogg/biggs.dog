@@ -304,15 +304,6 @@ spec:
               value: "1"
             - name: DXVK_ENABLE_NVAPI
               value: "1"
-            # TEST 2026-10-15 (cross-GPU dmabuf import): pin the app container
-            # to GPU 0 (UUID of card at 01:00.0 = renderD129, the node wolf's
-            # compositor/NVENC uses). With NVIDIA_VISIBLE_DEVICES=all,
-            # gamescope's --prefer-vk-device 10de:2b85 matches BOTH 5090s and
-            # can land on GPU 1; client buffers allocated there cannot be
-            # imported by wolf's GPU-0 EGL display (EGL_BAD_ALLOC on every
-            # buffer, exactly the observed signature).
-            - name: NVIDIA_VISIBLE_DEVICES
-              value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
