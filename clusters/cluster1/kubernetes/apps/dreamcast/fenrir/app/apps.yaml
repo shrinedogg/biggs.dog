@@ -253,8 +253,10 @@ spec:
             # risk under the pre-615 driver is what the gpu-arbiter mitigates.
             - name: RUN_SWAY
               value: "true"
-            - name: RUN_GAMESCOPE
-              value: "false"
+            # NOTE: RUN_GAMESCOPE must stay ABSENT (the gow startup scripts
+            # test -n, so "false" still enables gamescope). Keep the
+            # GAMESCOPE_MODE env below for the next re-test; it is inert
+            # under sway.
             # --hdr-enabled: offer an HDR10 swapchain to the game (needs
             # gamescope 3.14+ in the image). -b: borderless (the game's own
             # exclusive-fullscreen path is what stalled under Xwayland).
