@@ -198,7 +198,9 @@ spec:
               mountPath: /work
       containers:
         - name: app
-          image: ghcr.io/games-on-whales/steam:fedora-43
+          # TEMP diag: steam image + vulkan-validation-layers for
+          # VK_LAYER_LUNARG_api_dump (revert to steam:fedora-43 after).
+          image: docker.io/shrinedogg/steam-apidump:latest
           # Without a GPU allocation the container gets no /dev/dri node and no
           # driver libs (CDI injection is per-allocated-container), so Sway and
           # Steam render nothing onto the Wayland display -> black video.
@@ -310,13 +312,11 @@ spec:
             # with this pinned value instead of creating a duplicate env key.
             - name: NVIDIA_VISIBLE_DEVICES
               value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
-            # TEMP diag v2 (fixed layer): log gamescope's real vkCreateImage /
-            # vkAllocateMemory / vkGetMemoryFdKHR (layer + manifest staged in
-            # the shared /tmp/.X11-unix volume). Remove after diagnosis.
-            - name: VK_LAYER_PATH
-              value: "/tmp/.X11-unix"
+            # TEMP diag v3 (VK_LAYER_LUNARG_api_dump from the baked-in
+            # validation-layers package; logs every vulkan call with full
+            # params to stderr). Remove after diagnosis.
             - name: VK_INSTANCE_LAYERS
-              value: "VK_LAYER_FDGRAB_dump"
+              value: "VK_LAYER_LUNARG_api_dump"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply
