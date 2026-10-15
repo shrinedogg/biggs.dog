@@ -304,6 +304,12 @@ spec:
               value: "1"
             - name: DXVK_ENABLE_NVAPI
               value: "1"
+            # TEST 2026-10-15 (cross-GPU dmabuf import): pin the app container
+            # to GPU 0 (01:00.0 = renderD129, wolf's compositor/NVENC node).
+            # Requires operator >= v0.1.7, which overwrites its default "all"
+            # with this pinned value instead of creating a duplicate env key.
+            - name: NVIDIA_VISIBLE_DEVICES
+              value: "GPU-2299d6a8-a955-d7da-b045-3b17e922bc92"
           # NOTE: do not set NVIDIA_DRIVER_CAPABILITIES here. The operator
           # already appends NVIDIA_DRIVER_CAPABILITIES=all to the app container
           # (session.go), and a duplicate env key makes the server-side-apply

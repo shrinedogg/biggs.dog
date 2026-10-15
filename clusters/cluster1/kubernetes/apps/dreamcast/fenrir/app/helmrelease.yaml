@@ -47,9 +47,15 @@ spec:
               # bounds those calls (5s connect, 30s request); before, a fresh
               # Deployment's 0/0 status passed the gate and the dial to a
               # not-yet-programmed ClusterIP hung past the reaper.
-              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.5).
+              # v0.1.5 waits for a ready session pod before calling wolf and
+              # bounds those calls (5s connect, 30s request); before, a fresh
+              # Deployment's 0/0 status passed the gate and the dial to a
+              # not-yet-programmed ClusterIP hung past the reaper.
+              # v0.1.7 lets an App CR pin NVIDIA_VISIBLE_DEVICES (overwrite
+              # the operator's "all" entry instead of an SSA duplicate).
+              # Built from https://github.com/shrinedogg/fenrir (tag v0.1.7).
               repository: docker.io/shrinedogg/operator
-              tag: v0.1.5
+              tag: v0.1.7
             # The operator's --lb-sharing-key defaults to POD_NAMESPACE
             # ("dreamcast"), but the chart's moonlight-proxy Service is
             # annotated with sharing-key "direwolf". Mismatched keys make
