@@ -85,10 +85,16 @@ spec:
               # workaround, opt-back via GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1)
               # and adds the upstream stable fixes (RTSP crash on client reset,
               # resume instead of relaunch, input isolation).
-              # v0.2.3: gst-wayland-display 4d672d5 adds dmabuf-rejection
-              # diagnostics + A/B self-alloc import probe (gamescope
-              # EGL_BAD_ALLOC investigation).
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.3
+              # v0.2.4: gst-wayland-display 96ee75d hides 10-bit RGB dmabuf
+              # formats from CLIENTS (wolf's own 10-bit producer is separate).
+              # NVIDIA 615.78.08 EGL advertises XB30 block-linear as importable
+              # but rejects Vulkan-allocated XB30 (EGL_BAD_ALLOC); gamescope's
+              # Wayland backend picks XBGR2101010 output whenever advertised,
+              # so every gamescope output image failed to import and the app
+              # container crashlooped (black stream). GBM 10-bit and Vulkan
+              # 8-bit import fine. GST_WAYLAND_DISPLAY_CLIENT_10BIT=1 re-enables
+              # the old advertisement. Also carries dmabuf rejection logging.
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.4
       moonlight_proxy:
         containers:
           proxy:

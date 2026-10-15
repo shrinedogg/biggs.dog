@@ -259,17 +259,15 @@ spec:
             # exclusive-fullscreen path is what stalled under Xwayland).
             # --prefer-vk-device: pin the slot-1 5090 (10de:2b85), kept from
             # the 2026-10-11 test.
-            # TEST 2026-10-14: --hdr-enabled removed to isolate the XB30 import
-            # failure. gamescope's Wayland backend picks XBGR2101010 output
-            # whenever the host compositor advertises it, independent of
-            # --hdr-enabled, so the crash should reproduce without the flag.
+            # NOTE (2026-10-14): with wolf < v0.2.4 gamescope crashlooped under
+            # wolf regardless of --hdr-enabled: its Wayland backend picks
+            # XBGR2101010 output whenever the host advertises it and NVIDIA
+            # 615 EGL rejects Vulkan-allocated XB30 imports. wolf v0.2.4 hides
+            # 10-bit RGB from clients, so gamescope now outputs XR24 (8-bit).
+            # --hdr-enabled is kept for the game-facing HDR10 swapchain offer;
+            # the gamescope->wolf hop is 8-bit until the NVIDIA import works.
             - name: GAMESCOPE_MODE
-              value: "-b --prefer-vk-device 10de:2b85"
-            # TEMP debug (2026-10-14 EGL_BAD_ALLOC crashloop): log gamescope's
-            # wayland traffic so the failing dmabuf fourcc/modifier is visible
-            # in the app container log. Remove after diagnosis.
-            - name: WAYLAND_DEBUG
-              value: "1"
+              value: "--hdr-enabled -b --prefer-vk-device 10de:2b85"
             - name: PROTON_LOG
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
