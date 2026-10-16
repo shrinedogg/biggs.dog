@@ -52,13 +52,22 @@ spec:
     # cr.kagent.dev registry.
     registry: ghcr.io
     # ------------------------------------------------------------------
-    # Grafana MCP subchart (mcp-grafana). The subchart already runs
-    # --transport streamable-http with a correct -allowed-hosts list and
-    # injects the token via envFrom secretRef, and renders its own
-    # api.kagent.dev/v1alpha3 RemoteMCPServer (kagent-grafana-mcp).
+    # Grafana MCP subchart (mcp-grafana). The subchart runs
+    # --transport streamable-http and injects the token via envFrom
+    # secretRef, and renders its own api.kagent.dev/v1alpha3
+    # RemoteMCPServer (kagent-grafana-mcp).
     # Point it at the real Grafana Service (observability ns, port 80 ->
     # targetPort grafana/3000); egress from ai-system to observability is
     # allowed by the CNP 'allow-egress-to-observability'.
+    #
+    # allowedHosts "*" — workers reach this service through atenet-egress,
+    # which dials the pod IP directly and rewrites the Host header to the
+    # IP form; mcp-grafana's DNS-rebinding guard would 403 the handshake
+    # ("forbidden: host not allowed") and the agent would see zero tools.
+    # The chart documents "*" as the setting for exactly this proxy case.
+    # The service is headless in-cluster (no external ingress) and the
+    # Grafana token is server-side, so the Host check adds no protection
+    # here.
     #
     # The apiKey is NOT stored in git (GitHub secret scanning would block
     # the push): the runtime token is injected from the existing cluster
@@ -66,6 +75,7 @@ spec:
     # skips creating its own secret when secretRef is set).
     # ------------------------------------------------------------------
     grafana-mcp:
+      allowedHosts: "*"
       grafana:
         url: "http://grafana.observability:80/api"
         secretRef: kagent-grafana-mcp-token
