@@ -170,6 +170,19 @@ spec:
         enabled: false
       logs:
         enabled: false
+    # k8s-credential-provider enforces atespace->namespace authorization for
+    # FetchSecret (default-deny; the chart default is an empty list, which
+    # denies EVERY actor secret fetch: "credential request denied: atespace
+    # not permitted for namespace"). Egress maps that denial to a 403 on the
+    # actor's request, so every agent's LLM call to vllm fails. Grant the one
+    # mapping the fleet needs: actors in atespace ai-system read secrets in
+    # the ai-system namespace (kagent-vllm OPENAI_API_KEY is the only
+    # credential binding across all runtime revisions).
+    credentialProvider:
+      namespacePolicies:
+        - atespace: ai-system
+          allowedNamespaces:
+            - ai-system
     # Disable the in-cluster rustfs object store (issue #598). Substrate's
     # S3 backend (ATE_STORAGE_BACKEND=s3, already the chart default) is
     # pointed at the durable Backblaze B2 endpoint via the AWS_* env below
