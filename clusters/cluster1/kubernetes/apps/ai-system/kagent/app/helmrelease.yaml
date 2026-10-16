@@ -77,7 +77,11 @@ spec:
     grafana-mcp:
       allowedHosts: "*"
       grafana:
-        url: "http://grafana.observability:80/api"
+        # Bare base URL: mcp-grafana appends "/api/..." to GRAFANA_URL
+        # itself (see tools/datasources.go), so a trailing "/api" would
+        # double up and 404. The chart default (grafana.kagent:3000/api)
+        # has this bug; upstream README shows a bare base.
+        url: "http://grafana.observability:80"
         secretRef: kagent-grafana-mcp-token
     # ------------------------------------------------------------------
     # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
