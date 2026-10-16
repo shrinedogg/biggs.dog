@@ -3,7 +3,7 @@
 # wildcard-biggs-dog gateway via HTTPRoute -> livekit-service:7880).
 #
 # STANDBY / rollback path. LiveKit no longer advertises this VIP: with
-# internet clients it advertises the WAN IP (87.92.82.45, UDM-forwarded to
+# internet clients it advertises the WAN IP (62.78.184.99, UDM-forwarded to
 # nv-01) plus the node LAN IP 192.168.2.25 (see livekit-configmap.yaml —
 # v1.13.5 can't advertise an arbitrary VIP alongside the STUN external IP;
 # nat_1_to_1_ips was removed from the config schema). Kept so reverting to

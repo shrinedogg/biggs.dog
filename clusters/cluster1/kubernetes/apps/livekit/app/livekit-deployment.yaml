@@ -2,7 +2,7 @@
 # LiveKit SFU — uses hostNetwork for UDP media relay (single multiplexed port
 # 50100 via UDPMux) and TCP port 7881. HTTP/WS on 7880 is proxied via the
 # gateway. Media candidates advertised (see livekit-configmap.yaml): the WAN
-# IP 87.92.82.45 for internet clients (UDM forwards UDP 50100 + TCP 7881 to
+# IP 62.78.184.99 for internet clients (UDM forwards UDP 50100 + TCP 7881 to
 # nv-01) and the node LAN IP 192.168.2.25 for LAN/VPN clients.
 apiVersion: apps/v1
 kind: Deployment

@@ -23,7 +23,7 @@ data:
       udp_port: 50100
       # Dual-advertise for internet + LAN/VPN clients. Cloudflare proxies
       # livekit.biggs.dog and only forwards HTTP/HTTPS, so media must reach
-      # the WAN IP directly: use_external_ip STUN-detects 87.92.82.45 and
+      # the WAN IP directly: use_external_ip STUN-detects 62.78.184.99 and
       # advertises it as a host candidate. REQUIRES UDM forwards UDP 50100 +
       # TCP 7881 -> nv-01 (192.168.2.25), plus outbound STUN from the host
       # network at boot (the external IP is resolved once at startup —
