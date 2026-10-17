@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: oci://codeberg.org/k8s-gateway/charts/k8s-gateway
   ref:
-    tag: "3.7.2"
+    tag: "4.0.1"
