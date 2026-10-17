@@ -379,7 +379,7 @@ spec:
         # copied glibc loader and serves it at /mcp. This is the only network
         # endpoint; the cbm binary itself listens on nothing.
         - name: server
-          image: ghcr.io/sparfenyuk/mcp-proxy:v0.12.0
+          image: ghcr.io/sparfenyuk/mcp-proxy:v0.13.0
           imagePullPolicy: IfNotPresent
           args:
             - --host=0.0.0.0
