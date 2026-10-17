@@ -228,3 +228,48 @@ spec:
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
+---
+# Emby metadata providers. The scanner (and playback image/metadata requests)
+# fetch from these hosts; under the default-deny egress above every attempt
+# hangs to a TCP timeout, no item ever converges, and each 6h "Scan media
+# library" pass re-probes the whole library (~4h of ffprobes). DNS is covered
+# by allow-egress-dns (L7 matchPattern "*"), so toFQDNs works as-is.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-emby-metadata
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: emby
+  egress:
+    - toFQDNs:
+        # TheTVDb: series metadata, login, artwork (api4/artworks.thetvdb.com)
+        - matchName: thetvdb.com
+        - matchPattern: "*.thetvdb.com"
+        # TMDB: movie metadata and artwork
+        - matchName: tmdb.org
+        - matchPattern: "*.tmdb.org"
+        # FanArt.tv: backdrops, logos, clear art (webservice/assets.fanart.tv)
+        - matchName: fanart.tv
+        - matchPattern: "*.fanart.tv"
+        # TheAudioDB: music metadata
+        - matchName: theaudiodb.com
+        - matchPattern: "*.theaudiodb.com"
+        # MusicBrainz and cover art, incl. Emby's musicbrainz.emby.tv proxy
+        - matchName: musicbrainz.org
+        - matchPattern: "*.musicbrainz.org"
+        - matchName: emby.tv
+        - matchPattern: "*.emby.tv"
+        - matchName: coverartarchive.org
+        - matchPattern: "*.coverartarchive.org"
+        # Emby backend: activation, Emby Connect data, version checks
+        - matchName: mb3admin.com
+        - matchPattern: "*.mb3admin.com"
+        # Application and plugin update checks
+        - matchPattern: "*.github.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
