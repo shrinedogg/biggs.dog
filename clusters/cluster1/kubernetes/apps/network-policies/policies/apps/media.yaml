@@ -248,9 +248,11 @@ spec:
         # TheTVDb: series metadata, login, artwork (api4/artworks.thetvdb.com)
         - matchName: thetvdb.com
         - matchPattern: "*.thetvdb.com"
-        # TMDB: movie metadata and artwork
+        # TMDB: movie metadata (api.themoviedb.org) and artwork (image.tmdb.org)
         - matchName: tmdb.org
         - matchPattern: "*.tmdb.org"
+        - matchName: themoviedb.org
+        - matchPattern: "*.themoviedb.org"
         # FanArt.tv: backdrops, logos, clear art (webservice/assets.fanart.tv)
         - matchName: fanart.tv
         - matchPattern: "*.fanart.tv"
@@ -272,4 +274,12 @@ spec:
       toPorts:
         - ports:
             - port: "443"
+              protocol: TCP
+    # Emby fetches these two over plain HTTP; allow port 80 as well
+    - toFQDNs:
+        - matchName: musicbrainz.emby.tv
+        - matchName: coverartarchive.org
+      toPorts:
+        - ports:
+            - port: "80"
               protocol: TCP
