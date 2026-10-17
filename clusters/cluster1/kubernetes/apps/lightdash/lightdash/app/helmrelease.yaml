@@ -30,7 +30,7 @@ spec:
   chart:
     spec:
       chart: lightdash
-      version: 2.16.1076
+      version: 2.16.1176
       sourceRef:
         kind: HelmRepository
         name: lightdash
