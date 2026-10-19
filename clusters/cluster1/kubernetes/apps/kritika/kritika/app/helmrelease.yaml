@@ -71,7 +71,7 @@ spec:
           # PLACEHOLDER: replace with the GitHub App's real client ID once the
           # App exists (user-owned step, issue #643). The instance starts and
           # serves with the placeholder; GitHub auth fails until it is real.
-          clientId: "Iv1.REPLACE-AFTER-APP-CREATION"
+          clientId: "Iv23lipwA6RQKaoILlNW"
           privateKey: { env: GITHUB_APP_PRIVATE_KEY }
           webhookSecret: { env: GITHUB_APP_WEBHOOK_SECRET }
       providers:
