@@ -1,0 +1,107 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+# Kritika (self-hosted AI pull-request reviewer) on the cluster1 wildcard
+# edge: kritika.biggs.dog -> wildcard-biggs-dog -> kritika.kritika.svc:8080.
+#
+# Chart: kritika from oci://ghcr.io/home-operations/charts/kritika
+# (OCIRepository `kritika` in flux-system), pinned here.
+#
+# Postgres: external, CNPG cluster cnpg-kritika (3 instances, host-path,
+# PG 18 + VectorChord) - see
+# clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/cnpg-kritika.yaml.
+# The chart reads only the `uri` key of three basic-auth Secrets rendered by
+# app/external-secrets.yaml (1Password items kritika-user-password,
+# kritika-app-password, kritika-runner-password).
+#
+# Serve env (admin password, OpenRouter key, GitHub App private key + webhook
+# secret) comes from the kritika-credentials ExternalSecret (1Password items
+# kritika-admin-password, openrouter-api-key, kritika-github-app). The GitHub
+# App's clientId below is a PLACEHOLDER until the App exists (issue #643,
+# user-owned step).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kritika
+  namespace: kritika
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: kritika
+      version: 0.0.85
+      sourceRef:
+        kind: OCIRepository
+        name: kritika
+        namespace: flux-system
+  install:
+    createNamespace: false
+    timeout: 10m
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    timeout: 10m
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  values:
+    replicas: 2
+    image:
+      # Pinned per repo rule; defaults to the chart appVersion otherwise.
+      tag: "0.0.85"
+    database:
+      # Three basic-auth Secrets in this namespace, each with username /
+      # password / uri keys, rendered by app/external-secrets.yaml. The chart
+      # reads only the `uri` key.
+      owner:
+        existingSecret: kritika-postgres-credentials
+      app:
+        existingSecret: kritika-postgres-app
+      runner:
+        existingSecret: kritika-postgres-runner
+    config:
+      webUrl: https://kritika.biggs.dog
+      auth:
+        admin:
+          password: { env: ADMIN_PASSWORD }
+      apps:
+        github:
+          accounts: [shrinedogg]
+          # PLACEHOLDER: replace with the GitHub App's real client ID once the
+          # App exists (user-owned step, issue #643). The instance starts and
+          # serves with the placeholder; GitHub auth fails until it is real.
+          clientId: "Iv1.REPLACE-AFTER-APP-CREATION"
+          privateKey: { env: GITHUB_APP_PRIVATE_KEY }
+          webhookSecret: { env: GITHUB_APP_WEBHOOK_SECRET }
+      providers:
+        openrouter:
+          type: openrouter
+          apiKey: { env: OPENROUTER_API_KEY }
+      review:
+        # OpenRouter floating alias (~<vendor>/<model>-latest), resolved
+        # server-side per request (docs/models.md). User-tunable; embeddings
+        # off, pollInterval default (10m).
+        model: openrouter/~anthropic/claude-sonnet-latest
+    envFrom:
+      - secretRef:
+          name: kritika-credentials
+    networkPolicy:
+      enabled: true
+      type: cilium
+      # Postgres lives in cnpg-system, NOT the release namespace: the runner
+      # policy must name its pods or every run fails to connect (database.md).
+      postgres:
+        namespace: cnpg-system
+        podSelector:
+          cnpg.io/cluster: cnpg-kritika
+    # Monitoring stack on cluster1 is VictoriaMetrics, not prometheus-operator:
+    # all chart monitoring stays off (defaults). /metrics is served on :8081
+    # regardless; a VMPodScrape is a noted follow-up, not this PR.
+    monitoring:
+      serviceMonitor:
+        enabled: false
+      prometheusRule:
+        enabled: false
+      dashboards:
+        enabled: false

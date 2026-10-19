@@ -27,6 +27,7 @@ resources:
   - fenrir-oci.yaml
   - kagent-crds-oci.yaml
   - kagent-oci.yaml
+  - kritika-oci.yaml
   # The substrate-stack migration (2026-10-10) re-added substrate-crds and
   # the substrate-podcert signer source alongside substrate-oci.yaml.
   # Lockstep group — see the substrate-stack rule in renovate.json.
