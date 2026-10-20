@@ -1,0 +1,32 @@
+---
+# agentgateway AI backend: MiniMax (OpenAI-compatible API at api.minimax.io).
+# Joins the model lineup: local Qwen 3.8-27B (vllm.biggs.dog, plain
+# passthrough to the in-cluster vLLM) and Z.ai GLM (consumed via its own
+# key, not gateway-routed).
+#
+# The data plane authenticates upstream with the MiniMax key from the
+# minimax-api-key secret; clients do not send the MiniMax key.
+# No model is pinned: the client picks any of the account's models
+# (MiniMax-M3, MiniMax-M3.1-Flash, MiniMax-M2.x, ...) via the OpenAI
+# "model" field.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: minimax
+  namespace: ai-system
+spec:
+  ai:
+    provider:
+      openai: {}
+      host: api.minimax.io
+      port: 443
+  policies:
+    auth:
+      secretRef:
+        name: minimax-api-key
+    ai:
+      # Path-suffix -> handler; the OpenAI surface from the provider docs.
+      routes:
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Models"
+        "*": "Passthrough"

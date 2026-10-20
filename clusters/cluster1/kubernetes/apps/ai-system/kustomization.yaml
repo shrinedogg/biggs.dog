@@ -27,3 +27,4 @@ resources:
   - ./embeddings/ks.yaml
   - ./codebase-memory-mcp/ks.yaml
   - ./mindwtr-mcp/ks.yaml
+  - ./agentgateway-ai/ks.yaml

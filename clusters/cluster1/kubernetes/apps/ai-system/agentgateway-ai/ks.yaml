@@ -1,0 +1,24 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app agentgateway-ai
+  namespace: flux-system
+spec:
+  dependsOn:
+    # agentgateway controller + AgentgatewayBackend CRD.
+    - name: agentgateway-crds
+    # ClusterSecretStore (onepassword-connect) for the ExternalSecret.
+    - name: secretstore
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/agentgateway-ai/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
