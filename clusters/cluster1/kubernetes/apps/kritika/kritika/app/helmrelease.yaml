@@ -74,17 +74,37 @@ spec:
         openrouter:
           type: openrouter
           apiKey: { env: OPENROUTER_API_KEY }
+        # Local vLLM on cluster1 (Qwen3.8-27B-FP8, ai-system): an
+        # OpenAI-compatible server with no auth. The model supports tool
+        # calls, which reviews require (docs/models.md "Local models").
+        local:
+          type: openai
+          baseUrl: http://vllm.ai-system.svc.cluster.local:8000/v1
+          apiKey: { env: LOCAL_LLM_KEY }
+          # vLLM reports no cost; explicit zeros keep accounting clean.
+          pricing:
+            "qwen 3.8 - local": { input: 0, output: 0 }
       review:
-        # OpenRouter floating alias (~<vendor>/<model>-latest), resolved
-        # server-side per request (docs/models.md). User-tunable; embeddings
-        # off, pollInterval default (10m).
-        model: openrouter/~anthropic/claude-sonnet-latest
+        # Runs on the local vLLM (zero marginal cost, stays on-cluster):
+        # provider key `local`, model id = the served model name. Rollback:
+        # point this back at the openrouter floating alias. Embeddings off,
+        # pollInterval default (10m).
+        model: "local/qwen 3.8 - local"
     envFrom:
       - secretRef:
           name: kritika-credentials
+    env:
+      # Placeholder credential for the local vLLM provider, which takes no
+      # key: required by the chart even when unused (docs/models.md).
+      # A plain value, not a secret.
+      LOCAL_LLM_KEY: vllm-local-no-auth
     networkPolicy:
       enabled: true
       type: cilium
+      # Serve pods' model endpoint: the in-cluster vLLM (ai-system). Without
+      # this, egress allows only 443 and every review dies (docs/models.md).
+      egressPorts:
+        - 8000
       # Postgres lives in cnpg-system, NOT the release namespace: the runner
       # policy must name its pods or every run fails to connect (database.md).
       postgres:
