@@ -105,6 +105,18 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+    # Steam3 Connection Manager protocol (the SteamKit "Connecting to Steam3"
+    # phase of DepotDownloader) runs on 27017, not 443. Verified 2026-10-20
+    # with an in-pod probe: api.steampowered.com:27017 dropped while :443 and
+    # :80-control behaved per policy, and the pod crashlooped with
+    # "Connection to Steam failed" x10.
+    - toFQDNs:
+        - matchName: steampowered.com
+        - matchPattern: "*.steampowered.com"
+      toPorts:
+        - ports:
+            - port: "27017"
+              protocol: TCP
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
