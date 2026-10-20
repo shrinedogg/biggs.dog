@@ -50,6 +50,11 @@ spec:
 # machines hitting the LB-IPAM address (world) and any traffic SNAT'd by a
 # node under externalTrafficPolicy Cluster (host/remote-node) — without the
 # host/remote-node entities those flows are denied at the pod.
+# Additionally: clients playing from dreamcast session pods (fenrir, e.g.
+# the joey/stacie Steam sessions) are in-cluster endpoints and arrive with
+# their pod identity, which none of the entities above match. The windrose
+# policy has the matching fromEndpoints rule; romestead was missing it
+# (2026-10-20: joey-steam session could not reach the server).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -64,6 +69,13 @@ spec:
         - world
         - host
         - remote-node
+      toPorts:
+        - ports:
+            - port: "8050"
+              protocol: UDP
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: dreamcast
       toPorts:
         - ports:
             - port: "8050"
