@@ -44,7 +44,8 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: vllm
-          # CUDA 12.9 build supports the 5090 (Blackwell, sm_120).
+          # Untagged variant = CUDA 13.0 default build (append -cu129 for the
+          # CUDA 12.9 build); both support the 5090 (Blackwell, sm_120).
           image: docker.io/vllm/vllm-openai:v0.32.0
           args:
             # ----------------------------------------------------------------
