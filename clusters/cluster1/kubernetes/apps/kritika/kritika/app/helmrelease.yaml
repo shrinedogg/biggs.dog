@@ -86,12 +86,24 @@ spec:
           # vLLM reports no cost; explicit zeros keep accounting clean.
           pricing:
             "qwen 3.8 - local": { input: 0, output: 0 }
+        # Z.ai GLM Coding Plan (flat subscription, no per-token marginal
+        # cost): OpenAI-compatible endpoint, model glm-5.3-flash (1M
+        # context). Key: 1Password item zai-api-key in the biggs-dog vault
+        # (the store reads biggs-dog only; the value was copied from the
+        # personal hermes-glm-api-key item).
+        zai:
+          type: openai
+          baseUrl: https://api.z.ai/api/coding/paas/v4
+          apiKey: { env: ZAI_API_KEY }
+          pricing:
+            glm-5.3-flash: { input: 0, output: 0 }
       review:
-        # Runs on the local vLLM (zero marginal cost, stays on-cluster):
-        # provider key `local`, model id = the served model name. Rollback:
-        # point this back at the openrouter floating alias. Embeddings off,
+        # Runs on the Z.ai GLM Coding Plan: provider key `zai`, model
+        # glm-5.3-flash (1M context, flat subscription). Rollback: point
+        # this at "local/qwen 3.8 - local" (on-cluster, zero marginal
+        # cost) or the openrouter floating alias. Embeddings off,
         # pollInterval default (10m).
-        model: "local/qwen 3.8 - local"
+        model: "zai/glm-5.3-flash"
     envFrom:
       - secretRef:
           name: kritika-credentials
