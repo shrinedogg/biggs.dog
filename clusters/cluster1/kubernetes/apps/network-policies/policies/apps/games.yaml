@@ -70,11 +70,14 @@ spec:
               protocol: UDP
 ---
 # Romestead DepotDownloader (runs on every boot: UPDATE_ON_START=true,
-# -app 4763510 -validate) needs the Steam metadata API + content CDN, and
-# the game links GameAnalytics. Without this the first boot hangs in the
-# download phase under default-deny egress. If first-boot logs show
-# connection failures to other Steam hosts, add them here (Hubble shows the
-# dropped FQDNs) in a follow-up commit.
+# -app 4763510 -validate) needs the Steam3 connection managers
+# (cm*.steampowered.com), the web login (login.steamcommunity.com, anonymous
+# dedicated-server subscription), the ISteamUser API, and the content CDN,
+# and the game links GameAnalytics. Without these, first boot fails under
+# default-deny egress (2026-10-20: exact-name-only list -> "Connection to
+# Steam failed" x10 -> "InitializeSteam failed" -> Server.dll missing).
+# If first-boot logs show connection failures to other Steam hosts, add them
+# here.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -86,10 +89,17 @@ spec:
       app.kubernetes.io/name: romestead
   egress:
     - toFQDNs:
+        # Steam3 CM (cm*.steampowered.com) + ISteamUser API + store
+        - matchName: steampowered.com
+        - matchPattern: "*.steampowered.com"
+        # web login (login.steamcommunity.com) + community
         - matchName: steamcommunity.com
-        - matchName: api.steampowered.com
-        - matchPattern: "*.steamcontent.com"
+        - matchPattern: "*.steamcommunity.com"
+        # DepotDownloader content CDNs
         - matchName: steamcdn-a.akamaihd.net
+        - matchName: steamcommunity-a.akamaihd.net
+        - matchPattern: "*.steamcontent.com"
+        # telemetry
         - matchPattern: "*.gameanalytics.com"
       toPorts:
         - ports:
