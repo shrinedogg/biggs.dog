@@ -448,3 +448,27 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# kritika's serve pods (kritika ns) call the in-cluster vLLM as the
+# OpenAI-compatible model endpoint (providers.local.baseUrl in the
+# kritika HelmRelease). Cross-namespace ClusterIP: the vllm Service
+# VIP reverse-NATs SYN,ACK, so the return path must be allowed as
+# ingress here, or the dial is dropped (i/o timeout from the serve
+# pods). The egress side is the chart's own CNP (networkPolicy.egressPorts).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-kritika
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: vllm
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kritika
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
