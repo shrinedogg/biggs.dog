@@ -97,6 +97,15 @@ spec:
           apiKey: { env: ZAI_API_KEY }
           pricing:
             glm-5.3-flash: { input: 0, output: 0 }
+      agent:
+        # GLM 5.3 Flash is a reasoning model: the first real review ran
+        # 57 steps / 3.2M tokens and hit the 20m default wall time
+        # mid-verification ("agent timeout (20m0s) reached"). Raised for
+        # the model class; docs caps: timeout 2h35m (tokens 4M default).
+        # A review/follow-up runner Job's deadline is derived from this
+        # timeout, so no runner.jobTemplate override is needed.
+        timeout: 45m
+        tokens: 8000000
       review:
         # Runs on the Z.ai GLM Coding Plan: provider key `zai`, model
         # glm-5.3-flash (1M context, flat subscription). Rollback: point
