@@ -85,7 +85,9 @@ spec:
 # OpenAI-compatible chat endpoint. vLLM is a single pod on nv-01 behind a
 # ClusterIP; the lightdash pods are kept off that node by pod anti-affinity in
 # the HelmRelease values (same-node hairpin, cilium/cilium#47913), so the
-# ClusterIP dial always goes cross-node.
+# ClusterIP dial always goes cross-node. The return path is allowed by the
+# paired allow-ingress-from-lightdash CNP in policies/infra/ai-system.yaml
+# (ai-system runs under implicit default-deny; see the kritika precedent).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
