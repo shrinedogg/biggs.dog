@@ -101,9 +101,11 @@ spec:
     networkPolicy:
       enabled: true
       type: cilium
-      # Serve pods' model endpoint: the in-cluster vLLM (ai-system). Without
-      # this, egress allows only 443 and every review dies (docs/models.md).
+      # Model endpoint: the in-cluster vLLM (ai-system), 8000. 443 is the
+      # chart default (GitHub API, OpenRouter) and is REPLACED, not extended,
+      # when this key is set, so both must be listed.
       egressPorts:
+        - 443
         - 8000
       # Postgres lives in cnpg-system, NOT the release namespace: the runner
       # policy must name its pods or every run fails to connect (database.md).
