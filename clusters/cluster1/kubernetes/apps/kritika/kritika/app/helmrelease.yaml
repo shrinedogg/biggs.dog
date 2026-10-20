@@ -75,8 +75,10 @@ spec:
           type: openrouter
           apiKey: { env: OPENROUTER_API_KEY }
         # Local vLLM on cluster1 (Qwen3.8-27B-FP8, ai-system): an
-        # OpenAI-compatible server with no auth. The model supports tool
-        # calls, which reviews require (docs/models.md "Local models").
+        # OpenAI-compatible server secured by a shared API key (the
+        # vllm-api-key 1Password item, same field ai-system's kagent-vllm
+        # secret reads). The model supports tool calls, which reviews
+        # require (docs/models.md "Local models").
         local:
           type: openai
           baseUrl: http://vllm.ai-system.svc.cluster.local:8000/v1
@@ -93,11 +95,6 @@ spec:
     envFrom:
       - secretRef:
           name: kritika-credentials
-    env:
-      # Placeholder credential for the local vLLM provider, which takes no
-      # key: required by the chart even when unused (docs/models.md).
-      # A plain value, not a secret.
-      LOCAL_LLM_KEY: vllm-local-no-auth
     networkPolicy:
       enabled: true
       type: cilium
