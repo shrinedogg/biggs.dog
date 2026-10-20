@@ -9,6 +9,15 @@
 # No model is pinned: the client picks any of the account's models
 # (MiniMax-M3, MiniMax-M3.1-Flash, MiniMax-M2.x, ...) via the OpenAI
 # "model" field.
+#
+# The dial target is the in-cluster minimax-egress forwarder, NOT
+# api.minimax.io directly: the data plane dials one resolver-provided
+# address per connection with no v6->v4 fallback, and pods have no global
+# IPv6 route, so dialing the dual-stack Akamai endpoint directly 503s on
+# every AAAA (see minimax-egress/app/configmap.yaml). The forwarder
+# terminates the hop at A-only DNS; the TLS SNI is pinned back to
+# api.minimax.io below so Akamai presents (and we validate) the real
+# certificate.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
@@ -18,15 +27,24 @@ spec:
   ai:
     provider:
       openai: {}
-      host: api.minimax.io
+      host: minimax-egress.ai-system.svc.cluster.local
       port: 443
   policies:
     auth:
       secretRef:
         name: minimax-api-key
+    tls:
+      # SNI (and certificate-validation name) for the passthrough TLS
+      # through the egress forwarder. Without it the SNI would be the
+      # service name and Akamai would not present the api.minimax.io
+      # certificate.
+      sni: api.minimax.io
     ai:
       # Path-suffix -> handler; the OpenAI surface from the provider docs.
+      # "Models" is in the CRD enum but NOT implemented by the v2.2.1 data
+      # plane (501 "Route 'Models' not implemented"); /v1/models passes
+      # through to the upstream, which serves it natively.
       routes:
         "/v1/chat/completions": "Completions"
-        "/v1/models": "Models"
+        "/v1/models": "Passthrough"
         "*": "Passthrough"
