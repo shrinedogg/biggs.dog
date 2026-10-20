@@ -117,6 +117,19 @@ spec:
         - ports:
             - port: "27017"
               protocol: TCP
+    # SteamKit dials the CM hosts it gets from ICMList by RAW IP (verified
+    # 27017/27018 SYN drops to 155.133.248.38 / 162.254.192.99 via cilium
+    # monitor; no ipcache/DNS-proxy attribution exists for those IPs), so an
+    # FQDN rule can never cover the common path. Scope: exactly the two CM
+    # ports to world.
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "27017"
+              protocol: TCP
+            - port: "27018"
+              protocol: TCP
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
