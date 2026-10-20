@@ -1,0 +1,56 @@
+# cnpg-kritika: Postgres for the kritika AI PR reviewer (issue #643).
+#
+# PG 18 standard-bookworm with VectorChord 1.1.1 (image-volume extension) and
+# pgvector: kritika's queue, findings, and embeddings live here. Image,
+# extension form, and bootstrap mirror the upstream smoke ground truth
+# (scripts/smoke.sh); sizing/storage/PDB mirror cnpg-substrate.
+#
+# Bootstrap credentials: 1Password item kritika-user-password (CES in
+# ../secrets/kritika-user-password.yaml). Roles kritika_app / kritika_runner:
+# 1Password items kritika-app-password / kritika-runner-password (CES in
+# ../secrets/, roles in cnpg-kritika-db.yaml).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-kritika
+  namespace: cnpg-system
+spec:
+  instances: 3
+  # Mirrors cnpg-substrate: accept full DB downtime during node maintenance.
+  enablePDB: false
+  # Direct imageName, NOT ../secrets/postgresql-minimal-trixie-catalog.yaml:
+  # the catalog carries no VectorChord and its minimal-trixie operand's lib
+  # paths differ from what the vchord-scratch extension image ships. This is
+  # the upstream kritika smoke image (scripts/smoke.sh), PG 18 + VectorChord.
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.6-standard-bookworm
+  enableSuperuserAccess: false
+  bootstrap:
+    initdb:
+      database: kritika
+      owner: kritika
+      dataChecksums: true
+      secret:
+        name: kritika-user-password
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 150m
+    limits:
+      memory: 300Mi
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  postgresql:
+    extensions:
+      - name: vchord
+        image:
+          reference: ghcr.io/tensorchord/vchord-scratch:pg18-v1.1.1
+        # The image keeps Debian's paths rather than CNPG's defaults.
+        dynamic_library_path:
+          - /usr/lib/postgresql/18/lib/
+        extension_control_path:
+          - /usr/share/postgresql/18/
+    shared_preload_libraries:
+      - vchord
+    parameters:
+      archive_mode: "off"

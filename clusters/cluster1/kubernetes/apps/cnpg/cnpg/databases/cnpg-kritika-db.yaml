@@ -1,0 +1,53 @@
+# kritika database + roles on cnpg-kritika (issue #643).
+#
+# The Database CR creates the `kritika` DB with pgvector + vchord as
+# superuser (the owner `kritika` never needs it). The two DatabaseRoles are
+# CNPG's declarative role management; `retain` keeps the role and running
+# connections if the CR is deleted. Passwords from 1Password items
+# kritika-app-password / kritika-runner-password (CES in
+# ../secrets/kritika-{app,runner}-password.yaml); kritika's migrations grant
+# the roles what they need.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-kritika-db
+  namespace: cnpg-system
+spec:
+  name: kritika
+  owner: kritika
+  cluster:
+    name: cnpg-kritika
+  extensions:
+    - name: vector
+      ensure: present
+    - name: vchord
+      version: "1.1.1"   # move with the vchord-scratch image tag
+      ensure: present
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: kritika-app
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: cnpg-kritika
+  name: kritika_app
+  login: true
+  passwordSecret:
+    name: kritika-app-password
+  databaseRoleReclaimPolicy: retain
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: DatabaseRole
+metadata:
+  name: kritika-runner
+  namespace: cnpg-system
+spec:
+  cluster:
+    name: cnpg-kritika
+  name: kritika_runner
+  login: true
+  passwordSecret:
+    name: kritika-runner-password
+  databaseRoleReclaimPolicy: retain
