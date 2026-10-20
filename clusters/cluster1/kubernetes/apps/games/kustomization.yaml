@@ -6,3 +6,4 @@ resources:
   - ./namespace.yaml
   # Flux-Kustomizations
   - ./windrose/ks.yaml
+  - ./romestead/ks.yaml

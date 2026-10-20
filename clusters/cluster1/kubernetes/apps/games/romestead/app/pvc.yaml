@@ -1,0 +1,20 @@
+---
+# Persistent state for the Romestead dedicated server. Single volume
+# /home/steam/server-files holds the Steam install (~10GB, DepotDownloader
+# app 4763510), world saves, and config.json. 20Gi per the image README
+# (10GB minimum / 20GB recommended). Persisting it avoids re-downloading the
+# depot on every pod recreation.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: romestead-saved
+  namespace: games
+  labels:
+    app.kubernetes.io/name: romestead
+spec:
+  storageClassName: ceph-block
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

@@ -1,4 +1,4 @@
-# Namespace: games  (windrose)
+# Namespace: games  (windrose, romestead)
 # NOTE: if a game server is exposed directly via a LoadBalancer (not the HTTP
 # gateway), add an explicit world-ingress rule for its UDP/TCP game ports.
 ---
@@ -44,6 +44,57 @@ spec:
               protocol: TCP
             - port: "28050"
               protocol: UDP
+---
+# Romestead game port (LB 192.168.6.13:8050, UDP only).
+# Same rationale as the windrose policy above: clients are LAN/external
+# machines hitting the LB-IPAM address (world) and any traffic SNAT'd by a
+# node under externalTrafficPolicy Cluster (host/remote-node) — without the
+# host/remote-node entities those flows are denied at the pod.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-romestead-game-port
+  namespace: games
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: romestead
+  ingress:
+    - fromEntities:
+        - world
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "8050"
+              protocol: UDP
+---
+# Romestead DepotDownloader (runs on every boot: UPDATE_ON_START=true,
+# -app 4763510 -validate) needs the Steam metadata API + content CDN, and
+# the game links GameAnalytics. Without this the first boot hangs in the
+# download phase under default-deny egress. If first-boot logs show
+# connection failures to other Steam hosts, add them here (Hubble shows the
+# dropped FQDNs) in a follow-up commit.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-romestead-steam
+  namespace: games
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: romestead
+  egress:
+    - toFQDNs:
+        - matchName: steamcommunity.com
+        - matchName: api.steampowered.com
+        - matchPattern: "*.steamcontent.com"
+        - matchName: steamcdn-a.akamaihd.net
+        - matchPattern: "*.gameanalytics.com"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
