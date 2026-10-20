@@ -15,9 +15,9 @@
 #
 # Serve env (admin password, OpenRouter key, GitHub App private key + webhook
 # secret) comes from the kritika-credentials ExternalSecret (1Password items
-# kritika-admin-password, openrouter-api-key, kritika-github-app). The GitHub
-# App's clientId below is a PLACEHOLDER until the App exists (issue #643,
-# user-owned step).
+# kritika-admin-password, openrouter-api-key, kritika-github-app). The version
+# pin (0.0.85) lives on the OCIRepository (flux-system/sources/kritika-oci.yaml),
+# matching the house chartRef pattern.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -25,14 +25,10 @@ metadata:
   namespace: kritika
 spec:
   interval: 3m
-  chart:
-    spec:
-      chart: kritika
-      version: 0.0.85
-      sourceRef:
-        kind: OCIRepository
-        name: kritika
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: kritika
+    namespace: flux-system
   install:
     createNamespace: false
     timeout: 10m
