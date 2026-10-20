@@ -1,0 +1,25 @@
+---
+# Exposes the Romestead game port on the LAN. Pinned to the 192.168.6.0/24
+# BGP range via Cilium LB-IPAM (clients connect to 192.168.6.13:8050/UDP; the
+# UDM port-forwards that address to players). externalTrafficPolicy Cluster
+# lets any node forward traffic; the matching CiliumNetworkPolicy allows
+# host/remote-node for the SNAT'd off-node flows.
+apiVersion: v1
+kind: Service
+metadata:
+  name: romestead
+  namespace: games
+  labels:
+    app.kubernetes.io/name: romestead
+  annotations:
+    io.cilium/lb-ipam-ips: "192.168.6.13"
+spec:
+  type: LoadBalancer
+  externalTrafficPolicy: Cluster
+  selector:
+    app.kubernetes.io/name: romestead
+  ports:
+    - name: game-udp
+      port: 8050
+      targetPort: game-udp
+      protocol: UDP

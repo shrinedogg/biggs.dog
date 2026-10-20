@@ -1,0 +1,113 @@
+---
+# Romestead dedicated server (indifferentbroccoli/romestead-server-docker).
+#
+# The image's entrypoint (scripts/init.sh) runs as ROOT: it usermods the
+# steam user to PUID/PGID, chowns /home/steam, downloads/validates the Steam
+# depot on every boot (UPDATE_ON_START), writes config.json from env vars,
+# then drops to the steam user via su. Consequences:
+#   - PUID/PGID env vars are MANDATORY (init.sh exits 1 without them; the
+#     README claims a default but the Dockerfile does not set them)
+#   - no runAsNonRoot, no fsGroup (the image chowns itself), no capabilities
+#     drop (usermod/chown need root's default caps)
+#   - PUID/PGID = 1000 so the steam user owns the PVC contents
+#
+# Single replica with a dedicated PVC: saves are stateful, so replicas is
+# pinned at 1 (strategy Recreate to avoid two pods contending for the RWO
+# volume during rollouts).
+#
+# Probes are exec-based on /proc/net/udp (8050 = 0x1F72): the game binds UDP
+# only, so tcpSocket probes would never pass. The startup window covers the
+# first-boot depot download (~10GB); UPDATE_ON_START re-validates the depot
+# on every subsequent boot (minutes).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: romestead
+  namespace: games
+  labels:
+    app.kubernetes.io/name: romestead
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: romestead
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: romestead
+    spec:
+      # The entrypoint's graceful-shutdown path (SIGTERM -> 'stop' via FIFO)
+      # budgets 30s internally before forcing; 90s covers that plus a world
+      # save over RBD.
+      terminationGracePeriodSeconds: 90
+      securityContext:
+        # Root-init image (see header comment); seccomp is the only pod-level
+        # restriction that is safe with the usermod/chown/su sequence.
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: romestead
+          # Pin by digest so Renovate can track and bump it. The tag is kept
+          # so Renovate has a version to propose updates against.
+          image: docker.io/indifferentbroccoli/romestead-server-docker:v1.0.1@sha256:b197d61d4b69cba95e9db91f051772a2f37bdc34b66793b10a295c204665e44e
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: game-udp
+              containerPort: 8050
+              protocol: UDP
+          # PUID/PGID are mandatory (init.sh exits 1 without them).
+          env:
+            - name: PUID
+              value: "1000"
+            - name: PGID
+              value: "1000"
+            # REQUIRED non-empty: with an empty world name the server falls
+            # through to its interactive menu and crashloops headless
+            # (upstream issue #1: Console.ReadKey on redirected stdin).
+            # Verified 2026-10-20: non-empty name auto-creates + loads.
+            - name: AUTO_START_WORLD_NAME
+              value: "main"
+          # PASSWORD from the ExternalSecret-rendered k8s Secret.
+          envFrom:
+            - secretRef:
+                name: romestead-secret
+          startupProbe:
+            # 10s x 180 = 30 min: first boot downloads the ~10GB depot.
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - awk 'NR>1 && $2 ~ /:1F72$/ {found=1} END {exit !found}' /proc/net/udp
+            periodSeconds: 10
+            failureThreshold: 180
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - awk 'NR>1 && $2 ~ /:1F72$/ {found=1} END {exit !found}' /proc/net/udp
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              # 8Gi per the image README (4GB min / 8GB recommended). No CPU
+              # limit (repo policy: avoid CFS throttling on bursty workloads).
+              memory: 8Gi
+            limits:
+              memory: 8Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            # No capabilities drop: root needs CAP_CHOWN/CAP_SETUID for the
+            # usermod/groupmod/chown sequence in init.sh.
+          volumeMounts:
+            # Install + saves + config, persisted across restarts.
+            - name: saved
+              mountPath: /home/steam/server-files
+      volumes:
+        - name: saved
+          persistentVolumeClaim:
+            claimName: romestead-saved
