@@ -37,9 +37,12 @@ spec:
               labelSelector:
                 matchLabels:
                   app.kubernetes.io/name: k8s-gateway
-    # CoreDNS listens on container port 1053 (the Service maps 53 -> 1053), so it
-    # can run fully non-root with no added capabilities (NET_BIND_SERVICE is not
-    # required). The chart already forces runAsUser 1000 while secure: true.
+    # Chart 4.x defaults to 100m/128Mi CPU/memory; the live 3.x release has none.
+    # Keep the no-limits behavior: CFS-throttling a LAN-wide DNS authority during
+    # a query burst is exactly what the fallthrough design cannot afford.
+    resources: {}
+    # The server listens on container port 1053, so it can run fully non-root
+    # with no added capabilities (NET_BIND_SERVICE is not required).
     podSecurityContext:
       runAsNonRoot: true
       runAsUser: 1000
@@ -59,62 +62,69 @@ spec:
     # nodeSelector:
     #   kubernetes.io/hostname: control-01
     # Service added so k8s-gateway creates DNS for annotated LoadBalancer services (e.g. turn.biggs.dog → Coturn)
-    watchedResources: ["HTTPRoute", "Service"]
-    domain: biggs.dog
-    # Fall through unknown biggs.dog names to PUBLIC resolvers so services on
-    # OTHER clusters resolve (e.g. omni/netbird/dex on cluster0 -> 87.58.147.51
-    # via public DNS) for LAN/VPN clients whose UDM conditionally forwards
-    # *.biggs.dog here. cluster1 services keep resolving via k8s_gateway to LAN IPs.
-    #
-    # LOOP HAZARD: the chart's DEFAULT extraZonePlugins forward is
-    # `forward . /etc/resolv.conf`, which points at in-cluster kube-dns, which
-    # forwards biggs.dog BACK here (biggs.dog:53 zone in kube-system/coredns ->
-    # 10.101.183.97). With the default forward, fallthrough loops -> SERVFAIL.
-    # The extraZonePlugins list below is the chart default REPLICATED IN FULL,
-    # with ONLY the forward parameters changed from `/etc/resolv.conf` to the
-    # homelab's NextDNS resolvers (45.90.28.232 / 45.90.30.232) to break that
-    # loop. The ready/health/prometheus plugins MUST stay -- they back the liveness/readiness probes
-    # and the ServiceMonitor; dropping them (an earlier attempt set only the
-    # forward entry) left pods NotReady and the LB with no endpoints.
-    fallthrough:
-      enabled: true
-      zones: [biggs.dog]
-    extraZonePlugins:
-      - name: log
-      - name: errors
-      # Serves a /health endpoint on :8080, required for livenessProbe
-      - name: health
-        configBlock: |-
-          lameduck 5s
-      # Serves a /ready endpoint on :8181, required for readinessProbe
-      - name: ready
-      # Serves a /metrics endpoint on :9153, required for serviceMonitor
-      - name: prometheus
-        parameters: 0.0.0.0:9153
-      # cluster0 edge names. k8s_gateway only knows cluster1 routes, so without
-      # this they fall through to public DNS, which returns the Cloudflare
-      # proxy IP; Cloudflare's edge answers gRPC with a 403 challenge page and
-      # omnictl / the Omni-proxied kubeconfig break for every LAN client whose
-      # resolver conditionally forwards biggs.dog here. The hosts plugin runs
-      # before k8s_gateway and forward in CoreDNS plugin order.
-      - name: hosts
-        configBlock: |-
-          192.168.2.31 omni.biggs.dog dex.biggs.dog netbird.biggs.dog factory.biggs.dog
-          fallthrough
-      # NextDNS resolvers ONLY -- NOT /etc/resolv.conf (-> kube-dns -> loop).
-      # These are the homelab's NextDNS IPs (filtering/logging); the k8s-gateway
-      # CNP allows egress world:53 so they're reachable from the pod.
-      - name: forward
-        parameters: . 45.90.28.232 45.90.30.232
-      - name: loop
-      - name: reload
-      - name: loadbalance
-    dnsChallenge:
-      enabled: true
-      domain: dns01.clouddns.com
-    ttl: 60
+    # Chart 4.x schema: the 3.x `domain` / `watchedResources` / `fallthrough` /
+    # `ttl` / `dnsChallenge` / `extraZonePlugins` values are gone; the Corefile is
+    # a list of server blocks. use_tcp keeps TCP DNS alongside UDP (the 3.x
+    # service.useTcp: true). The 3.x dnsChallenge `_acme-challenge` CNAME shim is
+    # dropped: cert-manager uses the Cloudflare DNS-01 solver (TXT written
+    # straight into Cloudflare), so nothing on the issuance path consults it.
+    servers:
+      - zones:
+          - zone: biggs.dog.
+            use_tcp: true
+        # Non-root UID 1000 cannot bind :53, so the listener stays on 1053.
+        port: 1053
+        # Publish the Service on 53 (the 3.x service.port) instead of the
+        # listener port: lan-dns and the Talos-managed CoreDNS both forward
+        # biggs.dog to port 53, and without this the Service would publish 1053
+        # and break both.
+        servicePort: 53
+        plugins:
+          - name: errors
+          # Serves a /health endpoint on :8080, required for livenessProbe
+          - name: health
+            configBlock: |-
+              lameduck 5s
+          # Serves a /ready endpoint on :8181, required for readinessProbe
+          - name: ready
+          # 3.x rendered `apex k8s-gateway.networking` (the release FQDN) from
+          # the chart's apex default; chart 4.x renders no apex, so the directive
+          # must be explicit or the zone SOA/NS records fall back to the binary
+          # default (dns1.kube-system).
+          - name: k8s_gateway
+            parameters: biggs.dog
+            configBlock: |-
+              apex k8s-gateway.networking
+              ttl 60
+              resources HTTPRoute Service
+              fallthrough biggs.dog
+          # cluster0 edge names. k8s_gateway only knows cluster1 routes, so
+          # without this they fall through to public DNS, which returns the
+          # Cloudflare proxy IP; Cloudflare's edge answers gRPC with a 403
+          # challenge page and omnictl / the Omni-proxied kubeconfig break for
+          # every LAN client whose resolver conditionally forwards biggs.dog
+          # here. The hosts plugin runs before forward in CoreDNS plugin order.
+          - name: hosts
+            configBlock: |-
+              192.168.2.31 omni.biggs.dog dex.biggs.dog netbird.biggs.dog factory.biggs.dog
+              fallthrough
+          # NextDNS resolvers ONLY -- NOT /etc/resolv.conf (see docs/NOTES.md):
+          # the chart 4.x default forward is `forward . /etc/resolv.conf`, which
+          # points at in-cluster kube-dns, which forwards biggs.dog BACK here;
+          # with it, fallthrough loops and SERVFAILs. These are the homelab's
+          # NextDNS IPs (filtering/logging); the k8s-gateway CNP allows egress
+          # world:53 so they're reachable from the pod.
+          - name: forward
+            parameters: . 45.90.28.232 45.90.30.232
+          - name: loop
+          - name: reload
+          - name: loadbalance
+          # Serves a /metrics endpoint on :9153, required for scraping
+          - name: prometheus
+            parameters: 0.0.0.0:9153
+    # The 3.x service.type moved to top level in chart 4.x.
+    serviceType: LoadBalancer
     service:
-      type: LoadBalancer
       # Pinned to the live ClusterIP so it survives a Service recreate. lan-dns
       # and the Talos-managed kube-dns both forward biggs.dog to this address
       # (NOT the .6.6 LB VIP, which fails the same-node Cilium LB hairpin when a
@@ -122,9 +132,11 @@ spec:
       # which never applied because ClusterIP is immutable once assigned.
       clusterIP: 10.101.183.97
       loadBalancerIP: 192.168.6.6
-      port: 53
       externalTrafficPolicy: Cluster # Allow any node to forward traffic
-      useTcp: true
+      # Chart 4.x no longer hard-codes the scrape annotations.
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9153"
     serviceAccount:
       create: true
       name: ""
