@@ -16,7 +16,7 @@
 # Serve env (admin password, OpenRouter key, GitHub App private key + webhook
 # secret) comes from the kritika-credentials ExternalSecret (1Password items
 # kritika-admin-password, openrouter-api-key, kritika-github-app). The version
-# pin (0.0.85) lives on the OCIRepository (flux-system/sources/kritika-oci.yaml),
+# pin (0.0.90) lives on the OCIRepository (flux-system/sources/kritika-oci.yaml),
 # matching the house chartRef pattern.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
@@ -44,8 +44,10 @@ spec:
   values:
     replicas: 2
     image:
-      # Pinned per repo rule; defaults to the chart appVersion otherwise.
-      tag: "0.0.85"
+      # Pinned per repo rule (no `latest`); the chart also pins the serve
+      # image by digest, which wins over this tag, so the tag only acts as
+      # the fallback when the chart ships no digest.
+      tag: "0.0.90"
     database:
       # Three basic-auth Secrets in this namespace, each with username /
       # password / uri keys, rendered by app/external-secrets.yaml. The chart
