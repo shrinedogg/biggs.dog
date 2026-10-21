@@ -93,7 +93,7 @@ spec:
               # resume instead of relaunch, input isolation).
               # v0.2.4-v0.2.8 were diag builds for biggs.dog#622 (gamescope
               # EGL import crashloop on 615.78.08); evidence trail in the issue.
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.0
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.8
       moonlight_proxy:
         containers:
           proxy:
