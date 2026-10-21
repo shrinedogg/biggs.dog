@@ -214,7 +214,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 ### vLLM Deployment
 
 - **Model**: [`Qwen/Qwen3.8-27B-FP8`](https://huggingface.co/Qwen/Qwen3.8-27B-FP8) (served as `qwen 3.8 - local`) - a **27B dense** model with a **Gated-DeltaNet / gated-attention hybrid** (only 16 of 64 layers keep paged KV), Alibaba's official W8A8 FP8 checkpoint (~28.7 GB safetensors incl. the MTP draft head). **Full native 262K context** served (`--max-model-len=262144`).
-- **Version**: `docker.io/vllm/vllm-openai:v0.28.0` (CUDA 12.9 for Blackwell GPU support on RTX 5090).
+- **Version**: `docker.io/vllm/vllm-openai:v0.32.0` (CUDA 13.0 default build for Blackwell GPU support on RTX 5090).
 - **GPU**: Tensor-parallel 2 across BOTH of `nv-01`'s RTX 5090s (~14.4 GiB weights per card, estimated ~10 GiB fp8 KV pool per card). The CDI device plugin injects only the allocated card and ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so the pod requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas to pigeonhole across both cards (verified 2026-09-09 with throwaway pods).
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
