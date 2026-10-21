@@ -59,7 +59,7 @@ spec:
                       - linux
       containers:
         - name: infinity
-          image: michaelf34/infinity:latest-cpu@sha256:161ef2dd48ba050ad29a413d671270502acb4ad67759d695eb0d325c033a935d
+          image: michaelf34/infinity:latest-cpu@sha256:5401a057f16f82a7a1202369f674dc15695fe37d8517f3c0263fdfb88b2e2717
           imagePullPolicy: IfNotPresent
           args:
             - v2
