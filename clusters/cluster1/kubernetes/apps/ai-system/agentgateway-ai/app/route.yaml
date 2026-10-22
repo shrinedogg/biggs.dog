@@ -1,10 +1,22 @@
 ---
 # External HTTPS route for the MiniMax OpenAI-compatible API via agentgateway.
-# Endpoint: https://minimax.biggs.dog/v1 (wildcard gateway, TLS at the edge).
+# Endpoint: https://minimax.biggs.dog/v1 (internal LAN-only gateway, TLS at
+# the edge). Placed on internal-biggs-dog, NOT wildcard-biggs-dog: the WAN
+# VIP 192.168.6.7 is the only UDM-forwarded address, so the public path 404s
+# while k8s-gateway answers minimax.biggs.dog with 192.168.6.15 for LAN
+# clients (the split-horizon answer is derived from this route's parent
+# Gateway).
+#
+# Client authentication is required (model-api-key AgentgatewayPolicy):
+# send the model-route token as `Authorization: Bearer <token>`. The token
+# comes from the model-api-keys Secret (ExternalSecret from the 1Password
+# item agentgateway-model-api-key); it is distinct from the MiniMax
+# provider key, which the backend uses upstream and never reaches clients.
 #
 # Usage:
 #   curl https://minimax.biggs.dog/v1/chat/completions \
 #     -H 'Content-Type: application/json' \
+#     -H 'Authorization: Bearer <model...ken>' \
 #     -d '{"model":"MiniMax-M3","messages":[{"role":"user","content":"hi"}]}'
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -15,7 +27,7 @@ spec:
   hostnames:
     - minimax.biggs.dog
   parentRefs:
-    - name: wildcard-biggs-dog
+    - name: internal-biggs-dog
       namespace: networking
   rules:
     - backendRefs:
