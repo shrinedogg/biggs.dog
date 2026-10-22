@@ -298,6 +298,44 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# Substrate actors -> agentgateway data plane (issue #661). The actors'
+# outbound model traffic exits through the substrate egress proxy
+# (app=atenet-egress), which resolves the actor's egress destination and dials
+# it directly (cmd/atenet/internal/router/egress/request.go); this is the pod
+# that carries egress for every ai-system actor. Tightest form: only the
+# internal-biggs-dog data plane pods in networking, matched by gateway-name
+# (NOT gateway-class-name — the WAN gateway wildcard-biggs-dog must stay
+# unreachable from the actors), and only the two actor ports. No world egress
+# is granted; this is the only new egress destination for app=atenet-egress.
+#
+# No ingress/return-path rule is added to this file: the ClusterIP
+# reverse-NAT reply to atenet-egress arrives with the data plane pod's
+# identity, which is already allowed by allow-ingress-from-gateway below (its
+# fromEndpoints match gateway.networking.k8s.io/gateway-class-name=agentgateway
+# in namespace networking, carried by the internal-biggs-dog pod). The gateway
+# side accepts the request via agentgateway-dataplane (fromEntities: cluster)
+# in policies/infra/networking.yaml.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-agentgateway
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: atenet-egress
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-name: internal-biggs-dog
+      toPorts:
+        - ports:
+            - port: "8443"
+              protocol: TCP
+            - port: "8444"
+              protocol: TCP
+---
 # kagent MCP server exposed via the kagent-mcp.biggs.dog HTTPRoute
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

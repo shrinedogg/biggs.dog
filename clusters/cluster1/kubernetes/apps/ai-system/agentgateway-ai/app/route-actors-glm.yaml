@@ -1,0 +1,42 @@
+---
+# In-cluster GLM model route for the kagent substrate actors (issue #661).
+#
+# NO hostnames on purpose: the actors dial through the substrate egress path
+# (atenet-egress), which dials the destination address directly and rewrites
+# the Host header to the IP form, so a hostname-matched route is unreachable
+# from an actor. An HTTPRoute with an empty hostnames list is a catch-all on
+# its listener (agentgateway v0.12.0 types/agent.rs: hostname_matchers() ->
+# HostnameMatch::None; kgateway v2.2.1 conversion.go: empty list == {"*"}).
+# Do NOT add defaultHeaders / Host overrides here: the rewrite happens
+# downstream of them and would win anyway (plan #657, CORRECTION-2).
+#
+# Clients: ModelConfig openAI.baseUrl =
+#   http://internal-biggs-dog.networking.svc.cluster.local:8444/v1
+# (the existing ClusterIP Service, resolvable in-cluster; plain HTTP on this
+# port, no TLS). Auth: model-api-key-actors-glm (Bearer token from the
+# model-api-keys Secret, created by issue #659). Backend:
+# AgentgatewayBackend/glm (issue #660).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-actors-glm
+  namespace: ai-system
+spec:
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+      sectionName: model-actors-glm
+  rules:
+    - backendRefs:
+        - name: glm
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # LLM requests can run for minutes; same generous timeouts as the
+      # glm route.
+      timeouts:
+        request: 600s
+        backendRequest: 600s
