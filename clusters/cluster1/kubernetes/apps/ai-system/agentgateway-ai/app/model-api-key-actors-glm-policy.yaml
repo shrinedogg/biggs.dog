@@ -1,0 +1,31 @@
+---
+# API-key auth + rate limit for the in-cluster GLM actor route
+# (model-actors-glm, issue #661).
+#
+# Same client-token design as model-api-key (issue #659): the actors present
+# the model-api-keys token (kagent's credential binding for the ModelConfig
+# baseUrl hostname emits "Authorization: Bearer <token>"); the upstream Z.ai
+# key stays in the zai-api-key Secret and is never handed to an actor. Fails
+# closed (401) until the model-api-keys Secret exists.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: model-api-key-actors-glm
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: model-actors-glm
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      # location omitted — defaults to Authorization header with "Bearer " prefix
+      secretRef:
+        name: model-api-keys
+    # Bound spend per proxy; a leaked token still cannot run away.
+    rateLimit:
+      local:
+        - requests: 120
+          unit: Minutes
+          burst: 40
