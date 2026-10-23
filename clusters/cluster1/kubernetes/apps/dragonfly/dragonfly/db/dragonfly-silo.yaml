@@ -19,8 +19,11 @@ spec:
   # Network access is governed centrally by CiliumNetworkPolicies in
   # network-policies/policies/apps/dragonfly.yaml.
   args:
-    # Cap io threads (each reserves ~250MiB); silo's redis load is light.
-    - "--proactor_threads=2"
+    # Each io thread reserves 256MiB, and the startup check requires
+    # threads * 256MiB <= maxmemory (80% of the memory limit): 2 threads
+    # need 512MiB, which exceeds the 400MiB maxmemory of the 500Mi limit and
+    # exits at boot. Silo's redis load (sessions, queues) is light: 1 thread.
+    - "--proactor_threads=1"
   resources:
     requests:
       cpu: 250m
