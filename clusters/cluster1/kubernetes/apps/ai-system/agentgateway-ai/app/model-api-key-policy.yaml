@@ -1,0 +1,41 @@
+---
+# API-key auth + rate limit in front of the hosted-model route (minimax
+# HTTPRoute). Follows the kagent-mcp-auth-policy.yaml precedent.
+#
+# Validates bearer tokens against the model-api-keys Secret (materialized
+# by ExternalSecret from the 1Password item agentgateway-model-api-key).
+#
+# Machine clients (kagent actors via their ModelConfig apiKeySecret, or LAN
+# tools) send:
+#   Authorization: Bearer <model...ken>
+#
+# The token is a cluster-internal client credential, distinct from the
+# MiniMax provider key (which stays in the minimax-api-key Secret and is
+# used by the backend's auth policy upstream of here). A leaked agent
+# token must not be a leaked provider key.
+#
+# The GLM route (glm.biggs.dog, added by the sibling Z.ai issue) gets its
+# own AgentgatewayPolicy (glm-api-key) targeting HTTPRoute glm with the
+# same model-api-keys secretRef, so one token covers both model routes.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: model-api-key
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: minimax
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      # location omitted — defaults to Authorization header with "Bearer " prefix
+      secretRef:
+        name: model-api-keys
+    rateLimit:
+      # Bound spend on the paid upstream: 120 requests/min, burst 40.
+      local:
+        - requests: 120
+          unit: Minutes
+          burst: 40
