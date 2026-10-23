@@ -21,5 +21,6 @@ resources:
   # - ./cwa/ks.yaml
   - ./emby/ks.yaml
   - ./bookboss/ks.yaml
+  - ./silo/ks.yaml
   # - ./booklore/ks.yaml
   - ./nsyncd/ks.yaml

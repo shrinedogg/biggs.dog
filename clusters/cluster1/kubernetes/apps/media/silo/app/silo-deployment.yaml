@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: silo
+  namespace: media
+  labels:
+    app: silo
+spec:
+  replicas: 1
+  # Single replica backed by an RWO (ceph-block) data PVC. RollingUpdate can
+  # surge a second pod that deadlocks on a Multi-Attach error for the RWO
+  # volume; Recreate terminates the old pod first.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: silo
+  template:
+    metadata:
+      labels:
+        app: silo
+    spec:
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      automountServiceAccountToken: false
+      # Intel GPU nodes only (VA-API transcoding via the i915 device plugin).
+      nodeSelector:
+        intel.feature.node.kubernetes.io/gpu: "true"
+      # Keep silo off the emby/ersatz nodes: all three are GPU/transcode-heavy
+      # and the nodeSelector pins them to the same GPU-capable pool. Preferred
+      # (not required) so a single remaining GPU node doesn't leave a pod Pending.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: emby
+                topologyKey: kubernetes.io/hostname
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: ersatz
+                topologyKey: kubernetes.io/hostname
+      containers:
+        - name: silo
+          # Pre-1.0: the `latest` tag moves, so pin the image index digest for
+          # deterministic rollouts. To update, re-resolve the latest index
+          # digest (docker-content-digest header) and bump it here.
+          image: ghcr.io/silo-server/silo-server:latest@sha256:86c6f7c3b57645206518da5250cb6342e25bf723203477d56b51be934cb82a9d
+          imagePullPolicy: Always
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          ports:
+            - containerPort: 8080
+              name: web
+            - containerPort: 8096
+              name: jellyfin-compat
+            - containerPort: 13378
+              name: abs-compat
+          env:
+            - name: MODE
+              value: integrated
+            - name: PORT
+              value: "8080"
+            - name: JF_PORT
+              value: "8096"
+            # Master key for at-rest credential encryption. Back it up
+            # separately from DB dumps: losing it strands stored credentials.
+            - name: SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: silo-secret-key
+                  key: SECRET_KEY
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: silo-database-url
+                  key: DATABASE_URL
+            - name: REDIS_URL
+              value: redis://dragonfly-silo.dragonfly.svc.cluster.local:6379
+            # Keep the plugin cache on the durable data PVC.
+            - name: SILO_PLUGIN_CACHE_DIR
+              value: /var/lib/silo/plugins
+            # CNPG owns the postgres config; silo's ALTER SYSTEM auto-tune
+            # would fight the operator.
+            - name: POSTGRES_TUNE
+              value: "off"
+          readinessProbe:
+            httpGet:
+              path: /api/v1/ready
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          # No livenessProbe: first boot runs DB setup/migrations that can take
+          # a while, and the docs say to leave silo alone while it settles. A
+          # liveness window would restart it mid-setup.
+          volumeMounts:
+            - name: silo-data
+              mountPath: /var/lib/silo
+            - name: media-nfs
+              mountPath: /mnt/media
+              readOnly: true
+            - name: silo-transcode
+              mountPath: /tmp/silo-transcode
+          resources:
+            limits:
+              gpu.intel.com/i915: "1"
+              memory: 6Gi
+            requests:
+              gpu.intel.com/i915: "1"
+              memory: 3Gi
+      volumes:
+        - name: silo-data
+          persistentVolumeClaim:
+            claimName: silo-data
+        - name: media-nfs
+          persistentVolumeClaim:
+            claimName: media-nfs-pvc
+        - name: silo-transcode
+          emptyDir:
+            sizeLimit: 80Gi

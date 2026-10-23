@@ -93,6 +93,26 @@ spec:
             - port: "6379"
               protocol: TCP
 ---
+# silo (media) allowed to reach dragonfly-silo (6379)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-to-silo-db-from-media
+  namespace: dragonfly
+spec:
+  endpointSelector:
+    matchLabels:
+      app: dragonfly-silo
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: media
+            app: silo
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

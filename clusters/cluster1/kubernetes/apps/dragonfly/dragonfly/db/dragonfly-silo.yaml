@@ -1,0 +1,29 @@
+apiVersion: dragonflydb.io/v1alpha1
+kind: Dragonfly
+metadata:
+  labels:
+    app.kubernetes.io/name: dragonfly
+    app.kubernetes.io/instance: dragonfly-silo
+    app.kubernetes.io/part-of: dragonfly-operator
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/created-by: dragonfly-operator
+  name: dragonfly-silo
+  namespace: dragonfly
+spec:
+  # Single replica: silo uses Redis as a cache (sessions, queues), not as
+  # durable state.
+  replicas: 1
+  # Intel GPU nodes only (per silo deployment request).
+  nodeSelector:
+    intel.feature.node.kubernetes.io/gpu: "true"
+  # Network access is governed centrally by CiliumNetworkPolicies in
+  # network-policies/policies/apps/dragonfly.yaml.
+  args:
+    # Cap io threads (each reserves ~250MiB); silo's redis load is light.
+    - "--proactor_threads=2"
+  resources:
+    requests:
+      cpu: 250m
+      memory: 250Mi
+    limits:
+      memory: 500Mi

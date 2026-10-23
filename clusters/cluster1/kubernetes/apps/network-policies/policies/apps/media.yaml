@@ -283,3 +283,110 @@ spec:
         - ports:
             - port: "80"
               protocol: TCP
+---
+# silo -> cnpg-silo Postgres (same pattern as the bookboss rule above)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-postgres-silo
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: silo
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-silo
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+# Return path for the cnpg-silo-rw ClusterIP: replies are reverse-NATed from
+# the service IP and arrive as NEW connections from cnpg-system pods, which the
+# cluster-wide deny drops without this (same reason as the bookboss rule).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-postgres-silo
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: silo
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-silo
+---
+# silo -> dragonfly-silo Redis
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-dragonfly-silo
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: silo
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: dragonfly
+            app: dragonfly-silo
+      toPorts:
+        - ports:
+            - port: "6379"
+              protocol: TCP
+---
+# Return path for dragonfly-silo service replies (reverse-NAT, same reason as
+# the Postgres rule above).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-dragonfly-silo
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: silo
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: dragonfly
+            app: dragonfly-silo
+---
+# Silo metadata providers: TMDB, TheTVDB, TheIntroDB (skip timestamps),
+# FanArt.tv (artwork)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-silo-metadata
+  namespace: media
+spec:
+  endpointSelector:
+    matchLabels:
+      app: silo
+  egress:
+    - toFQDNs:
+        # TMDB: metadata + artwork CDN
+        - matchName: tmdb.org
+        - matchPattern: "*.tmdb.org"
+        - matchName: themoviedb.org
+        - matchPattern: "*.themoviedb.org"
+        # TheTVDB: metadata + artwork
+        - matchName: thetvdb.com
+        - matchPattern: "*.thetvdb.com"
+        # TheIntroDB: skip timestamps
+        - matchName: theintrodb.org
+        - matchPattern: "*.theintrodb.org"
+        # FanArt.tv: poster/background artwork
+        - matchName: fanart.tv
+        - matchPattern: "*.fanart.tv"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

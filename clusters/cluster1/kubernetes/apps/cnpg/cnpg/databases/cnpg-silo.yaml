@@ -1,0 +1,48 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-silo
+  namespace: cnpg-system
+spec:
+  # Single replica: silo's DB is derived metadata (library scan + embeddings),
+  # not source data; it can be rebuilt by re-scanning. Keeps host-path storage
+  # on one node.
+  instances: 1
+  bootstrap:
+    initdb:
+      database: silo
+      owner: silo
+      dataChecksums: true
+      secret:
+        name: silo-user-password
+  # Minimal trixie operand + extension images from the official CNPG 1.29 catalog
+  # (../secrets/postgresql-minimal-trixie-catalog.yaml). Enables pgvector by name only.
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  resources:
+    requests:
+      memory: 1Gi
+      cpu: 250m
+    limits:
+      memory: 1Gi
+  storage:
+    storageClass: host-path
+    size: 20Gi
+  # Intel GPU nodes only (per silo deployment request).
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: intel.feature.node.kubernetes.io/gpu
+                operator: In
+                values:
+                  - "true"
+  postgresql:
+    extensions:
+      - name: pgvector
+    parameters:
+      archive_mode: "off"

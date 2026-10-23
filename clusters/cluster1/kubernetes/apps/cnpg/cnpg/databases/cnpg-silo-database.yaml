@@ -1,0 +1,17 @@
+# Declaratively enable pgvector in the silo database. The Cluster mounts the
+# extension binaries (via image catalog + postgresql.extensions), but
+# CREATE EXTENSION requires superuser; silo's migration runs as the app user.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-silo-db
+  namespace: cnpg-system
+spec:
+  name: silo
+  owner: silo
+  cluster:
+    name: cnpg-silo
+  extensions:
+    - name: vector
+      version: "0.8.2"
+      ensure: present

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: silo-service
+  namespace: media
+spec:
+  selector:
+    app: silo
+  ports:
+    - name: web
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
+    - name: jellyfin-compat
+      protocol: TCP
+      port: 8096
+      targetPort: 8096
+    - name: abs-compat
+      protocol: TCP
+      port: 13378
+      targetPort: 13378
