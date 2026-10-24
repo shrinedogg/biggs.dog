@@ -360,7 +360,7 @@ spec:
             app: dragonfly-silo
 ---
 # Silo metadata providers: TMDB, TheTVDB, TheIntroDB (skip timestamps),
-# FanArt.tv (artwork)
+# FanArt.tv (artwork), Gemini API (embeddings for recommendations)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -386,6 +386,8 @@ spec:
         # FanArt.tv: poster/background artwork
         - matchName: fanart.tv
         - matchPattern: "*.fanart.tv"
+        # Gemini API: gemini-embedding-001 batchEmbedContents (recommendations)
+        - matchName: generativelanguage.googleapis.com
       toPorts:
         - ports:
             - port: "443"
