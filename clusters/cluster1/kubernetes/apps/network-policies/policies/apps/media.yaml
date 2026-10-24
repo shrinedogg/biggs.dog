@@ -95,6 +95,7 @@ spec:
 #   - ersatz    (ErsatzTV native OIDC; gates the web UI only — /iptv/* and the
 #                HDHR/IPTV endpoints are carved out of auth by ErsatzTV itself,
 #                so media players are unaffected)
+#   - silo      (silo.auth.oidc plugin: discovery, token, userinfo calls)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -108,6 +109,7 @@ spec:
         values:
           - bookboss
           - ersatz
+          - silo
   egress:
     - toEndpoints:
         - matchLabels:
