@@ -32,7 +32,7 @@ spec:
   chart:
     spec:
       chart: lightdash
-      version: 2.16.1270
+      version: 2.16.1337
       sourceRef:
         kind: HelmRepository
         name: lightdash
