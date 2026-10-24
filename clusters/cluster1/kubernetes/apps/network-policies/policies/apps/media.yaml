@@ -392,3 +392,18 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+    # Plugin catalog and plugin binaries. Silo auto-installs the official
+    # TMDB/TVDB/TheIntroDB metadata provider plugins from the catalog at
+    # startup; without this the library chain stays NFO-only and every scan
+    # matches nothing. Manifest: raw.githubusercontent.com; release downloads
+    # redirect github.com -> objects.githubusercontent.com.
+    - toFQDNs:
+        - matchName: raw.githubusercontent.com
+        - matchName: github.com
+        - matchName: objects.githubusercontent.com
+        # Seasonal movie lists (observed: /lists/.../json)
+        - matchName: mdblist.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
