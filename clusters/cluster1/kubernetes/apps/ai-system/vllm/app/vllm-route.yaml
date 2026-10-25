@@ -1,7 +1,10 @@
 ---
-# External HTTPS route for the vLLM OpenAI-compatible API.
-# Exposes /v1/* at vllm.biggs.dog for Zed AI, Open WebUI, or any
-# OpenAI-SDK client pointing at the local LLM.
+# LAN-only HTTPS route for the vLLM OpenAI-compatible API.
+# Exposes /v1/* at vllm.biggs.dog on the internal gateway
+# (192.168.6.15) for Zed AI, Open WebUI, or any OpenAI-SDK client
+# pointing at the local LLM. Reachable only from the LAN or a
+# Wireguard session into the UDM; the public wildcard gateway no
+# longer carries this route.
 #
 # Authentication: vLLM enforces --api-key on all /v1/* endpoints;
 # clients must send:  Authorization: Bearer <VLLM_API_KEY>
@@ -18,7 +21,7 @@ spec:
   hostnames:
     - vllm.biggs.dog
   parentRefs:
-    - name: wildcard-biggs-dog
+    - name: internal-biggs-dog
       namespace: networking
   rules:
     - backendRefs:
