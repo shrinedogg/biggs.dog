@@ -16,7 +16,13 @@ data:
   Corefile: |
     biggs.dog:1053 {
         errors
-        cache 30
+        # servfail 0: do NOT cache SERVFAIL (CoreDNS 1.8+ caches it for 5s by
+        # default). max_fails 0 below exists so a momentary k8s-gateway blip
+        # does not reach the LAN; cached SERVFAILs would keep clients failing
+        # for up to 5s after the upstream has already recovered.
+        cache 30 {
+            servfail 0
+        }
         # cluster0 edge names served locally (192.168.2.31 = cluster0 node /
         # omni-siderolink LB). Public DNS for these is Cloudflare-proxied and
         # the Cloudflare edge answers gRPC with a 403 page, which breaks omnictl
@@ -49,7 +55,10 @@ data:
         }
         ready
         prometheus :9153
-        cache 300
+        # servfail 0: same policy as the biggs.dog block; no cached SERVFAIL.
+        cache 300 {
+            servfail 0
+        }
         forward . tls://45.90.28.0 tls://45.90.30.0 {
             tls_servername 5c51ae.dns.nextdns.io
             health_check 5s
