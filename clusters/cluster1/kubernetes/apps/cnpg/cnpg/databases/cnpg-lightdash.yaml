@@ -28,7 +28,10 @@ spec:
       memory: 300Mi
       cpu: 150m
     limits:
-      memory: 300Mi
+      # 300Mi OOM-killed cnpg-lightdash-2 mid pg_rewind (~38% of the 67GB
+      # data dir) after a failover, looping the reinit forever. 1Gi covers the
+      # reinit window; steady-state usage is far below it.
+      memory: 1Gi
   storage:
     storageClass: host-path
     size: 5Gi
