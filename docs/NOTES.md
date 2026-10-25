@@ -390,7 +390,7 @@ On a match, Renovate opens a PR with updated versions. Once merged, Flux reconci
 
 ### Media and Transcoding
 
-- **Co-locate two GPU-transcode pods on one node and one starves** - Emby and Ersatz both use the Intel-iGPU `nodeSelector` (`intel.feature.node.kubernetes.io/gpu: "true"`), so with more than one Intel-GPU-capable node they could land on the same host and contend for the same iGPU. Fixed with a preferred (not required) `podAntiAffinity` on each toward the other's `app` label.
+- **Co-locate two GPU-transcode pods on one node and one starves** - media transcode servers pin to the Intel-iGPU `nodeSelector` (`intel.feature.node.kubernetes.io/gpu: "true"`), so with more than one Intel-GPU-capable node they can land on the same host and contend for the same iGPU. Enforce separation with `podAntiAffinity` on each toward the other's `app` label.
 
 ### Storage
 

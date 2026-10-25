@@ -1,8 +1,8 @@
 ---
-# Media services dashboard — Emby, BookBoss, Ersatz.
+# Media services dashboard — BookBoss, Silo.
 # Uses kube-state-metrics, cadvisor, and PVC metrics. No native app metrics
-# scraped for Emby/BookBoss, so this focuses on pod health, resource usage,
-# and storage utilisation.
+# are scraped in this namespace, so this focuses on pod health, resource
+# usage, and storage utilisation.
 # Picked up automatically by the Grafana sidecar (searchNamespace: ALL,
 # label: grafana-dashboard).
 apiVersion: v1
@@ -18,7 +18,7 @@ data:
   media-services.json: |
     {
       "annotations": { "list": [] },
-      "description": "Media services (Emby, BookBoss, Ersatz) — pod health, CPU/memory usage, restart tracking, and PVC utilisation.",
+      "description": "Media services (BookBoss, Silo) — pod health, CPU/memory usage, restart tracking, and PVC utilisation.",
       "editable": true,
       "graphTooltip": 1,
       "links": [],
@@ -83,7 +83,7 @@ data:
           "id": 5,
           "type": "timeseries",
           "title": "Per-Pod CPU Usage",
-          "description": "CPU cores consumed per pod. Emby transcoding pushes CPU during active streams.",
+          "description": "CPU cores consumed per pod. Transcoding pushes CPU during active streams.",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
@@ -168,7 +168,7 @@ data:
       ],
       "refresh": "30s",
       "schemaVersion": 39,
-      "tags": ["media", "emby", "bookboss", "ersatz"],
+      "tags": ["media", "bookboss", "silo"],
       "templating": {
         "list": [
           {

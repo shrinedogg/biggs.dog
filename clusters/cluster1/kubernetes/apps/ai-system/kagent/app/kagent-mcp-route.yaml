@@ -1,7 +1,7 @@
 ---
 # LAN-only HTTPS route for the kagent MCP server (kagent-controller:8083/mcp).
 #
-# Mirrors the ersatz pattern: parented to the INTERNAL gateway
+# Uses the LAN-only pattern: parented to the INTERNAL gateway
 # (internal-biggs-dog, VIP 192.168.6.15), which the UDM does NOT WAN-forward
 # (only the public gateway .6.7:80/443 is forwarded). So:
 #   - LAN/VPN clients: k8s-gateway split-horizon answers mcp.biggs.dog with

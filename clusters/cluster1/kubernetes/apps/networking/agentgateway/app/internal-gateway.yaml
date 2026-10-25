@@ -5,7 +5,7 @@
 # forwarded), so this gateway is reachable from LAN/VPN only.
 #
 # Use it for services that must have TLS at <name>.biggs.dog but must NOT be
-# exposed to the internet (e.g. ErsatzTV's admin UI / IPTV feed). Route a host
+# exposed to the internet (e.g. the kagent MCP server). Route a host
 # here by pointing its HTTPRoute parentRef at this Gateway instead of
 # wildcard-biggs-dog; k8s-gateway then answers that hostname with .6.15 for LAN
 # clients (split-horizon), while public DNS still points at Cloudflare -> the

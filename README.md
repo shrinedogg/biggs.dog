@@ -62,7 +62,7 @@ clusters/
         ├── liquidctl/             # NZXT Kraken Elite AIO fan/pump control (nv-01)
         ├── livekit/               # LiveKit SFU (WebRTC media server for MatrixRTC)
         ├── matrix/                # Continuwuity (Matrix) + Sable client
-        ├── media/                 # Emby, Bookboss, Ersatz, Nsyncd
+        ├── media/                 # Silo, Bookboss, Nsyncd
         ├── mindwtr/               # Mindwtr notes PWA + self-hosted sync server
         ├── network-policies/      # Tiered CiliumNetworkPolicies (apps + infra)
         ├── networking/            # k8s-gateway, lan-dns, agentgateway (wildcard-biggs-dog)
@@ -112,7 +112,6 @@ A single-node Talos management cluster (`talos-mgmt-01` / `cluster0-cp-01`) on t
 `cluster0` ingress is `cluster0-gateway` (`networking` namespace) with HTTPS listeners for `omni.biggs.dog`, `dex.biggs.dog`, and `factory.biggs.dog` (TLS terminated with per-host certs issued in the `networking` namespace via the `letsencrypt-prod` ClusterIssuer), plus a wildcard `*.biggs.dog` HTTP listener. Omni re-encrypts to its pod cert (HTTPS backend via BackendTLSPolicy).
 
 **Service-specific gateways:**
-- **ersatz** (`cluster1`, media server): LAN-only HTTPS gateway at `ersatz.biggs.dog`
 - **internal-biggs-dog** (`cluster1`): LAN-only gateway (VIP `192.168.6.15`) for internal routes including `mcp.biggs.dog` and `mindwtr.biggs.dog`
 
 ### Storage (`cluster1`)
@@ -206,7 +205,7 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | Category | Applications | Notes |
 | --- | --- | --- |
 | **Authentication** | Pocket ID, OAuth2 Proxy | Passkey-first OIDC SSO for applications |
-| **Media** | Emby, Bookboss, Ersatz, Nsyncd | Content and book management (`emby:4.10.0.29`, `bookboss:v0.8.34`) |
+| **Media** | Silo, Bookboss, Nsyncd | Content and book management (`bookboss:v0.8.34`) |
 | **Communication** | LiveKit SFU, Continuwuity, Sable | WebRTC media server (`livekit:v1.13.6`), Matrix homeserver, Sable Matrix web client |
 | **Task Management** | Mindwtr, mindwtr-agent | Offline PWA + self-hosted sync server; GTD agent with MCP tools |
 | **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast Game Streaming Stack](#dreamcast-game-streaming-stack)) |

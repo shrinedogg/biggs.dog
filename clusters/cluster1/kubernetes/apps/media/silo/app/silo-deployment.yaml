@@ -27,23 +27,6 @@ spec:
       # Intel GPU nodes only (VA-API transcoding via the i915 device plugin).
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
-      # Never share a node with emby/ersatz: all three are GPU/transcode-heavy
-      # and the nodeSelector pins them to the same GPU-capable pool. Required
-      # (not preferred) enforces this at scheduling time; the cost is that silo
-      # goes Pending if fewer than three GPU nodes are available. The emby and
-      # ersatz deployments carry matching rules so the guarantee holds no
-      # matter which pod is scheduled last.
-      affinity:
-        podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchLabels:
-                  app: emby
-              topologyKey: kubernetes.io/hostname
-            - labelSelector:
-                matchLabels:
-                  app: ersatz
-              topologyKey: kubernetes.io/hostname
       containers:
         - name: silo
           # Pre-1.0: the `latest` tag moves, so pin the image index digest for

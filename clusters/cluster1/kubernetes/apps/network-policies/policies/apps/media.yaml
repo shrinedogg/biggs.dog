@@ -1,4 +1,4 @@
-# Namespace: media  (emby, bookboss, ersatz, nsyncd, in-cluster nfs server)
+# Namespace: media  (silo, bookboss, nsyncd, in-cluster nfs server)
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
@@ -30,9 +30,9 @@ spec:
             dns:
               - matchPattern: "*"
 ---
-# Intra-namespace mesh: Ersatz streams from Emby, and media pods reach the
-# in-cluster NFS server pod directly (pod-to-pod, distinct from the node mount
-# path covered by allow-nfs-from-nodes).
+# Intra-namespace mesh: media pods reach each other and the in-cluster NFS
+# server pod directly (pod-to-pod, distinct from the node mount path covered
+# by allow-nfs-from-nodes).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -92,9 +92,6 @@ spec:
 #
 # Clients today:
 #   - bookboss  (its own OIDC SSO)
-#   - ersatz    (ErsatzTV native OIDC; gates the web UI only — /iptv/* and the
-#                HDHR/IPTV endpoints are carved out of auth by ErsatzTV itself,
-#                so media players are unaffected)
 #   - silo      (silo.auth.oidc plugin: discovery, token, userinfo calls)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -108,7 +105,6 @@ spec:
         operator: In
         values:
           - bookboss
-          - ersatz
           - silo
   egress:
     - toEndpoints:
@@ -230,61 +226,6 @@ spec:
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
----
-# Emby metadata providers. The scanner (and playback image/metadata requests)
-# fetch from these hosts; under the default-deny egress above every attempt
-# hangs to a TCP timeout, no item ever converges, and each 6h "Scan media
-# library" pass re-probes the whole library (~4h of ffprobes). DNS is covered
-# by allow-egress-dns (L7 matchPattern "*"), so toFQDNs works as-is.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-egress-emby-metadata
-  namespace: media
-spec:
-  endpointSelector:
-    matchLabels:
-      app: emby
-  egress:
-    - toFQDNs:
-        # TheTVDb: series metadata, login, artwork (api4/artworks.thetvdb.com)
-        - matchName: thetvdb.com
-        - matchPattern: "*.thetvdb.com"
-        # TMDB: movie metadata (api.themoviedb.org) and artwork (image.tmdb.org)
-        - matchName: tmdb.org
-        - matchPattern: "*.tmdb.org"
-        - matchName: themoviedb.org
-        - matchPattern: "*.themoviedb.org"
-        # FanArt.tv: backdrops, logos, clear art (webservice/assets.fanart.tv)
-        - matchName: fanart.tv
-        - matchPattern: "*.fanart.tv"
-        # TheAudioDB: music metadata
-        - matchName: theaudiodb.com
-        - matchPattern: "*.theaudiodb.com"
-        # MusicBrainz and cover art, incl. Emby's musicbrainz.emby.tv proxy
-        - matchName: musicbrainz.org
-        - matchPattern: "*.musicbrainz.org"
-        - matchName: emby.tv
-        - matchPattern: "*.emby.tv"
-        - matchName: coverartarchive.org
-        - matchPattern: "*.coverartarchive.org"
-        # Emby backend: activation, Emby Connect data, version checks
-        - matchName: mb3admin.com
-        - matchPattern: "*.mb3admin.com"
-        # Application and plugin update checks
-        - matchPattern: "*.github.com"
-      toPorts:
-        - ports:
-            - port: "443"
-              protocol: TCP
-    # Emby fetches these two over plain HTTP; allow port 80 as well
-    - toFQDNs:
-        - matchName: musicbrainz.emby.tv
-        - matchName: coverartarchive.org
-      toPorts:
-        - ports:
-            - port: "80"
-              protocol: TCP
 ---
 # silo -> cnpg-silo Postgres (same pattern as the bookboss rule above)
 apiVersion: cilium.io/v2
