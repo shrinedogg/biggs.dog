@@ -46,7 +46,7 @@ spec:
               topologyKey: kubernetes.io/hostname
       containers:
         - name: emby
-          image: emby/embyserver:4.11.0.9
+          image: emby/embyserver:4.11.0.10
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
