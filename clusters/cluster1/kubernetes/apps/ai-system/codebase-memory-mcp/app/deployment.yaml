@@ -230,7 +230,7 @@ spec:
         # Tracks `main` -- the same branch Flux reconciles.
         - name: git-sync
           restartPolicy: Always
-          image: registry.k8s.io/git-sync/git-sync:v4.7.1
+          image: registry.k8s.io/git-sync/git-sync:v4.8.0
           imagePullPolicy: IfNotPresent
           args:
             - --repo=https://github.com/shrinedogg/biggs.dog.git
@@ -277,7 +277,7 @@ spec:
         # server, so the repo path exists when index_repository is first
         # called. git-sync creates the --link symlink only after a clone.
         - name: wait-for-repo
-          image: registry.k8s.io/git-sync/git-sync:v4.7.1
+          image: registry.k8s.io/git-sync/git-sync:v4.8.0
           imagePullPolicy: IfNotPresent
           command:
             - /bin/sh
