@@ -45,7 +45,29 @@ spec:
               value: "true"
             - name: PORT
               value: "1411"
-          # DB_CONNECTION_STRING + ENCRYPTION_KEY from the pocket-id ExternalSecret.
+            # Application Configuration is managed as environment variables
+            # instead of the admin UI (UI_CONFIG_DISABLED). Only the non-default
+            # settings are set here; every setting left unset keeps its default.
+            - name: UI_CONFIG_DISABLED
+              value: "true"
+            - name: SESSION_DURATION
+              value: "300"
+            - name: ALLOW_USER_SIGNUPS
+              value: "withToken"
+            # Email: Proton SMTP relay (starttls, AUTH LOGIN).
+            # SMTP_USER + SMTP_PASSWORD come from the pocket-id secret.
+            - name: EMAIL_VERIFICATION_ENABLED
+              value: "true"
+            - name: SMTP_HOST
+              value: "smtp.protonmail.ch"
+            - name: SMTP_PORT
+              value: "587"
+            - name: SMTP_FROM
+              value: "shrinedogg@biggs.dog"
+            - name: SMTP_TLS
+              value: "starttls"
+          # DB_CONNECTION_STRING, ENCRYPTION_KEY, SMTP_USER, SMTP_PASSWORD from
+          # the pocket-id ExternalSecret.
           envFrom:
             - secretRef:
                 name: pocket-id
