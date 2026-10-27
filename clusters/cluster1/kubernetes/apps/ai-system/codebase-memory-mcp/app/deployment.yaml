@@ -248,7 +248,7 @@ spec:
             # and the pod loops in Init forever. Restore the pre-v4.8.0
             # behavior with the new repeatable flag (container is
             # single-tenant: git only ever looks at /repo).
-            - --git-config-add=safe.directory=*
+            - --git-config-add=safe.directory:*
           env:
             - name: GITSYNC_USERNAME
               valueFrom:
