@@ -4,10 +4,10 @@ metadata:
   name: cnpg-silo
   namespace: cnpg-system
 spec:
-  # Single replica: silo's DB is derived metadata (library scan + embeddings),
-  # not source data; it can be rebuilt by re-scanning. Keeps host-path storage
-  # on one node.
-  instances: 1
+  # 3-instance HA cluster (primary + 2 replicas). Instances spread one-per-node
+  # across the intel-GPU workers; each gets its own 20Gi host-path PVC
+  # (WaitForFirstConsumer binds the PVC to the pod's node).
+  instances: 3
   bootstrap:
     initdb:
       database: silo
