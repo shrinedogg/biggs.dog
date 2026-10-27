@@ -1,0 +1,56 @@
+---
+# The agentgateway v2 data plane does not add X-Forwarded-Proto (or
+# X-Forwarded-For) to backend requests. Backends that derive the client
+# origin from it see the plain transport scheme (http, because the gateway
+# terminates TLS upstream) and reject flows that require the public origin:
+# Silo's native app sign-in refused with "App sign-in is not available on
+# this server address" (start_origin=http://silo.biggs.dog vs
+# public_url=https://silo.biggs.dog).
+#
+# Set the true transport scheme per listener. `set` (not `add`) so a
+# client-supplied X-Forwarded-Proto cannot duplicate the header; Silo's
+# resolver treats multiple values as ambiguous and falls back to the
+# transport scheme.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: x-forwarded-proto-https
+  namespace: networking
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: wildcard-biggs-dog
+      sectionName: wildcard-biggs-dog-https
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: wildcard-biggs-dog
+      sectionName: biggs-dog-https
+  traffic:
+    headerModifiers:
+      request:
+        set:
+          - name: X-Forwarded-Proto
+            value: "https"
+---
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: x-forwarded-proto-http
+  namespace: networking
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: wildcard-biggs-dog
+      sectionName: wildcard-biggs-dog-http
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      name: wildcard-biggs-dog
+      sectionName: biggs-dog-http
+  traffic:
+    headerModifiers:
+      request:
+        set:
+          - name: X-Forwarded-Proto
+            value: "http"
