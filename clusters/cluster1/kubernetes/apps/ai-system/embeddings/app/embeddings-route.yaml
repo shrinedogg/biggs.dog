@@ -36,8 +36,10 @@ spec:
             type: PathPrefix
             value: /v1/embeddings
       filters:
+        # agentgateway's CRD inlines the filter value (no upstream `value:`
+        # wrapper) and names the full-path field replaceFullPath.
         - type: URLRewrite
-          value:
+          urlRewrite:
             path:
-              type: ReplaceFullPathMatch
-              replaceFullPathMatch: /embeddings
+              type: ReplaceFullPath
+              replaceFullPath: /embeddings
