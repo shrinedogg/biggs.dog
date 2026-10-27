@@ -45,8 +45,6 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: media
         - matchLabels:
-            k8s:io.kubernetes.pod.namespace: lightdash
-        - matchLabels:
             k8s:io.kubernetes.pod.namespace: kritika
       toPorts:
         - ports:
