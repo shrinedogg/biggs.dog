@@ -27,7 +27,7 @@ spec:
       memory: 1Gi
       cpu: 250m
     limits:
-      memory: 1Gi
+      memory: 4Gi
   storage:
     storageClass: host-path
     size: 20Gi
