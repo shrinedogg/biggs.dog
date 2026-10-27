@@ -240,6 +240,15 @@ spec:
             - --root=/repo
             - --link=current
             - --max-failures=5
+            # v4.8.0 dropped the safe.directory=* that v4.7.x set in the
+            # child git config (kubernetes/git-sync#993). The repo emptyDir
+            # is created root-owned by kubelet while git-sync runs as 65533,
+            # so the post-`git init` sanity check (git rev-parse
+            # --show-toplevel) trips git's "dubious ownership" protection
+            # and the pod loops in Init forever. Restore the pre-v4.8.0
+            # behavior with the new repeatable flag (container is
+            # single-tenant: git only ever looks at /repo).
+            - --git-config-add=safe.directory=*
           env:
             - name: GITSYNC_USERNAME
               valueFrom:
