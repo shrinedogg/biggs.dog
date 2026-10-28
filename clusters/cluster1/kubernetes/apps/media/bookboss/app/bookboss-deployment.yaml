@@ -112,7 +112,11 @@ spec:
             requests:
               memory: 256Mi
             limits:
-              memory: 1Gi
+              # 2Gi: the 1Gi limit OOMKilled the pod during a
+              # health.backfill_thumbnails burst (2026-10-28, two kills in
+              # ~30s); the Kobo sync loop and large-import bursts can also
+              # spike well past 1Gi.
+              memory: 2Gi
       volumes:
         - name: tmp
           emptyDir: {}
