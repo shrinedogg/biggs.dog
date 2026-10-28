@@ -1,0 +1,31 @@
+---
+# The agentgateway v2 data plane does not add X-Forwarded-Proto to backend
+# requests. Silo derives start_origin from it and refuses native app sign-in
+# when it sees the transport scheme (http, because the gateway terminates TLS
+# upstream) instead of the public one (https).
+#
+# Scoped to the silo route only. The previous listener-level policy
+# (networking/agentgateway/app/x-forwarded-proto.yaml) set the header on
+# every *.biggs.dog request, which flipped the scheme detected by oauth2-proxy
+# (trusted proxy 10.244.0.0/16) during the SSO flow and broke login for every
+# forward-auth-protected service (401 loop on /oauth2/auth, CSRF 403 on
+# /oauth2/callback).
+#
+# `set` (not `add`) so a client-supplied X-Forwarded-Proto cannot duplicate
+# the header; Silo's resolver treats multiple values as ambiguous.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: silo-x-forwarded-proto
+  namespace: media
+spec:
+  targetRefs:
+  - group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: silo
+  traffic:
+    headerModifiers:
+      request:
+        set:
+        - name: X-Forwarded-Proto
+          value: "https"
