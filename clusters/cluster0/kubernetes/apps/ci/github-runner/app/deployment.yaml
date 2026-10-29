@@ -2,8 +2,9 @@
 # (polarsquad/krops#729). Static Deployment; no controller, no CRDs.
 #
 # Mechanism: myoung34/github-runner (actions/runner v2.338.2, image tag pins
-# the upstream release; renovate bumps it via PR) registers against
-# https://github.com/polarsquad/krops in runner group `krops-e2e` with label
+# the upstream release; renovate bumps it via PR) registers ORG-scoped
+# against https://github.com/polarsquad in runner group `krops-e2e` (group
+# repo/workflow restrictions limit it to the krops e2e workflow) with label
 # `krops-e2e`, then idles waiting for jobs. A docker:dind sidecar provides
 # the docker daemon the e2e harness (kind) hard-depends on; the myoung34
 # image ships the docker CLI, so the script's `command -v docker` gate
@@ -87,9 +88,13 @@ spec:
             seccompProfile:
               type: RuntimeDefault
           env:
-            # Registration target: polarsquad/krops, repo scope.
+            # Registration target: ORG scope (https://github.com/polarsquad).
+            # Org scope is REQUIRED: the registration token is minted by the
+            # org runner group krops-e2e, and only org runners can belong to
+            # an org runner group (--runnergroup). Repo scope + an org-group
+            # token fails registration with 404 (verified 2026-10-29).
             - name: REPO_URL
-              value: https://github.com/polarsquad/krops
+              value: https://github.com/polarsquad
             - name: RUNNER_NAME
               value: krops-e2e-cluster0
             - name: RUNNER_LABELS
