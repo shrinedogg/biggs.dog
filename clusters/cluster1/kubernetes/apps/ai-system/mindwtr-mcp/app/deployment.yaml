@@ -76,7 +76,7 @@ spec:
         # better-sqlite3 is unused in Cloud mode but ships in the package; the
         # build toolchain is kept so npm install never fails on the native addon.
         - name: mindwtr-install
-          image: docker.io/library/node:24-alpine
+          image: docker.io/library/node:26-alpine
           imagePullPolicy: IfNotPresent
           command: ["/bin/sh", "-ec"]
           args:
