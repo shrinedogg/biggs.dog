@@ -93,6 +93,9 @@ spec:
         - matchName: auth.docker.io
         # Docker Hub blob redirects land on the Cloudflare CDN host.
         - matchName: production.cloudflare.docker.com
+        # ...and sometimes on the CloudFront CDN host (observed in run
+        # 40888928820: kind node-image blob pull i/o timeout on this host).
+        - matchName: production.cloudfront.docker.com
         - matchName: public.ecr.aws
         - matchName: registry.k8s.io
         - matchName: quay.io
