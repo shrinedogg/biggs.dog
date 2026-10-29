@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  # No Pod Security Standards labels: the github-runner pod runs a privileged
+  # docker:dind sidecar (kind needs nested containers). Restrictive PSA
+  # labels (baseline/restricted) would reject it; house namespaces that run
+  # privileged workloads (omni) opt in explicitly, and per the #729 plan this
+  # namespace carries none.
+  name: ci

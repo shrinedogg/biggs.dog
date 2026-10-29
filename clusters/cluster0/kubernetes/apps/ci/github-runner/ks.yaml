@@ -1,0 +1,24 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app github-runner
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/ci/github-runner/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 3m
+  dependsOn:
+    # host-path (openebs.io/local) provisions the runner-state PVC
+    - name: openebs
+    # ClusterSecretStore onepassword-connect must exist before the
+    # ExternalSecret can sync the registration token
+    - name: secretstore

@@ -1,0 +1,119 @@
+# Namespace: ci  (github-runner — self-hosted GitHub Actions runner for the
+# polarsquad/krops e2e-virtualized workflow, krops#729)
+#
+# Egress is enumerated from the e2e harness (krops
+# scripts/aws-e2e-virtualized.sh) and its mise pins: GitHub control plane +
+# git/action archive downloads (runner container), container registries for
+# the kind-in-docker pulls (dind sidecar), and mise tool downloads (runner
+# container).
+#
+# The docker:dind API is bound to pod-localhost (tcp://127.0.0.1:2375, TLS
+# off) and ingress is default-deny, so the unauthenticated docker socket is
+# not reachable from other pods. No ingress policy is needed: the runner
+# exposes no port (health signal = pod phase + "Idle" in the repo UI).
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# egress, so any traffic not explicitly allowed is dropped (ingress included).
+---
+# DNS for all ci pods. L7 proxy avoids the Go-resolver UDP conntrack
+# reply-drop behind default-deny ingress; the DNS proxy is what populates
+# the toFQDNs mappings in the egress policies below.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: ci
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: In
+              values: [kube-system]
+            - key: k8s:k8s-app
+              operator: In
+              values: [coredns, kube-dns]
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# GitHub control plane + git + action/tool archive downloads (runner
+# container): registration, runner session, job polling, git clone
+# (actions/checkout), action tarballs fetched at job start, and release
+# assets for the mise-installed tools (kind, clusterctl, clusterawsadm, uv,
+# python-build-standalone) plus CAPI/CAPA/cert-manager provider manifests.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-github
+  namespace: ci
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: api.github.com
+        - matchName: github.com
+        - matchName: codeload.github.com
+        - matchPattern: "*.githubusercontent.com"
+        - matchPattern: "*.actions.githubusercontent.com"
+        - matchPattern: "*.blob.core.windows.net"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Container registries (mostly the dind sidecar's kind pulls; the runner
+# container is the cold path for helm pulling the ACK charts): Docker Hub
+# (kindest/node, wiremock), ECR (ACK charts + s3/rds/iam controller images),
+# registry.k8s.io (kind kubeadm images + CAPI core/CAPA controllers), quay
+# (cert-manager, installed on the fresh kind cluster every run).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-registries
+  namespace: ci
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: registry-1.docker.io
+        - matchName: auth.docker.io
+        # Docker Hub blob redirects land on the Cloudflare CDN host.
+        - matchName: production.cloudflare.docker.com
+        - matchName: public.ecr.aws
+        - matchName: registry.k8s.io
+        - matchName: quay.io
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# mise tool downloads (runner container): kubectl, helm, node and aws-cli
+# pinned in the krops mise.toml / mise.aws.toml. The e2e python harness is
+# stdlib-only, so no pypi/files.pythonhosted.org is needed.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-tool-downloads
+  namespace: ci
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: dl.k8s.io
+        - matchName: get.helm.sh
+        - matchName: nodejs.org
+        - matchName: awscli.amazonaws.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

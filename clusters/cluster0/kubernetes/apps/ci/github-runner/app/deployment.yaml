@@ -1,0 +1,171 @@
+# Self-hosted GitHub Actions runner for the krops e2e-virtualized workflow
+# (polarsquad/krops#729). Static Deployment; no controller, no CRDs.
+#
+# Mechanism: myoung34/github-runner (actions/runner v2.338.2, image tag pins
+# the upstream release; renovate bumps it via PR) registers against
+# https://github.com/polarsquad/krops in runner group `krops-e2e` with label
+# `krops-e2e`, then idles waiting for jobs. A docker:dind sidecar provides
+# the docker daemon the e2e harness (kind) hard-depends on; the myoung34
+# image ships the docker CLI, so the script's `command -v docker` gate
+# passes and kind's pulls NAT through dind.
+#
+# Restart semantics (token-free):
+#   - First boot (empty PVC): the image entrypoint runs config.sh with the
+#     registration token (RUNNER_TOKEN) plus --runnergroup krops-e2e
+#     --replace, then persists .runner/.credentials/_diag to the PVC
+#     (CONFIGURED_ACTIONS_RUNNER_FILES_DIR=/runner-state).
+#   - Every later boot: the entrypoint finds .runner on the PVC, SKIPS
+#     registration, and runs the listener. Pod recreation needs NO fresh
+#     token; the stored credentials stay valid until the runner is deleted
+#     server-side (the next registration reclaims the fixed name via
+#     --replace).
+#   - DISABLE_AUTOMATIC_DEREGISTRATION=true is REQUIRED for this reuse mode
+#     (the entrypoint exits 1 otherwise). Consequence: deleting the pod
+#     leaves a stale "offline" runner entry in the GitHub UI; cosmetic.
+#   - EPHEMERAL stays UNSET: an ephemeral runner de-registers after every
+#     job and would need a fresh token per run, which a static token cannot
+#     provide.
+#   - Failure mode: PVC loss + registration token older than its 1h GitHub
+#     validity -> registration fails and the container crash-loops. Recovery
+#     (user console steps): regenerate the token, update the 1Password item
+#     krops-actions-runner, wait <=5m (ExternalSecret refresh), then
+#     kubectl --context cluster0 -n ci delete pod -l app.kubernetes.io/name=github-runner.
+#
+# PRIVILEGED EXCEPTION (dind sidecar): the dind container runs privileged
+# because dockerd needs cgroup + overlay mounts to run nested containers
+# (kind). This is the standard self-hosted-runner "container mode: docker"
+# shape and is a deliberate, documented exception to the AGENTS.md hardening
+# convention. The unauthenticated docker API is bound to pod-localhost only
+# (tcp://127.0.0.1:2375, TLS off) and the namespace is ingress default-deny,
+# so no other pod can reach it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-runner
+  namespace: ci
+spec:
+  replicas: 1
+  # Recreate (not RollingUpdate): the runner-state PVC is RWO, so a rolling
+  # update could never schedule the second replica.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: github-runner
+    spec:
+      # No cluster0 API access: the job's kubectl targets the throwaway kind
+      # cluster, never cluster0's API server.
+      automountServiceAccountToken: false
+      containers:
+        - name: runner
+          image: docker.io/myoung34/github-runner:2.338.2-ubuntu-noble
+          # Runs as root by image design (the entrypoint execs the listener
+          # as root; RUN_AS_ROOT is the default). Forcing non-root would
+          # require RUN_AS_ROOT=false + the gosu path, which is not the
+          # image's tested default.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          env:
+            # Registration target: polarsquad/krops, repo scope.
+            - name: REPO_URL
+              value: https://github.com/polarsquad/krops
+            - name: RUNNER_NAME
+              value: krops-e2e-cluster0
+            - name: RUNNER_LABELS
+              value: krops-e2e
+            - name: RUNNER_GROUP
+              value: krops-e2e
+            # Registration token, materialized by the ExternalSecret from the
+            # 1Password item krops-actions-runner / registration-token.
+            - name: RUNNER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: krops-actions-runner
+                  key: registration-token
+            # Reuse mode: persist config to the PVC so restarts skip
+            # registration (token-free). Required true for reuse.
+            - name: DISABLE_AUTOMATIC_DEREGISTRATION
+              value: "true"
+            # Pin the runner binary to the image version (renovate bumps it
+            # via PR, not mid-job).
+            - name: DISABLE_AUTO_UPDATE
+              value: "true"
+            # Unset the registration token + config vars before job execution
+            # so workflow steps cannot read them.
+            - name: UNSET_CONFIG_VARS
+              value: "true"
+            # PVC-backed runner config/credentials (see Restart semantics).
+            - name: CONFIGURED_ACTIONS_RUNNER_FILES_DIR
+              value: /runner-state
+            # Job checkouts on a dedicated emptyDir (never the PVC).
+            - name: RUNNER_WORKDIR
+              value: /runner-work
+            # Reach the dind sidecar's docker API (pod-localhost, TLS off).
+            - name: DOCKER_HOST
+              value: tcp://127.0.0.1:2375
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 2Gi
+          volumeMounts:
+            - name: runner-state
+              mountPath: /runner-state
+            - name: runner-work
+              mountPath: /runner-work
+        - name: dind
+          image: docker.io/docker:29.9.2-dind
+          # PRIVILEGED (see header): dockerd needs cgroup + overlay mounts
+          # for nested containers (kind). The docker API is loopback-only
+          # and the namespace is ingress default-deny.
+          securityContext:
+            privileged: true
+          env:
+            # No TLS: we bind an explicit loopback socket via command/args
+            # below. (Empty value also stops the dind wrapper's TLS cert
+            # generation if it were ever invoked.)
+            - name: DOCKER_TLS_CERTDIR
+              value: ""
+          # Bypass the dind wrapper (which would bind tcp://0.0.0.0:2375)
+          # and run dockerd directly under docker-init/tini (zombie
+          # reaping for the nested container shims), bound to pod-localhost
+          # only.
+          command: ["docker-init", "--", "dockerd"]
+          args:
+            - --host=tcp://127.0.0.1:2375
+          resources:
+            requests:
+              cpu: 2000m
+              memory: 6Gi
+            limits:
+              cpu: "6"
+              memory: 24Gi
+          volumeMounts:
+            - name: docker-graph
+              mountPath: /var/lib/docker
+      volumes:
+        # Runner config/credentials, persisted across pod recreation so
+        # restarts skip registration (token-free).
+        - name: runner-state
+          persistentVolumeClaim:
+            claimName: github-runner-state
+        # Job checkouts (ephemeral).
+        - name: runner-work
+          emptyDir:
+            sizeLimit: 10Gi
+        # dind /var/lib/docker (ephemeral; cold pull after pod recreation is
+        # acceptable: kind node image ~1GB + CAPI/CAPA/cert-manager/wiremock
+        # ~4-6GB, node has ~417Gi ephemeral).
+        - name: docker-graph
+          emptyDir:
+            sizeLimit: 40Gi
