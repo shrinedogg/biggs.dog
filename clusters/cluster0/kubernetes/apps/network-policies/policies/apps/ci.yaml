@@ -96,9 +96,14 @@ spec:
         # ...and sometimes on the CloudFront CDN host (observed in run
         # 40888928820: kind node-image blob pull i/o timeout on this host).
         - matchName: production.cloudfront.docker.com
+        # Docker Hub AND ECR Public serve blobs via this CloudFront
+        # distribution (observed in run 40894455347: ACK chart pull at step
+        # 5/8 i/o timeout on it).
+        - matchName: d2glxqk2uabbnd.cloudfront.net
         # quay.io blob redirects land on its Akamai CDN host (observed in
         # run 40891787459: cert-manager image pull i/o timeout on cdn01).
         - matchName: cdn01.quay.io
+        - matchName: cdn02.quay.io
         # Flux controllers on the e2e management cluster ship from ghcr.
         - matchName: ghcr.io
         - matchName: public.ecr.aws
