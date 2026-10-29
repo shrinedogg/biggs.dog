@@ -110,6 +110,9 @@ spec:
 # mise-versions.jdx.dev: mise's tool version-resolution API. Blocking it does
 # not fail fast - each lookup 20s-times-out and retries, burning the whole
 # job timeout at "resolving" (observed in run 40879423932: 30 min, 0/15).
+# registry.npmjs.org: mise npm-backend tools (markdownlint-cli2) check the
+# package age at registry.npmjs.org before install; blocked = timeouts and
+# install failure (observed in run 40884757971: 13 installed, 2 failed).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -127,6 +130,7 @@ spec:
         - matchName: fulcio.sigstore.dev
         - matchName: rekor.sigstore.dev
         - matchName: mise-versions.jdx.dev
+        - matchName: registry.npmjs.org
       toPorts:
         - ports:
             - port: "443"
