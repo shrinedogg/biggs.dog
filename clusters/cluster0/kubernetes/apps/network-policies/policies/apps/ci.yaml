@@ -96,6 +96,11 @@ spec:
         # ...and sometimes on the CloudFront CDN host (observed in run
         # 40888928820: kind node-image blob pull i/o timeout on this host).
         - matchName: production.cloudfront.docker.com
+        # quay.io blob redirects land on its Akamai CDN host (observed in
+        # run 40891787459: cert-manager image pull i/o timeout on cdn01).
+        - matchName: cdn01.quay.io
+        # Flux controllers on the e2e management cluster ship from ghcr.
+        - matchName: ghcr.io
         - matchName: public.ecr.aws
         - matchName: registry.k8s.io
         - matchName: quay.io
@@ -137,6 +142,11 @@ spec:
         - matchName: mise-versions.jdx.dev
         - matchName: registry.npmjs.org
         - matchName: dl.google.com
+        # Helm chart repos reconciled by Flux on the e2e management cluster
+        # (cert-manager, CAPI operator). Fetches originate from the kind
+        # node inside dind and ride the same pod egress policy.
+        - matchName: charts.jetstack.io
+        - matchName: kubernetes-sigs.github.io
       toPorts:
         - ports:
             - port: "443"
