@@ -1,0 +1,47 @@
+---
+# agentgateway AI backend: Z.ai GLM (OpenAI-compatible API at api.z.ai).
+# Same shape as the MiniMax (backend.yaml) and Mistral (backend-mistral.yaml)
+# backends: no model is pinned, the client picks the model via the OpenAI
+# "model" field (glm-5.3-flash per the #660 decision record).
+#
+# Z.ai's coding-plan OpenAI surface is rooted at /api/coding/paas/v4, not
+# /v1. pathPrefix overrides the upstream base path (CRD: "Overrides the
+# default base path prefix, such as /v1, for upstream requests"), so
+# clients keep speaking plain OpenAI /v1 and the data plane dials
+# api.z.ai:443/api/coding/paas/v4/<endpoint>.
+#
+# The data plane authenticates upstream with the Z.ai key from the
+# zai-api-key Secret (external-secret-glm.yaml); clients do not send the
+# Z.ai key.
+#
+# Direct dial, no egress forwarder (same decision as #658 for MiniMax and
+# Mistral): the deployed proxy resolves A-first, so the dual-stack endpoint
+# (A 47.245.170.100/47.245.163.4 + 2x AAAA) dials over IPv4, and the SNI
+# defaults to the provider host api.z.ai, which is why tls is empty.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: glm
+  namespace: ai-system
+spec:
+  ai:
+    provider:
+      openai: {}
+      host: api.z.ai
+      port: 443
+      pathPrefix: /api/coding/paas/v4
+  policies:
+    auth:
+      secretRef:
+        name: zai-api-key
+    tls: {}
+    ai:
+      # Path-suffix -> handler; the OpenAI surface from the provider docs
+      # (same shape as the MiniMax/Mistral backends, per the record).
+      # Clients that dial the upstream-shaped path
+      # /api/coding/paas/v4/<endpoint> directly fall through to
+      # "*" -> Passthrough and reach the upstream unchanged.
+      routes:
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Passthrough"
+        "*": "Passthrough"
