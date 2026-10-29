@@ -15,7 +15,7 @@ metadata:
 #
 # Uses the official mindwtr-mcp npm package (v1.1.3) in Cloud mode, wrapped
 # by mcp-proxy so kagent can connect over the network. No custom container
-# image — a node:24-alpine init container installs the package from npm and
+# image — a node:26-alpine init container installs the package from npm and
 # stages it into a shared emptyDir that mcp-proxy reads.
 #
 # Data source: the live Mindwtr Cloud sync endpoint
@@ -69,7 +69,7 @@ spec:
                     values:
                       - linux
       initContainers:
-        # Stage node + mindwtr-mcp package into shared emptyDir. node:24-alpine
+        # Stage node + mindwtr-mcp package into shared emptyDir. node:26-alpine
         # is musl-linked (matching the mcp-proxy base image) but still depends on
         # libstdc++.so.6 + libgcc_s.so.1 from the g++ apk; those are copied next
         # to the binary so the server container can run it via LD_LIBRARY_PATH.
@@ -150,7 +150,7 @@ spec:
                 secretKeyRef:
                   name: mindwtr-mcp-cloud-token
                   key: token
-            # node (copied from node:24-alpine) needs libstdc++.so.6 +
+            # node (copied from node:26-alpine) needs libstdc++.so.6 +
             # libgcc_s.so.1, which the init container stages next to the binary.
             - name: LD_LIBRARY_PATH
               value: "/staged/bin"
