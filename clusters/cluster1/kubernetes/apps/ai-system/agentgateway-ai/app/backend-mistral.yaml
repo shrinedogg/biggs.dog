@@ -1,0 +1,36 @@
+---
+# agentgateway AI backend: Mistral (OpenAI-compatible API at api.mistral.ai).
+# Same shape as the MiniMax backend (backend.yaml): no model is pinned, the
+# client picks any of the account's models via the OpenAI "model" field.
+#
+# The data plane authenticates upstream with the Mistral key from the
+# mistral-api-key Secret; clients do not send the Mistral key.
+#
+# Direct dial, no egress forwarder: the deployed proxy (agentgateway 0.12.0,
+# hickory 0.25.2) resolves A-first (Ipv4thenIpv6), so the dual-stack
+# Cloudflare endpoint (api.mistral.ai has A and AAAA) dials fine and the
+# SNI/certificate validation use the real upstream host. Per the #657 plan
+# record (#658 decision): no forwarder, no image bump, no AgentgatewayParameters.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: mistral
+  namespace: ai-system
+spec:
+  ai:
+    provider:
+      openai: {}
+      host: api.mistral.ai
+      port: 443
+  policies:
+    auth:
+      secretRef:
+        name: mistral-api-key
+    tls: {}
+    ai:
+      # Path-suffix -> handler; the OpenAI surface from the provider docs.
+      # "/v1/models" passes through to the upstream, which serves it natively.
+      routes:
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Passthrough"
+        "*": "Passthrough"

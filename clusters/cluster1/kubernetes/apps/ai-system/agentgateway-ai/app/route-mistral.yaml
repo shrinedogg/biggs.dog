@@ -1,0 +1,46 @@
+---
+# External HTTPS route for the Mistral OpenAI-compatible API via agentgateway.
+# Endpoint: https://mistral.biggs.dog/v1 (internal LAN-only gateway, TLS at
+# the edge). Placed on internal-biggs-dog, NOT wildcard-biggs-dog: the WAN
+# VIP 192.168.6.7 is the only UDM-forwarded address, so the public path 404s
+# while k8s-gateway answers mistral.biggs.dog with 192.168.6.15 for LAN
+# clients (the split-horizon answer is derived from this route's parent
+# Gateway).
+#
+# Client authentication is required (model-api-key-mistral AgentgatewayPolicy):
+# send the model-route token as `Authorization: Bearer *** The token
+# comes from the model-api-keys Secret (ExternalSecret from the 1Password
+# item agentgateway-model-api-key, shared with the minimax route); it is
+# distinct from the Mistral provider key, which the backend uses upstream
+# and never reaches clients.
+#
+# Usage:
+#   curl https://mistral.biggs.dog/v1/chat/completions \
+#     -H 'Content-Type: application/json' \
+#     -H 'Authorization: Bearer ***' \
+#     -d '{"model":"mistral-small-latest","messages":[{"role":"user","content":"hi"}]}'
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mistral
+  namespace: ai-system
+spec:
+  hostnames:
+    - mistral.biggs.dog
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+  rules:
+    - backendRefs:
+        - name: mistral
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # LLM requests can run for minutes; same generous timeouts as the
+      # minimax route.
+      timeouts:
+        request: 600s
+        backendRequest: 600s

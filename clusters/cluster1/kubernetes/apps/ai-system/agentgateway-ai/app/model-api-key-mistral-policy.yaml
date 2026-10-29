@@ -1,0 +1,35 @@
+---
+# API-key auth + rate limit in front of the Mistral model route
+# (HTTPRoute mistral). Same client-token design as model-api-key: one token
+# from the model-api-keys Secret covers every hosted-model route, so LAN
+# tools (Hermes, kagent ModelConfigs) authenticate identically across
+# providers. The Mistral provider key stays in the mistral-api-key Secret
+# and is used by the backend's auth policy upstream of here.
+#
+# Machine clients (Hermes on the LAN, kagent actors via their ModelConfig
+# apiKeySecret) send:
+#   Authorization: Bearer ***
+#
+# Fails closed (401) until the model-api-keys Secret exists.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: model-api-key-mistral
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: mistral
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      # location omitted — defaults to Authorization header with "Bearer " prefix
+      secretRef:
+        name: model-api-keys
+    rateLimit:
+      # Bound spend on the paid upstream: 120 requests/min, burst 40.
+      local:
+        - requests: 120
+          unit: Minutes
+          burst: 40
