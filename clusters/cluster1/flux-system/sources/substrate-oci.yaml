@@ -15,4 +15,4 @@ spec:
     # digest-pinned ateapi fork, no bundled postgres. Bumps for the whole
     # substrate stack are grouped + automerge:false — see the substrate-stack
     # rule in renovate.json.
-    tag: "0.5.0-alpha2"
+    tag: "0.7.0-alpha2"
