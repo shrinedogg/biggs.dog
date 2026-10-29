@@ -113,6 +113,8 @@ spec:
 # registry.npmjs.org: mise npm-backend tools (markdownlint-cli2) check the
 # package age at registry.npmjs.org before install; blocked = timeouts and
 # install failure (observed in run 40884757971: 13 installed, 2 failed).
+# dl.google.com: Go toolchain downloads (mise core go plugin); blocked =
+# go install fails after 30s timeouts (observed in run 40888037855).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -131,6 +133,7 @@ spec:
         - matchName: rekor.sigstore.dev
         - matchName: mise-versions.jdx.dev
         - matchName: registry.npmjs.org
+        - matchName: dl.google.com
       toPorts:
         - ports:
             - port: "443"
