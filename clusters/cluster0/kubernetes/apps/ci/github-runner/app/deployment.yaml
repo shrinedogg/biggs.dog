@@ -129,6 +129,14 @@ spec:
             # Reach the dind sidecar's docker API (pod-localhost, TLS off).
             - name: DOCKER_HOST
               value: tcp://127.0.0.1:2375
+            # Temp dir on the shared-tmp volume: docker bind mounts in this
+            # container are resolved by the DIND daemon against ITS
+            # filesystem, so any host path passed to `docker run -v ...`
+            # must exist in both containers (observed in krops run
+            # 40890117392: the harness's keytool docker-run wrote the CSR to
+            # a dind-side auto-created path and openssl never saw it).
+            - name: TMPDIR
+              value: /shared-tmp
           resources:
             requests:
               cpu: 250m
@@ -141,6 +149,8 @@ spec:
               mountPath: /runner-state
             - name: runner-work
               mountPath: /runner-work
+            - name: shared-tmp
+              mountPath: /shared-tmp
         - name: dind
           image: docker.io/docker:29.9.2-dind
           # PRIVILEGED (see header): dockerd needs cgroup + overlay mounts
@@ -170,6 +180,8 @@ spec:
           volumeMounts:
             - name: docker-graph
               mountPath: /var/lib/docker
+            - name: shared-tmp
+              mountPath: /shared-tmp
       volumes:
         # Runner config/credentials, persisted across pod recreation so
         # restarts skip registration (token-free).
@@ -180,6 +192,13 @@ spec:
         - name: runner-work
           emptyDir:
             sizeLimit: 10Gi
+        # Shared between runner and dind AT THE SAME PATH so docker bind
+        # mounts of runner-side temp paths resolve in the dind daemon's
+        # filesystem (the harness's keytool docker-run mounts $TMPDIR/certs).
+        # Tiny: wiremock certs + rendered templates only.
+        - name: shared-tmp
+          emptyDir:
+            sizeLimit: 64Mi
         # dind /var/lib/docker (ephemeral; cold pull after pod recreation is
         # acceptable: kind node image ~1GB + CAPI/CAPA/cert-manager/wiremock
         # ~4-6GB, node has ~417Gi ephemeral).
