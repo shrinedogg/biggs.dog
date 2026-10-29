@@ -71,7 +71,19 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
+              # drop ALL alone breaks this image: root without CAP_DAC_OVERRIDE
+              # gets only the "other" (r-x) bits on the runner-owned
+              # /actions-runner, so config.sh cannot create _diag/.env, the
+              # entrypoint's chown (CAP_CHOWN) fails, and gosu's privilege
+              # drop (SETUID/SETGID) fails -> Runner.Listener aborts (exit 134).
+              # Add back exactly what the entrypoint needs, nothing else.
               drop: ["ALL"]
+              add:
+                - CHOWN          # entrypoint: chown -R runner /actions-runner /runner-work /runner-state
+                - DAC_OVERRIDE   # root writes to runner-owned /actions-runner during config.sh
+                - FOWNER         # cp -p preserving times on runner-owned files/dirs
+                - SETUID         # gosu: drop root -> runner for the listener
+                - SETGID         # gosu: drop root group -> runner group
             seccompProfile:
               type: RuntimeDefault
           env:
