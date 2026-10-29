@@ -106,6 +106,13 @@ spec:
         - matchName: cdn02.quay.io
         # Flux controllers on the e2e management cluster ship from ghcr.
         - matchName: ghcr.io
+        # registry.k8s.io 307-redirects blobs to regional Google Artifact
+        # Registry / GCS hosts (observed in PR #731's run: CAPA controller
+        # ImagePullBackOff, curl probe 307 -> europe-north1-docker.pkg.dev,
+        # then i/o timeout).
+        - matchPattern: "*.pkg.dev"
+        - matchPattern: "*.gcr.io"
+        - matchName: storage.googleapis.com
         - matchName: public.ecr.aws
         - matchName: registry.k8s.io
         - matchName: quay.io
