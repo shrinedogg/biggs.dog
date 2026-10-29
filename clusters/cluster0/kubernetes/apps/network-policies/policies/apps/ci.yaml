@@ -104,6 +104,9 @@ spec:
 # mise tool downloads (runner container): kubectl, helm, node and aws-cli
 # pinned in the krops mise.toml / mise.aws.toml. The e2e python harness is
 # stdlib-only, so no pypi/files.pythonhosted.org is needed.
+# sigstore hosts: mise-action v5 verifies the downloaded mise binary via a
+# sigstore bundle (observed in run 40878688464: "sigstore refused the bundle:
+# error refreshing TUF metadata" when tuf-repo-cdn was blocked).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -117,6 +120,9 @@ spec:
         - matchName: get.helm.sh
         - matchName: nodejs.org
         - matchName: awscli.amazonaws.com
+        - matchName: tuf-repo-cdn.sigstore.dev
+        - matchName: fulcio.sigstore.dev
+        - matchName: rekor.sigstore.dev
       toPorts:
         - ports:
             - port: "443"
