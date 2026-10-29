@@ -10,14 +10,15 @@
 # (MiniMax-M3, MiniMax-M3.1-Flash, MiniMax-M2.x, ...) via the OpenAI
 # "model" field.
 #
-# The dial target is the in-cluster minimax-egress forwarder, NOT
-# api.minimax.io directly: the data plane dials one resolver-provided
-# address per connection with no v6->v4 fallback, and pods have no global
-# IPv6 route, so dialing the dual-stack Akamai endpoint directly 503s on
-# every AAAA (see minimax-egress/app/configmap.yaml). The forwarder
-# terminates the hop at A-only DNS; the TLS SNI is pinned back to
-# api.minimax.io below so Akamai presents (and we validate) the real
-# certificate.
+# The dial target is api.minimax.io directly. The previous value pointed
+# at an in-cluster "minimax-egress" forwarder that never existed: no such
+# Service was ever in this repo, in git history, or in the cluster, so
+# the proxy could not resolve the backend name and 503d every request
+# ("backends required DNS resolution which failed"). The data plane
+# resolves A-first and the cluster is IPv4-only, so dialing the
+# dual-stack Akamai endpoint directly works over IPv4. The TLS SNI is
+# pinned to api.minimax.io below so Akamai presents (and we validate)
+# the real certificate.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
 metadata:
@@ -27,7 +28,7 @@ spec:
   ai:
     provider:
       openai: {}
-      host: minimax-egress.ai-system.svc.cluster.local
+      host: api.minimax.io
       port: 443
   policies:
     auth:
