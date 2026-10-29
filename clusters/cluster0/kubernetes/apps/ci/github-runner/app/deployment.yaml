@@ -36,8 +36,9 @@
 # (kind). This is the standard self-hosted-runner "container mode: docker"
 # shape and is a deliberate, documented exception to the AGENTS.md hardening
 # convention. The unauthenticated docker API is bound to pod-localhost only
-# (tcp://127.0.0.1:2375, TLS off) and the namespace is ingress default-deny,
-# so no other pod can reach it.
+# (tcp://127.0.0.1:2375, TLS off), so no other pod can reach it (the ci
+# namespace carries egress-only policies; see
+# network-policies/policies/apps/ci.yaml).
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -126,8 +127,7 @@ spec:
         - name: dind
           image: docker.io/docker:29.9.2-dind
           # PRIVILEGED (see header): dockerd needs cgroup + overlay mounts
-          # for nested containers (kind). The docker API is loopback-only
-          # and the namespace is ingress default-deny.
+          # for nested containers (kind). The docker API is loopback-only.
           securityContext:
             privileged: true
           env:
