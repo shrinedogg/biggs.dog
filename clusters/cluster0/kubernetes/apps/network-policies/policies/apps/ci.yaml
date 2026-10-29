@@ -107,6 +107,9 @@ spec:
 # sigstore hosts: mise-action v5 verifies the downloaded mise binary via a
 # sigstore bundle (observed in run 40878688464: "sigstore refused the bundle:
 # error refreshing TUF metadata" when tuf-repo-cdn was blocked).
+# mise-versions.jdx.dev: mise's tool version-resolution API. Blocking it does
+# not fail fast - each lookup 20s-times-out and retries, burning the whole
+# job timeout at "resolving" (observed in run 40879423932: 30 min, 0/15).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -123,6 +126,7 @@ spec:
         - matchName: tuf-repo-cdn.sigstore.dev
         - matchName: fulcio.sigstore.dev
         - matchName: rekor.sigstore.dev
+        - matchName: mise-versions.jdx.dev
       toPorts:
         - ports:
             - port: "443"
