@@ -6,3 +6,4 @@ resources:
   - ./namespace.yaml
   # Flux-Kustomizations
   - ./github-runner/ks.yaml
+  - ./github-runner-talos/ks.yaml

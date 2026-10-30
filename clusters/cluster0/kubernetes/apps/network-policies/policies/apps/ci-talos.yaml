@@ -1,0 +1,33 @@
+# Namespace: ci  (github-runner-talos — self-hosted GitHub Actions runner for
+# the shrinedogg talos-nvidia-open-extension builds)
+#
+# The shared ci.yaml policies (endpointSelector: {}, i.e. every ci pod) already
+# cover DNS, the GitHub control plane + git/action downloads, and the
+# container registries the bldr build pulls from (ghcr.io, docker.io, quay,
+# registry.k8s.io, ...). This policy adds ONLY the talos-build hosts that the
+# krops e2e allowlist does not carry, and it is scoped to the talos runner pod
+# by label so the krops runner's egress is unchanged:
+#   - *.kernel.org      : kernel.org source tarball (cdn.kernel.org, the
+#                         KERNEL_SRC_FALLBACK=0 default CI path) and the cgit
+#                         snapshot fallback (git.kernel.org, =1)
+#   - download.nvidia.com : the NVIDIA open .run installers (amd64)
+#
+# The allowlist is iterated per observed pull (matching the ci.yaml policy
+# history): if the first CI run is blocked on another host, add it here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-talos-build
+  namespace: ci
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner-talos
+  egress:
+    - toFQDNs:
+        - matchPattern: "*.kernel.org"
+        - matchName: download.nvidia.com
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

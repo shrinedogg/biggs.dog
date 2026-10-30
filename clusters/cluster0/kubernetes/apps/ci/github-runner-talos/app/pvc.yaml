@@ -1,0 +1,16 @@
+# Runner config/credentials only (.runner, .credentials, _diag): this is
+# what makes pod recreation token-free (see deployment.yaml header).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: github-runner-talos-state
+  namespace: ci
+spec:
+  accessModes:
+    - ReadWriteOnce
+  # openebs.io/local host-path provisioner (default StorageClass on
+  # cluster0; single node).
+  storageClassName: host-path
+  resources:
+    requests:
+      storage: 1Gi
