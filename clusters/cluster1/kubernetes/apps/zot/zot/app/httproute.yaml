@@ -1,0 +1,24 @@
+---
+# zot.biggs.dog on the wildcard-biggs-dog gateway: TLS terminates there with
+# the existing *.biggs.dog certificate; registry API under PathPrefix /.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zot
+spec:
+  hostnames:
+    - zot.biggs.dog
+  parentRefs:
+    - name: wildcard-biggs-dog
+      namespace: networking
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: zot
+          port: 8080

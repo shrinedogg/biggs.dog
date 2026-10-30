@@ -1,15 +1,18 @@
+---
 # Zot pull-through cache registry (on-demand) for ghcr.io.
 #
 # Why: cluster0's public IP is being 403'd by the GHCR edge for
 # docker-daemon-class clients (2026-10-30, see the talos-nvidia-open-extension
 # CI incident). This cache re-serves ghcr content under the /ghcr subpath from
-# zot's own Go client, which the edge accepts from this IP. Reference rewrite:
+# zot's own Go client, and it lives on cluster1 so its egress uses a different
+# uplink/IP than the runner cluster. Reference rewrite:
 #   ghcr.io/siderolabs/bldr:v0.6.5  ->  zot.biggs.dog/ghcr/siderolabs/bldr:v0.6.5
-# Blobs are cached in the PVC on first pull, so repeat builds (and future
-# egress incidents) are served locally.
+# Blobs are cached on the ceph-block PVC on first pull, so repeat builds (and
+# future egress incidents) are served from the cluster.
 #
-# Plain-HTTP backend on 8080; cluster0-gateway is the sole TLS terminator
-# (listener zot-https, cert zot-biggs-dog-tls, same pattern as dex).
+# Plain-HTTP backend on 8080; the wildcard-biggs-dog gateway (192.168.6.7:443)
+# terminates TLS with the existing *.biggs.dog cert - no new listener or
+# certificate needed.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

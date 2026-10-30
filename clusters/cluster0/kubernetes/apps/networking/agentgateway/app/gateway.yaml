@@ -49,18 +49,6 @@ spec:
         certificateRefs:
           - kind: Secret
             name: factory-biggs-dog-tls
-    - hostname: zot.biggs.dog
-      name: zot-https
-      port: 443
-      protocol: HTTPS
-      allowedRoutes:
-        namespaces:
-          from: All
-      tls:
-        mode: Terminate
-        certificateRefs:
-          - kind: Secret
-            name: zot-biggs-dog-tls
     - hostname: "*.biggs.dog"
       name: wildcard-http
       port: 80

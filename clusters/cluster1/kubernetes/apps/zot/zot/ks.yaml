@@ -7,7 +7,7 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: *app
-  path: ./clusters/cluster0/kubernetes/apps/zot/zot/app
+  path: ./clusters/cluster1/kubernetes/apps/zot/zot/app
   prune: false
   sourceRef:
     kind: GitRepository
@@ -17,6 +17,6 @@ spec:
   retryInterval: 1m
   timeout: 5m
   dependsOn:
-    - name: openebs
-    - name: issuers
+    # The wildcard-biggs-dog gateway (192.168.6.7) already terminates *.biggs.dog
+    # on 443; the HTTPRoute must attach to a live gateway.
     - name: agentgateway
