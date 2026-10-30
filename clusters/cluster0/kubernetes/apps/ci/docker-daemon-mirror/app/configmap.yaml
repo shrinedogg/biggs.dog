@@ -1,0 +1,26 @@
+# dockerd config for the github-runner / github-runner-talos dind sidecars.
+#
+# registry-mirrors is global: every docker-CLI pull (kind node images in the
+# krops e2e, helper images in jobs) first tries zot.biggs.dog and falls back
+# to the upstream registry on 404 (zot only serves what it syncs: ghcr.io,
+# cgr.dev). The point is to keep docker-daemon-class pulls OFF the cluster0
+# egress IP that the GHCR edge 403's; the pulls ride cluster1's uplink via
+# the zot pod instead.
+#
+# The dind image ships no /etc/docker, so the runners mount this volume there
+# (dockerd's default config path). The buildx docker-container driver
+# (buildkitd) does NOT read this file; its mirror config is injected per
+# workflow via setup-buildx-action buildkitd-config-inline (see
+# shrinedogg/talos-nvidia-open-extension ci.yaml).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: docker-daemon-mirror
+  namespace: ci
+  labels:
+    app.kubernetes.io/name: docker-daemon-mirror
+data:
+  daemon.json: |
+    {
+      "registry-mirrors": ["https://zot.biggs.dog"]
+    }

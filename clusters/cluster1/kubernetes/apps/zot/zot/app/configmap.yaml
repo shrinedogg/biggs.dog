@@ -6,6 +6,17 @@ metadata:
   labels:
     app.kubernetes.io/name: zot
 data:
+  # On-demand (pull-through) sync, transparent path: content is stored under
+  # the SAME path as the upstream (destination ""), so clients pull the
+  # upstream ref with only the registry host swapped:
+  #   ghcr.io/siderolabs/bldr:v0.6.5  ->  zot.biggs.dog/siderolabs/bldr:v0.6.5
+  # That is what makes the runner-side mirror configs (buildkitd
+  # [registry."ghcr.io"] mirrors, dockerd registry-mirrors) transparent.
+  #
+  # Sources:
+  #   ghcr.io - bldr syntax image, the pkgs build graph (tools, llvm, glibc,
+  #             extensions-validator), the talos imager inputs.
+  #   cgr.dev - chainguard/wolfi-base digest ref in the toolkit pkg.yaml.
   config.json: |
     {
       "distSpecVersion": "1.0.1",
@@ -29,7 +40,20 @@ data:
               "urls": ["https://ghcr.io"],
               "content": [
                 {
-                  "destination": "/ghcr",
+                  "destination": "",
+                  "prefix": "**"
+                }
+              ],
+              "onDemand": true,
+              "tlsVerify": true,
+              "maxRetries": 3,
+              "retryDelay": "1m"
+            },
+            {
+              "urls": ["https://cgr.dev"],
+              "content": [
+                {
+                  "destination": "",
                   "prefix": "**"
                 }
               ],

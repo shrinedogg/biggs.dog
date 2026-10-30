@@ -1,12 +1,13 @@
 ---
-# Zot pull-through cache registry (on-demand) for ghcr.io.
+# Zot pull-through cache registry (on-demand) for ghcr.io + cgr.dev.
 #
 # Why: cluster0's public IP is being 403'd by the GHCR edge for
 # docker-daemon-class clients (2026-10-30, see the talos-nvidia-open-extension
-# CI incident). This cache re-serves ghcr content under the /ghcr subpath from
+# CI incident). This cache re-serves the upstream content, transparent, from
 # zot's own Go client, and it lives on cluster1 so its egress uses a different
-# uplink/IP than the runner cluster. Reference rewrite:
-#   ghcr.io/siderolabs/bldr:v0.6.5  ->  zot.biggs.dog/ghcr/siderolabs/bldr:v0.6.5
+# uplink/IP than the runner cluster. The runner-side mirror configs point at
+# the plain upstream path (no subpath):
+#   ghcr.io/siderolabs/bldr:v0.6.5  ->  zot.biggs.dog/siderolabs/bldr:v0.6.5
 # Blobs are cached on the ceph-block PVC on first pull, so repeat builds (and
 # future egress incidents) are served from the cluster.
 #

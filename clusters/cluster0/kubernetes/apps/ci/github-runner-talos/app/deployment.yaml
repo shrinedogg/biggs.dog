@@ -195,6 +195,13 @@ spec:
               mountPath: /var/lib/docker
             - name: shared-tmp
               mountPath: /shared-tmp
+            # The image ships no /etc/docker; the mount adds daemon.json
+            # (dockerd's default config path) with the zot registry mirror.
+            # Nested buildkitd containers inherit the pod's /etc/hosts and
+            # DNS, so the mirror resolves zot.biggs.dog the same way.
+            - name: docker-daemon-mirror
+              mountPath: /etc/docker
+              readOnly: true
       volumes:
         # Runner config/credentials, persisted across pod recreation so
         # restarts skip registration (token-free).
@@ -219,3 +226,8 @@ spec:
         - name: docker-graph
           emptyDir:
             sizeLimit: 150Gi
+        # dockerd config: registry-mirrors -> zot.biggs.dog (pull-through
+        # cache on cluster1; the GHCR edge 403's this node's egress IP).
+        - name: docker-daemon-mirror
+          configMap:
+            name: docker-daemon-mirror

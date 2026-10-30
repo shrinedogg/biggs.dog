@@ -5,5 +5,6 @@ resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
   # Flux-Kustomizations
+  - ./docker-daemon-mirror/ks.yaml
   - ./github-runner/ks.yaml
   - ./github-runner-talos/ks.yaml
