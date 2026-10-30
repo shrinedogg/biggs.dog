@@ -17,13 +17,21 @@ data:
   #   ghcr.io - bldr syntax image, the pkgs build graph (tools, llvm, glibc,
   #             extensions-validator), the talos imager inputs.
   #   cgr.dev - chainguard/wolfi-base digest ref in the toolkit pkg.yaml.
+  #
+  # gcDelay: 24h. zot GC prunes a tag from the repo index when its child
+  # manifests are not in storage yet (the normal state right after an
+  # on-demand manifest sync, before layers are pulled) and deletes
+  # orphaned blobs after gcDelay. 24h keeps evicted-but-recent blobs
+  # around so a pruned tag re-syncs the manifest only (blobs stay local),
+  # while the 30Gi PVC still reclaims genuinely abandoned content.
   config.json: |
     {
       "distSpecVersion": "1.0.1",
       "storage": {
         "rootDirectory": "/data",
         "dedupe": true,
-        "gc": true
+        "gc": true,
+        "gcDelay": "24h"
       },
       "http": {
         "address": "0.0.0.0",
