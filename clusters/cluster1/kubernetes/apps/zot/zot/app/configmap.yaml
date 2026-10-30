@@ -28,6 +28,11 @@ data:
   # orphaned blobs after gcDelay. 24h keeps evicted-but-recent blobs
   # around so a pruned tag re-syncs the manifest only (blobs stay local),
   # while the 30Gi PVC still reclaims genuinely abandoned content.
+  #
+  # http.compat docker2s2: part of the pkgs build graph (e.g.
+  # siderolabs/stagex/* stage images) still ships legacy Docker media
+  # types (manifest.list.v2). Without this, on-demand sync rejects them
+  # and clients fall back to the origin on every build.
   config.json: |
     {
       "distSpecVersion": "1.0.1",
@@ -39,7 +44,8 @@ data:
       },
       "http": {
         "address": "0.0.0.0",
-        "port": "8080"
+        "port": "8080",
+        "compat": ["docker2s2"]
       },
       "log": {
         "level": "info"
