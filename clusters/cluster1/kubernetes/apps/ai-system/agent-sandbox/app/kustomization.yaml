@@ -1,6 +1,6 @@
 # Installs only the agent-sandbox controller (sigs.k8s.io Sandbox CRD +
-# controller). The kagent SandboxAgent CRs are not used: in kagent 0.9.10
-# a `platform: agent-sandbox` SandboxAgent runs a sandbox pod but is never
+# controller). The kagent SandboxAgent CRs are not used: a
+# `platform: agent-sandbox` SandboxAgent runs a sandbox pod but is never
 # registered in the controller's A2A registry, so it is not invokable via the
 # kagent MCP server (mcp.biggs.dog) or UI. Instead, agents use classic
 # `kind: Agent` CRs (which still use executeCodeBlocks + this controller for

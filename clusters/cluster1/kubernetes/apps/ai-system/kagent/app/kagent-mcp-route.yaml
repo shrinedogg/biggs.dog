@@ -8,8 +8,8 @@
 #     .6.15 -> this route -> kagent MCP. TLS terminated here with the wildcard
 #     *.biggs.dog cert, so clients use https://mcp.biggs.dog/mcp.
 #   - WAN clients: public DNS -> Cloudflare -> public gateway (.6.7), which has
-#     no mcp.biggs.dog route -> 404. LAN-only reachability is the access control
-#     (no auth on the MCP path).
+#     no mcp.biggs.dog route -> 404. LAN-only reachability plus API-key auth
+#     (kagent-mcp-auth-policy, secret kagent-mcp-api-keys) gate the endpoint.
 #
 # No path rewrite and no filters: the backend serves Streamable-HTTP at /mcp.
 # We pass "/" straight through to the untagged (plain-HTTP) kagent-controller

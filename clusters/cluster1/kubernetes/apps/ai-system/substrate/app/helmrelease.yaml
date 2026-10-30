@@ -128,15 +128,6 @@ spec:
               - op: replace
                 path: /spec/pauseImage
                 value: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
-  # Drift correction: when the chart/values are unchanged, Flux no-ops the helm
-  # upgrade, so out-of-band changes (a deleted resource, a `kubectl edit`)
-  # silently persist while status stays Ready=True. `enabled` makes the
-  # controller detect AND correct such drift on every reconcile via a
-  # server-side dry-run apply (recreating deleted resources, reverting edits
-  # to git state). Aligns with this repo's rule that persistent changes are
-  # made in YAML here, not by mutating the cluster.
-  driftDetection:
-    mode: enabled
   install:
     remediation:
       retries: 3

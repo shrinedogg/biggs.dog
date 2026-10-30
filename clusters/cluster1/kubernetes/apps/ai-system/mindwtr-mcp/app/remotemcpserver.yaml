@@ -12,8 +12,8 @@ spec:
     listing, updating, and deleting tasks; inbox processing with 2-minute
     rule; project management with sections; focus view for next actions;
     Waiting For tracking; Someday/Maybe shelving; and weekly review.
-    Connects to a local Mindwtr SQLite database (local-first, no external
-    API calls).
+    Connects to the self-hosted Mindwtr Cloud endpoint (Cloud mode, --write) —
+    the same store the desktop/mobile clients sync against.
   protocol: STREAMABLE_HTTP
   url: http://mindwtr-mcp.ai-system:8080/mcp
   sseReadTimeout: 5m0s
