@@ -211,7 +211,11 @@ spec:
           emptyDir:
             sizeLimit: 64Mi
         # dind /var/lib/docker (ephemeral; cold pull after pod recreation is
-        # acceptable: the bldr + kernel + NVIDIA build needs ~40 Gi).
+        # acceptable). 150Gi: the GitHub-hosted runners (where this build has
+        # run for months) expose a 140Gi disk; the build's docker artifacts
+        # exceed 40Gi mid-compile (the old 40Gi cap got the pod evicted at
+        # ~28 min into a 12-core kernel build). The node has ~416Gi
+        # allocatable, so the cap is a runaway guard, not a budget.
         - name: docker-graph
           emptyDir:
-            sizeLimit: 40Gi
+            sizeLimit: 150Gi
