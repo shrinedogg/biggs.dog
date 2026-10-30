@@ -185,7 +185,10 @@ spec:
               cpu: 2000m
               memory: 6Gi
             limits:
-              cpu: "6"
+              # 12 of the node's 16 cores for the nested builds (bldr/make run
+              # inside dind and inherit this cgroup limit). 4 cores left as
+              # headroom for the krops runner and other workloads.
+              cpu: "12"
               memory: 24Gi
           volumeMounts:
             - name: docker-graph
