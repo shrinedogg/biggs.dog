@@ -1,0 +1,83 @@
+# Zot pull-through cache registry (on-demand) for ghcr.io.
+#
+# Why: cluster0's public IP is being 403'd by the GHCR edge for
+# docker-daemon-class clients (2026-10-30, see the talos-nvidia-open-extension
+# CI incident). This cache re-serves ghcr content under the /ghcr subpath from
+# zot's own Go client, which the edge accepts from this IP. Reference rewrite:
+#   ghcr.io/siderolabs/bldr:v0.6.5  ->  zot.biggs.dog/ghcr/siderolabs/bldr:v0.6.5
+# Blobs are cached in the PVC on first pull, so repeat builds (and future
+# egress incidents) are served locally.
+#
+# Plain-HTTP backend on 8080; cluster0-gateway is the sole TLS terminator
+# (listener zot-https, cert zot-biggs-dog-tls, same pattern as dex).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zot
+spec:
+  replicas: 1
+  # Recreate because the PVC is RWO - two pods cannot co-mount during a
+  # rolling update.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zot
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zot
+    spec:
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+      volumes:
+        - name: zot-config
+          configMap:
+            name: zot-config
+        - name: zot-data
+          persistentVolumeClaim:
+            claimName: zot-data
+      containers:
+        - name: zot
+          image: ghcr.io/project-zot/zot:v2.1.22
+          imagePullPolicy: IfNotPresent
+          args:
+            - serve
+            - /etc/zot/config.json
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /v2/
+              port: 8080
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /v2/
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: zot-config
+              mountPath: /etc/zot
+              readOnly: true
+            - name: zot-data
+              mountPath: /data

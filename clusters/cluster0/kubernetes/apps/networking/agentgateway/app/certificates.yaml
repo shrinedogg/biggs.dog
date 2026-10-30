@@ -72,3 +72,22 @@ spec:
   usages:
     - digital signature
     - key encipherment
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: zot-biggs-dog
+  namespace: networking
+spec:
+  commonName: zot.biggs.dog
+  dnsNames:
+    - zot.biggs.dog
+  secretName: zot-biggs-dog-tls
+  duration: 720h # 30 days
+  renewBefore: 168h # 7 days
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer
+  usages:
+    - digital signature
+    - key encipherment

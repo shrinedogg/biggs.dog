@@ -1,0 +1,16 @@
+# Blob cache for the on-demand ghcr pull-through. 30Gi covers several full
+# full kernel-pkgs builds of stage images (measured: node disk had 398Gi
+# free; existing host-path PVCs total 40Gi).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: zot-data
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zot
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 30Gi

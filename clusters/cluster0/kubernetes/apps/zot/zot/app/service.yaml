@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: zot
+  namespace: zot
+  labels:
+    app.kubernetes.io/name: zot
+spec:
+  selector:
+    app.kubernetes.io/name: zot
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+      protocol: TCP
