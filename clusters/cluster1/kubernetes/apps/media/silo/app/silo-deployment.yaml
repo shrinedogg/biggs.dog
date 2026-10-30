@@ -32,7 +32,7 @@ spec:
           # Pre-1.0: the `latest` tag moves, so pin the image index digest for
           # deterministic rollouts. To update, re-resolve the latest index
           # digest (docker-content-digest header) and bump it here.
-          image: ghcr.io/silo-server/silo-server:latest@sha256:7559d148544c24dca3d306c8447d5cd3129551007d2ad1e511e470fbbf20e224
+          image: ghcr.io/silo-server/silo-server:latest@sha256:ac34ffe5d9b89f300bea4044a72bf635d7fc5c8d71f09822afa87c4af5716b3d
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
