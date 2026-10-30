@@ -17,6 +17,10 @@ data:
   #   ghcr.io - bldr syntax image, the pkgs build graph (tools, llvm, glibc,
   #             extensions-validator), the talos imager inputs.
   #   cgr.dev - chainguard/wolfi-base digest ref in the toolkit pkg.yaml.
+  #   docker.io - buildkit builder image (moby/buildkit), crane, and the
+  #               repo's own pushed images. dockerd registry-mirrors only
+  #               applies to docker.io, so this is what the runner's
+  #               /etc/docker daemon.json mirror actually caches.
   #
   # gcDelay: 24h. zot GC prunes a tag from the repo index when its child
   # manifests are not in storage yet (the normal state right after an
@@ -59,6 +63,19 @@ data:
             },
             {
               "urls": ["https://cgr.dev"],
+              "content": [
+                {
+                  "destination": "",
+                  "prefix": "**"
+                }
+              ],
+              "onDemand": true,
+              "tlsVerify": true,
+              "maxRetries": 3,
+              "retryDelay": "1m"
+            },
+            {
+              "urls": ["https://registry-1.docker.io"],
               "content": [
                 {
                   "destination": "",
