@@ -204,27 +204,12 @@ spec:
             - port: "443"
               protocol: TCP
 ---
-# mindwtr-mcp init container fetches build toolchain (gcc g++ make python3
-# linux-headers) via apk from dl-cdn.alpinelinux.org, then npm-installs
-# mindwtr-mcp from the npm registry, both over HTTPS. Scoped to the
-# mindwtr-mcp pod like the other per-app internet policies. DNS is already
-# allowed by allow-egress-dns.
-apiVersion: cilium.io/v2
-kind: CiliumNetworkPolicy
-metadata:
-  name: allow-egress-mindwtr-mcp
-  namespace: ai-system
-spec:
-  endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: mindwtr-mcp
-  egress:
-    - toEntities:
-        - world
-      toPorts:
-        - ports:
-            - port: "443"
-              protocol: TCP
+# (Removed) allow-egress-mindwtr-mcp: the mindwtr-mcp init container used to
+# apk-install a build toolchain and npm-install the package at pod start,
+# which needed world:443. The package is now baked into the
+# shrinedogg/mindwtr-mcp image and staged from a local emptyDir, so the pod
+# needs no world egress at all: DNS (allow-egress-dns) plus
+# allow-egress-to-mindwtr-cloud below cover everything it dials.
 ---
 # substrate atelet pulls sandbox container images in-process (its
 # memorypullcache via go-containerregistry) — the agent runtime image
