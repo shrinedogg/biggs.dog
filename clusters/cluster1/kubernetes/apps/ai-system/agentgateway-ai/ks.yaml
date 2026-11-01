@@ -6,8 +6,8 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    # agentgateway controller + AgentgatewayBackend CRD.
-    - name: agentgateway-crds
+    # agentgateway controller/data plane and AgentgatewayBackend CRD.
+    - name: agentgateway
     # ClusterSecretStore (onepassword-connect) for the ExternalSecret.
     - name: secretstore
   commonMetadata:
