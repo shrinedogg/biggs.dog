@@ -164,6 +164,10 @@ spec:
           env:
             - name: HF_HOME
               value: /models
+            # Persist torch.compile artifacts; the default ~/.cache/vllm is
+            # lost whenever the pod is replaced, forcing recompilation.
+            - name: VLLM_CACHE_ROOT
+              value: /models/.cache/vllm
             # Secures the OpenAI-compatible endpoint; kagent sends the same key.
             - name: VLLM_API_KEY
               valueFrom:
