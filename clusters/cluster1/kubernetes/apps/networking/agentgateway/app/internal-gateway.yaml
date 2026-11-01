@@ -50,21 +50,23 @@ spec:
     # address directly and rewrites the Host header to the IP form, so a
     # hostname-matched listener/route would never match; the hostname-less
     # listeners pair with hostname-less catch-all HTTPRoutes (model-actors,
-    # model-actors-glm) that accept any Host.
+    # model-actors-glm, model-actors-vllm) that accept any Host.
     #
     # Plain HTTP, no TLS: the substrate egress leg uses the system trust
     # store, and the in-cluster vLLM/embeddings ModelConfigs already run
     # plaintext http://. The Bearer token therefore travels in cleartext on
     # the pod network, consistent with the existing kagent-vllm key.
     #
-    # Two ports (not two hostnames) because Gateway API forbids two listeners
-    # on one port with overlapping hostnames and the existing listeners own
-    # *.biggs.dog on 80/443.
+    # Separate MiniMax, GLM, and local vLLM listeners use distinct ports (not
+    # hostnames) because Gateway API forbids two listeners on one port with
+    # overlapping hostnames and the existing listeners own *.biggs.dog on
+    # 80/443.
     #
     # kgateway syncs the LoadBalancer Service's ports from these listeners
-    # (port name listener-<name>; see the Service's ownerReference). 8443/8444
-    # therefore also appear on the .6.15 VIP — no WAN exposure: the UDM does
-    # not forward .6.15 at all (see the header note on the LAN-only guarantee).
+    # (port name listener-<name>; see the Service's ownerReference).
+    # 8443/8444/8445 therefore also appear on the .6.15 VIP — no WAN exposure:
+    # the UDM does not forward .6.15 at all (see the header note on the LAN-only
+    # guarantee).
     - name: model-actors-minimax
       port: 8443
       protocol: HTTP
@@ -73,6 +75,12 @@ spec:
           from: All
     - name: model-actors-glm
       port: 8444
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+    - name: model-actors-vllm
+      port: 8445
       protocol: HTTP
       allowedRoutes:
         namespaces:
