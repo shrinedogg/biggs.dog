@@ -16,6 +16,7 @@ spec:
   podTargetLabels:
     - gateway.networking.k8s.io/gateway-name
   podMetricsEndpoints:
-    - port: "15020"
+    # targetPort is numeric; port selects a container port by name.
+    - targetPort: 15020
       path: /metrics
       interval: 30s
