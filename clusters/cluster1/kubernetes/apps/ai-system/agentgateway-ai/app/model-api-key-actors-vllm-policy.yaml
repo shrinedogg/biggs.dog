@@ -1,0 +1,18 @@
+---
+# Strict client-token authentication for the local vLLM actor route. The
+# upstream vLLM credential remains separate in kagent-vllm.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: model-api-key-actors-vllm
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: model-actors-vllm
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      secretRef:
+        name: model-api-keys

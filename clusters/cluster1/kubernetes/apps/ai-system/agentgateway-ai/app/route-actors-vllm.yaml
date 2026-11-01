@@ -1,0 +1,31 @@
+---
+# In-cluster local vLLM route for kagent substrate actors.
+#
+# No hostnames on purpose: substrate egress rewrites the Host header to IP
+# form. This catch-all route pairs with the hostname-less model-actors-vllm
+# listener. Do not add Host-header overrides.
+#
+# Clients use http://internal-biggs-dog.networking.svc.cluster.local:8445/v1
+# and authenticate with model-api-keys. The gateway uses kagent-vllm upstream.
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: model-actors-vllm
+  namespace: ai-system
+spec:
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+      sectionName: model-actors-vllm
+  rules:
+    - backendRefs:
+        - name: vllm
+          group: agentgateway.dev
+          kind: AgentgatewayBackend
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      timeouts:
+        request: 600s
+        backendRequest: 600s
