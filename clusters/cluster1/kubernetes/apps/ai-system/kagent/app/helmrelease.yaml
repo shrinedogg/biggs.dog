@@ -84,10 +84,11 @@ spec:
         url: "http://grafana.observability:80"
         secretRef: kagent-grafana-mcp-token
     # ------------------------------------------------------------------
-    # Default model provider -> our in-cluster vLLM (OpenAI-compatible).
-    # The chart renders a ModelConfig named "default-model-config"
-    # (api.kagent.dev/v1alpha3) that the agents use. Pointing it at vLLM
-    # keeps everything local.
+    # Default model provider -> local vLLM through agentgateway
+    # (OpenAI-compatible). The chart renders a ModelConfig named
+    # "default-model-config" (api.kagent.dev/v1alpha3) that the agents use.
+    # The gateway route keeps model traffic local while centralizing routing,
+    # authentication, and telemetry.
     # ------------------------------------------------------------------
     providers:
       default: openAI
@@ -96,10 +97,10 @@ spec:
         # Must match vLLM's --served-model-name (not the HuggingFace weights
         # path -- see vllm/app/deployment.yaml for why they differ).
         model: "qwen 3.8 - local"
-        apiKeySecretRef: kagent-vllm
-        apiKeySecretKey: OPENAI_API_KEY
+        apiKeySecretRef: model-api-keys
+        apiKeySecretKey: editor
         config:
-          baseUrl: "http://vllm.ai-system.svc.cluster.local:8000/v1"
+          baseUrl: "http://internal-biggs-dog.networking.svc.cluster.local:8445/v1"
     # ------------------------------------------------------------------
     # Use the cluster's CNPG operator (cnpg-kagent) instead of a bundled
     # dev Postgres. The full connection URL (incl. password) comes from the
