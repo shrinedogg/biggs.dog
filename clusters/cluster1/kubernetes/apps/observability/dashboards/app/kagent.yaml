@@ -175,6 +175,36 @@ data:
             "defaults": { "unit": "short" }
           },
           "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "LLM Token Rate",
+          "description": "Tokens per second by requested model and token type across the internal agentgateway data plane.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (rate(agentgateway_gen_ai_client_token_usage_sum{namespace=\"networking\"}[5m]))", "legendFormat": "{{gen_ai_request_model}} {{gen_ai_token_type}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "LLM Token Volume (1h)",
+          "description": "One-hour token volume by requested model and token type across the internal agentgateway data plane.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (increase(agentgateway_gen_ai_client_token_usage_sum{namespace=\"networking\"}[1h]))", "legendFormat": "{{gen_ai_request_model}} {{gen_ai_token_type}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
         }
       ],
       "refresh": "30s",
@@ -198,5 +228,5 @@ data:
       "time": { "from": "now-6h", "to": "now" },
       "title": "Kagent",
       "uid": "kagent",
-      "version": 1
+      "version": 2
     }
