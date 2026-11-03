@@ -93,3 +93,23 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# cloudflare-ddns: public IPv4 discovery and Cloudflare API updates. DNS egress
+# is covered by allow-egress-dns above; no ingress or Kubernetes API access is
+# required by the CronJob.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: cloudflare-ddns
+  namespace: networking
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: cloudflare-ddns
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

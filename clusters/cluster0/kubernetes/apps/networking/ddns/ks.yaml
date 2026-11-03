@@ -1,7 +1,7 @@
 ---
-# Keeps home.biggs.dog -> current WAN IP. SUSPENDED indefinitely: nothing
-# consumes it (NetBird dropped 2026-09-06; the UDM's own VPN covers remote
-# access). Kept in-tree only as a ready-made option.
+# Keeps omni.biggs.dog -> current WAN IP so Omni remains reachable through
+# public DNS when cluster1's LAN resolver is unavailable. HTTPS uses cluster1's
+# wildcard Gateway; the UDM forwards TCP 8090/8100 directly to cluster0.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -20,6 +20,6 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 5m
-  suspend: true
+  suspend: false
   dependsOn:
     - name: secretstore

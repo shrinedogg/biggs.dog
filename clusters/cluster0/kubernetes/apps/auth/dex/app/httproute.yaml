@@ -6,8 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/name: dex
   annotations:
-    # LAN-only name: Cloudflare holds a MANUAL A record -> 192.168.2.31
-    # (public zone, private value; never port-forwarded).
+    # Public OIDC clients reach this cluster0-local hop through cluster1's
+    # wildcard-biggs-dog HTTPRoute and its TLS re-encrypting cluster0-dex backend.
 spec:
   hostnames:
     - dex.biggs.dog

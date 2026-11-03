@@ -39,13 +39,16 @@ spec:
                 capabilities:
                   drop: [ALL]
               env:
-                - name: CF_API_TOKEN
+                - name: CLOUDFLARE_API_TOKEN
                   valueFrom:
                     secretKeyRef:
                       name: cloudflare-api-token
                       key: api-token
                 - name: DOMAINS
-                  value: home.biggs.dog
+                  # A dedicated DNS-only record is required for omnictl and the
+                  # Omni Kubernetes proxy on TCP 8090/8100. Do not use the
+                  # Cloudflare-proxied wildcard for this hostname.
+                  value: omni.biggs.dog
                 - name: IP6_PROVIDER
                   value: none
                 - name: PROXIED

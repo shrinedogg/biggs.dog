@@ -7,9 +7,9 @@ metadata:
     app.kubernetes.io/name: omni
   annotations:
     agentgateway.dev/backend-protocol: "HTTPS"
-    # LAN-only name: Cloudflare holds a MANUAL A record -> 192.168.2.31
-    # (public zone, private value; never port-forwarded). cluster1's
-    # external-dns must NOT touch it.
+    # This remains the cluster0-local HTTPS hop. Public clients first reach
+    # cluster1's wildcard-biggs-dog HTTPRoute, which re-encrypts to this Gateway.
+    # Omni's dedicated public A record is maintained by networking/cloudflare-ddns.
 spec:
   hostnames:
     - omni.biggs.dog
