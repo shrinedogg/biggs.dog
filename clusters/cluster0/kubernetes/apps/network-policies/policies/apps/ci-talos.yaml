@@ -11,9 +11,27 @@
 #                         KERNEL_SRC_FALLBACK=0 default CI path) and the cgit
 #                         snapshot fallback (git.kernel.org, =1)
 #   - download.nvidia.com : the NVIDIA open .run installers (amd64)
+#   - proxy.golang.org  : Go module proxy for the imager and
+#                         nvidia-persistenced-wrapper `go mod download` steps
+#   - sum.golang.org    : the default Go checksum database (GOSUMDB), queried
+#                         when a go.sum entry is missing; not hit in run
+#                         41656613729 (go.sum complete) but carried with the
+#                         proxy so a future go.sum drift stalls no run
+#   - zlib.net          : zlib source tarball for the zfs-tools/zlib stage,
+#                         pinned by siderolabs/extensions v1.14.5
+#                         (storage/zfs/zfs-tools/zlib/pkg.yaml)
+#   - archive.ubuntu.com: libtirpc source tarball, pinned by
+#                         siderolabs/extensions v1.14.5
+#                         (storage/libs/libtirpc/pkg.yaml)
+#   - apk.cgr.dev       : Chainguard APK repository for the bldr apk-install
+#                         steps of the extension images
 #
 # The allowlist is iterated per observed pull (matching the ci.yaml policy
 # history): if the first CI run is blocked on another host, add it here.
+# 2026-11-03: runs 41053683918 and 41656613729 (push main) failed on
+# dial-tcp timeouts to the five hosts above (curl probe from the runner
+# pod: exit 28, no HTTP status = policy block; every other build host
+# already allowed returns an HTTP status).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -27,6 +45,11 @@ spec:
     - toFQDNs:
         - matchPattern: "*.kernel.org"
         - matchName: download.nvidia.com
+        - matchName: proxy.golang.org
+        - matchName: sum.golang.org
+        - matchName: zlib.net
+        - matchName: archive.ubuntu.com
+        - matchName: apk.cgr.dev
       toPorts:
         - ports:
             - port: "443"
