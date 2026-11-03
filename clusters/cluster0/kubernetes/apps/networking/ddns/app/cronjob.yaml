@@ -54,7 +54,7 @@ spec:
                 - name: PROXIED
                   value: "false"
                 - name: UPDATE_CRON
-                  value: "@never"   # CronJob owns the schedule
+                  value: "@once"   # CronJob owns the schedule; each pod runs once
               resources:
                 requests:
                   cpu: 10m
