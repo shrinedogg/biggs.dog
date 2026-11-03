@@ -45,10 +45,11 @@ spec:
                       name: cloudflare-api-token
                       key: api-token
                 - name: DOMAINS
-                  # A dedicated DNS-only record is required for omnictl and the
-                  # Omni Kubernetes proxy on TCP 8090/8100. Do not use the
-                  # Cloudflare-proxied wildcard for this hostname.
-                  value: omni.biggs.dog
+                  # Keep the existing proxied wildcard's origin current and
+                  # maintain a dedicated DNS-only Omni record for omnictl and
+                  # the Kubernetes proxy on TCP 8090/8100. Existing records
+                  # retain their current Cloudflare proxy status.
+                  value: "*.biggs.dog,omni.biggs.dog"
                 - name: IP6_PROVIDER
                   value: none
                 - name: PROXIED

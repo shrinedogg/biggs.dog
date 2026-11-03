@@ -1,7 +1,8 @@
 ---
-# Keeps omni.biggs.dog -> current WAN IP so Omni remains reachable through
-# public DNS when cluster1's LAN resolver is unavailable. HTTPS uses cluster1's
-# wildcard Gateway; the UDM forwards TCP 8090/8100 directly to cluster0.
+# Keeps the public wildcard and omni.biggs.dog -> current WAN IP so Omni
+# remains reachable through public DNS when cluster1's LAN resolver is down.
+# HTTPS uses cluster1's wildcard Gateway; the UDM forwards TCP 8090/8100
+# directly to cluster0.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
