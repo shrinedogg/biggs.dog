@@ -1,8 +1,8 @@
 ---
-# Kagent dashboard — AgentGateway + kagent MCP agent orchestration.
-# Uses kube-state-metrics, cadvisor, and kubelet PVC metrics.
-# No native Prometheus metrics scraped for AgentGateway, so focuses on
-# pod health, resource usage, and agent orchestration tracking.
+# kagent dashboard: agentgateway + kagent MCP agent orchestration.
+# Pod health and resource metrics come from kube-state-metrics and cAdvisor.
+# LLM token metrics come from the agentgateway VMPodScrape in
+# networking/agentgateway.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -16,7 +16,7 @@ data:
   kagent.json: |
     {
       "annotations": { "list": [] },
-      "description": "Kagent AgentGateway — pod health, resource usage, agent orchestration.",
+      "description": "kagent and agentgateway in ai-system: pod health, resource usage, agent orchestration, and LLM routing telemetry.",
       "editable": true,
       "graphTooltip": 1,
       "links": [],
@@ -28,7 +28,7 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "count(kube_pod_status_phase{namespace=\"kagent\", phase=\"Running\"} == 1)", "legendFormat": "Running", "refId": "A" }
+            { "expr": "count(kube_pod_status_phase{namespace=\"ai-system\", phase=\"Running\"} == 1)", "legendFormat": "Running", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
@@ -42,7 +42,7 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "count(kube_pod_status_ready{namespace=\"kagent\", condition=\"true\"} == 0)", "legendFormat": "Not Ready", "refId": "A" }
+            { "expr": "count(kube_pod_status_ready{namespace=\"ai-system\", condition=\"true\"} == 0)", "legendFormat": "Not Ready", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "red", "value": 1 } ] } }
@@ -56,7 +56,7 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"kagent\"}[24h]))", "legendFormat": "Restarts", "refId": "A" }
+            { "expr": "sum(increase(kube_pod_container_status_restarts_total{namespace=\"ai-system\"}[24h]))", "legendFormat": "Restarts", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short", "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "yellow", "value": 1 }, { "color": "red", "value": 5 } ] } }
@@ -71,7 +71,7 @@ data:
           "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "(time() - kube_pod_created{namespace=\"kagent\"}) / 86400", "legendFormat": "{{pod}}", "refId": "A" }
+            { "expr": "(time() - kube_pod_created{namespace=\"ai-system\"}) / 86400", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "d" }
@@ -85,7 +85,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kagent\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
+            { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"ai-system\", container!=\"\", container!=\"POD\"}[5m]))", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
@@ -99,7 +99,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"kagent\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
+            { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"ai-system\", container!=\"\", container!=\"POD\"})", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "bytes", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
@@ -114,7 +114,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"kagent\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"kagent\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
+            { "expr": "100 * sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"ai-system\", container!=\"\", container!=\"POD\"}[5m])) / clamp_min(sum by (pod) (kube_pod_container_resource_requests{namespace=\"ai-system\", resource=\"cpu\"}), 0.001)", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": {
@@ -133,7 +133,7 @@ data:
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"kagent\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"kagent\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}}", "refId": "A" }
+            { "expr": "100 * sum by (pod) (container_memory_working_set_bytes{namespace=\"ai-system\", container!=\"\", container!=\"POD\"}) / clamp_min(sum by (pod) (kube_pod_container_resource_limits{namespace=\"ai-system\", resource=\"memory\"}), 1)", "legendFormat": "{{pod}}", "refId": "A" }
           ],
           "fieldConfig": {
             "defaults": {
@@ -152,8 +152,8 @@ data:
           "gridPos": { "h": 4, "w": 12, "x": 0, "y": 16 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "kube_deployment_spec_replicas{namespace=\"kagent\"}", "legendFormat": "Desired - {{deployment}}", "refId": "A" },
-            { "expr": "kube_deployment_status_replicas_available{namespace=\"kagent\"}", "legendFormat": "Available - {{deployment}}", "refId": "B" }
+            { "expr": "kube_deployment_spec_replicas{namespace=\"ai-system\"}", "legendFormat": "Desired - {{deployment}}", "refId": "A" },
+            { "expr": "kube_deployment_status_replicas_available{namespace=\"ai-system\"}", "legendFormat": "Available - {{deployment}}", "refId": "B" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] } }
@@ -168,13 +168,43 @@ data:
           "gridPos": { "h": 4, "w": 12, "x": 12, "y": 16 },
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
-            { "expr": "kube_statefulset_replicas{namespace=\"kagent\"}", "legendFormat": "Desired - {{statefulset}}", "refId": "A" },
-            { "expr": "kube_statefulset_status_replicas{namespace=\"kagent\"}", "legendFormat": "Current - {{statefulset}}", "refId": "B" }
+            { "expr": "kube_statefulset_replicas{namespace=\"ai-system\"}", "legendFormat": "Desired - {{statefulset}}", "refId": "A" },
+            { "expr": "kube_statefulset_status_replicas{namespace=\"ai-system\"}", "legendFormat": "Current - {{statefulset}}", "refId": "B" }
           ],
           "fieldConfig": {
             "defaults": { "unit": "short" }
           },
           "options": { "colorMode": "value", "graphMode": "area", "reduceOptions": { "calcs": ["lastNotNull"] }, "textMode": "value" }
+        },
+        {
+          "id": 11,
+          "type": "timeseries",
+          "title": "LLM Token Rate",
+          "description": "Tokens per second by requested model and token type across the internal agentgateway data plane.",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (rate(agentgateway_gen_ai_client_token_usage_sum{namespace=\"networking\"}[5m]))", "legendFormat": "{{gen_ai_request_model}} {{gen_ai_token_type}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
+        },
+        {
+          "id": 12,
+          "type": "timeseries",
+          "title": "LLM Token Volume (1h)",
+          "description": "One-hour token volume by requested model and token type across the internal agentgateway data plane.",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 20 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            { "expr": "sum by (gen_ai_request_model, gen_ai_token_type) (increase(agentgateway_gen_ai_client_token_usage_sum{namespace=\"networking\"}[1h]))", "legendFormat": "{{gen_ai_request_model}} {{gen_ai_token_type}}", "refId": "A" }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "min": 0, "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "lineWidth": 2, "fillOpacity": 10 } }
+          },
+          "options": { "legend": { "calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "right", "showLegend": true } }
         }
       ],
       "refresh": "30s",
@@ -198,5 +228,5 @@ data:
       "time": { "from": "now-6h", "to": "now" },
       "title": "Kagent",
       "uid": "kagent",
-      "version": 1
+      "version": 2
     }

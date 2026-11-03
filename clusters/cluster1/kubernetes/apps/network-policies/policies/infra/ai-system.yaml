@@ -290,7 +290,7 @@ spec:
 # that carries egress for every ai-system actor. Tightest form: only the
 # internal-biggs-dog data plane pods in networking, matched by gateway-name
 # (NOT gateway-class-name — the WAN gateway wildcard-biggs-dog must stay
-# unreachable from the actors), and only the two actor ports. No world egress
+# unreachable from the actors), and only the actor model ports. No world egress
 # is granted; this is the only new egress destination for app=atenet-egress.
 #
 # No ingress/return-path rule is added to this file: the ClusterIP
@@ -319,6 +319,8 @@ spec:
             - port: "8443"
               protocol: TCP
             - port: "8444"
+              protocol: TCP
+            - port: "8445"
               protocol: TCP
 ---
 # kagent MCP server exposed via the kagent-mcp.biggs.dog HTTPRoute

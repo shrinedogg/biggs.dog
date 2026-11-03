@@ -1,0 +1,24 @@
+---
+# AI-aware backend for the local OpenAI-compatible vLLM endpoint. The upstream
+# Service is plaintext, so no TLS block is configured. The gateway authenticates
+# with the existing kagent-vllm credential; actors never receive that key.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayBackend
+metadata:
+  name: vllm
+  namespace: ai-system
+spec:
+  ai:
+    provider:
+      openai: {}
+      host: vllm.ai-system.svc.cluster.local
+      port: 8000
+  policies:
+    auth:
+      secretRef:
+        name: kagent-vllm
+    ai:
+      routes:
+        "/v1/chat/completions": "Completions"
+        "/v1/models": "Passthrough"
+        "*": "Passthrough"

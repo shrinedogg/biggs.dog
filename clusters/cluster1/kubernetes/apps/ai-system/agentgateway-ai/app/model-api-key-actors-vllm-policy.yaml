@@ -1,0 +1,28 @@
+---
+# Strict client-token authentication + request-rate bound for the local vLLM
+# actor route. The upstream vLLM credential remains separate in kagent-vllm.
+apiVersion: agentgateway.dev/v1alpha1
+kind: AgentgatewayPolicy
+metadata:
+  name: model-api-key-actors-vllm
+  namespace: ai-system
+spec:
+  targetRefs:
+    - group: gateway.networking.k8s.io
+      kind: HTTPRoute
+      name: model-actors-vllm
+  traffic:
+    apiKeyAuthentication:
+      mode: Strict
+      secretRef:
+        name: model-api-keys
+    # Same per-proxy bound as the hosted actor routes (model-api-key-actors,
+    # model-api-key-actors-glm). No spend risk on the local backend, but a
+    # leaked token or a runaway actor loop would still saturate the shared
+    # GPU for all consumers. Local rate limits are per proxy replica, not a
+    # global budget.
+    rateLimit:
+      local:
+        - requests: 120
+          unit: Minutes
+          burst: 40

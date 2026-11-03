@@ -13,6 +13,8 @@ spec:
     - name: agent-sandbox
     # The local model endpoint + shared API key secret must be ready.
     - name: vllm
+    # The default ModelConfig's gateway backend and actor route must be ready.
+    - name: agentgateway-ai
     # The substrate control plane (ate-api-server) must be up before the
     # controller's substrate wiring (KAGENT_SUBSTRATE_ATE_API_ENDPOINT) and
     # the kagent-default WorkerPool CR it creates.
