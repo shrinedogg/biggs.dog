@@ -22,12 +22,12 @@ data:
   #               applies to docker.io, so this is what the runner's
   #               /etc/docker daemon.json mirror actually caches.
   #
-  # gcDelay: 24h. zot GC prunes a tag from the repo index when its child
-  # manifests are not in storage yet (the normal state right after an
-  # on-demand manifest sync, before layers are pulled) and deletes
-  # orphaned blobs after gcDelay. 24h keeps evicted-but-recent blobs
-  # around so a pruned tag re-syncs the manifest only (blobs stay local),
-  # while the 30Gi PVC still reclaims genuinely abandoned content.
+  # gcDelay: 24h. Since v2.1.23 GC keeps a sparse index whose child manifests
+  # are not in storage yet until the index blob itself is older than gcDelay
+  # (previously the tag was pruned as soon as children were missing and
+  # re-synced manifest-only on the next pull), and deletes orphaned blobs
+  # after gcDelay. 24h keeps evicted-but-recent blobs around while the 30Gi
+  # PVC still reclaims genuinely abandoned content.
   #
   # http.compat docker2s2: part of the pkgs build graph (e.g.
   # siderolabs/stagex/* stage images) still ships legacy Docker media
