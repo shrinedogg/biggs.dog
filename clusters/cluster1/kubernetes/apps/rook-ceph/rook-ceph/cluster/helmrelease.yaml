@@ -40,15 +40,36 @@ spec:
           rbdMirrorPeer:
             keyRotationPolicy: KeyGeneration
             keyGeneration: 2
-      # mon b is pinned to control-01 (Rook node assignment), which carries
-      # the control-plane NoSchedule taint; without this toleration the mon
-      # pod stays Pending and blocks cephx rotation (EBUSY mon stop checks).
+      # Control plane hosts no rook-ceph daemons (decision 2026-11-04).
+      # Previously mon b was pinned to control-01 via a CP taint toleration
+      # here; when control-01 was cordoned for the v1.14.5 upgrade, mon-b
+      # could not reschedule, quorum fell to a+d, and the operator held
+      # rook-ceph-mon-pdb at maxUnavailable=0, stalling worker drains.
+      # mons, mgr and osd placement now exclude the control plane; the four
+      # workers carry all Ceph state (one mon per node, allowMultiplePerNode:
+      # false, storage.nodes worker-only).
       placement:
         mon:
-          tolerations:
-            - key: node-role.kubernetes.io/control-plane
-              operator: Exists
-              effect: NoSchedule
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: DoesNotExist
+        mgr:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: DoesNotExist
+        osd:
+          nodeAffinity:
+            requiredDuringSchedulingIgnoredDuringExecution:
+              nodeSelectorTerms:
+                - matchExpressions:
+                    - key: node-role.kubernetes.io/control-plane
+                      operator: DoesNotExist
       cephConfig:
         global:
           bdev_enable_discard: "true" # quote
