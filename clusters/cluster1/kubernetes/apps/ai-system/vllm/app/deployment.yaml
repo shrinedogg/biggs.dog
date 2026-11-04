@@ -44,9 +44,9 @@ spec:
       terminationGracePeriodSeconds: 10
       containers:
         - name: vllm
-          # Untagged variant = CUDA 13.0 default build (append -cu129 for the
-          # CUDA 12.9 build); both support the 5090 (Blackwell, sm_120).
-          image: docker.io/vllm/vllm-openai:v0.32.0
+          # Untagged variant = CUDA 13.0 build (v0.33.0 dropped the -cu129
+          # CUDA 12.9 images entirely); supports the 5090 (Blackwell, sm_120).
+          image: docker.io/vllm/vllm-openai:v0.33.0
           args:
             # ----------------------------------------------------------------
             # MODEL: Alibaba's official FP8 (W8A8, dynamic activation scaling)
