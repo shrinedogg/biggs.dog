@@ -50,6 +50,20 @@ spec:
       # false, storage.nodes worker-only).
       placement:
         mon:
+          # Never schedule a mon on the control plane node. Two walls:
+          # nodeAffinity excludes nodes carrying the control-plane role
+          # label; the required podAntiAffinity below additionally blocks
+          # any node running the control-plane static pods (anchored on
+          # component=kube-apiserver, which runs only on control-01), so a
+          # stale per-mon nodeSelector pin to the CP fails scheduling
+          # explicitly instead of sitting Pending.
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - labelSelector:
+                    matchLabels:
+                      component: kube-apiserver
+                  topologyKey: kubernetes.io/hostname
           nodeAffinity:
             requiredDuringSchedulingIgnoredDuringExecution:
               nodeSelectorTerms:
