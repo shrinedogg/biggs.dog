@@ -37,10 +37,19 @@ spec:
               labelSelector:
                 matchLabels:
                   app.kubernetes.io/name: k8s-gateway
-    # Chart 4.x defaults to 100m/128Mi CPU/memory; the live 3.x release has none.
-    # Keep the no-limits behavior: CFS-throttling a LAN-wide DNS authority during
-    # a query burst is exactly what the fallthrough design cannot afford.
-    resources: {}
+    # Chart 4.x defaults to 100m/128Mi CPU/memory limits AND requests; the
+    # live 3.x release has none. `resources: {}` does NOT clear them -- Helm's
+    # value coalescing merges the chart defaults back into an empty map. Null
+    # each key to keep the no-limits behavior: CFS-throttling a LAN-wide DNS
+    # authority during a query burst is exactly what the fallthrough design
+    # cannot afford.
+    resources:
+      limits:
+        cpu: null
+        memory: null
+      requests:
+        cpu: null
+        memory: null
     # The server listens on container port 1053, so it can run fully non-root
     # with no added capabilities (NET_BIND_SERVICE is not required).
     podSecurityContext:
