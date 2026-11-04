@@ -105,6 +105,17 @@ spec:
             - name: uwu-port
               containerPort: 8080
               protocol: TCP
+          # First-run DB migrations (2026-10-30 build and later) run before the
+          # HTTP listener opens, so probes see a dead port while a migration is
+          # in flight; a liveness kill mid-migration loops the pod because the
+          # run-once marker only writes on completion. This budget
+          # (60 x 10s = 10m) keeps the other probes off until startup finishes;
+          # ks.yaml timeout is raised to cover it.
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 60
           readinessProbe:
             tcpSocket:
               port: 8080
