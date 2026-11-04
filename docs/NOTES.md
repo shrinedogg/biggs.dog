@@ -282,7 +282,7 @@ These five are currently `ACCEPTED=False` / `READY=False` (`ReconcileFailed`, si
 
 There are two sandboxing mechanisms deployed in `ai-system`:
 
-1. **SIG-Apps `Sandbox` CRD + controller** (`agents.x-k8s.io`, GitRepository ref `v1.0.0` with `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks`. All classic agents are configured with code execution enabled.
+1. **SIG-Apps `Sandbox` CRD + controller** (`agents.x-k8s.io`, GitRepository ref `v1.0.9` with `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks`. All classic agents are configured with code execution enabled.
 2. **kagent substrate runtime (ATE / actor runtime)** - a separate control plane for sandboxed code execution via **gVisor**, used by `kind: SandboxAgent` CRs. See [Substrate Runtime](#substrate-runtime) below.
 
 **Two hard requirements**:
