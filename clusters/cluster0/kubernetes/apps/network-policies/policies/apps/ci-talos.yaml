@@ -25,6 +25,12 @@
 #                         (storage/libs/libtirpc/pkg.yaml)
 #   - apk.cgr.dev       : Chainguard APK repository for the bldr apk-install
 #                         steps of the extension images
+#   - *.r2.cloudflarestorage.com: Cloudflare R2 presigned object store.
+#                         apk.cgr.dev answers .apk requests with a 303
+#                         redirect to a presigned R2 URL, so the second hop
+#                         must be allowed separately. Without it, `apk add`
+#                         hangs ~120s per package then fails EACCES (run
+#                         41656613729 attempts 2-3, 2026-11-03/04)
 #
 # The allowlist is iterated per observed pull (matching the ci.yaml policy
 # history): if the first CI run is blocked on another host, add it here.
@@ -50,6 +56,7 @@ spec:
         - matchName: zlib.net
         - matchName: archive.ubuntu.com
         - matchName: apk.cgr.dev
+        - matchPattern: "*.r2.cloudflarestorage.com"
       toPorts:
         - ports:
             - port: "443"
