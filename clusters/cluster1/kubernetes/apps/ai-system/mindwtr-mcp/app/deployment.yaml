@@ -124,7 +124,7 @@ spec:
         # answers initialize without a cold child spawn, so kagent registers
         # tools cleanly (see codebase-memory-mcp deployment comments).
         - name: server
-          image: ghcr.io/sparfenyuk/mcp-proxy:v0.13.0
+          image: ghcr.io/sparfenyuk/mcp-proxy:v0.14.0
           imagePullPolicy: IfNotPresent
           # The image ENTRYPOINT is ["catatonit","--"] with CMD ["mcp-proxy"].
           # catatonit execs mcp-proxy (CMD) and appends these args. mcp-proxy's
@@ -137,6 +137,13 @@ spec:
             - --port=8080
             - --transport=streamablehttp
             - --pass-environment
+            # v0.13.3+ validates the Host header on a wildcard bind; the
+            # kagent RemoteMCPServer client connects by cluster DNS, so the
+            # authorities it uses must be allow-listed explicitly (otherwise
+            # every MCP request is answered 421 while the tcpSocket probes
+            # keep the pod Ready).
+            - --allowed-host=mindwtr-mcp.ai-system:8080
+            - --allowed-host=mindwtr-mcp.ai-system
             - --
             - /staged/bin/node
             - /staged/node_modules/mindwtr-mcp/dist/index.js

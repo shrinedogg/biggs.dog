@@ -388,13 +388,20 @@ spec:
         # copied glibc loader and serves it at /mcp. This is the only network
         # endpoint; the cbm binary itself listens on nothing.
         - name: server
-          image: ghcr.io/sparfenyuk/mcp-proxy:v0.13.0
+          image: ghcr.io/sparfenyuk/mcp-proxy:v0.14.0
           imagePullPolicy: IfNotPresent
           args:
             - --host=0.0.0.0
             - --port=8080
             - --transport=streamablehttp
             - --pass-environment
+            # v0.13.3+ validates the Host header on a wildcard bind; the
+            # kagent RemoteMCPServer client connects by cluster DNS, so the
+            # authorities it uses must be allow-listed explicitly (otherwise
+            # every MCP request is answered 421 while the tcpSocket probes
+            # keep the pod Ready).
+            - --allowed-host=codebase-memory-mcp.ai-system:8080
+            - --allowed-host=codebase-memory-mcp.ai-system
             - --
             # The binary is patchelf'd (INTERP -> staged loader, RPATH ->
             # /opt/cbm/lib, where the libs are staged FLAT), so it execs
