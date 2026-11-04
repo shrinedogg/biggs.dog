@@ -33,7 +33,7 @@ spec:
                     values:
                       - worker-01
       containers:
-        - image: ghcr.io/continuwuity/continuwuity:main@sha256:42e80046f72efabeeb51206ba8cc6b0c4e4d5d97043ed017810da525fbd76298
+        - image: ghcr.io/continuwuity/continuwuity:main@sha256:f3a3c5dbeb930d505433882d1a4dedfe2e24ce9e319eb2d5dc3455a0ae6f946f
           imagePullPolicy: Always
           name: continuwuity
           env:
@@ -105,6 +105,17 @@ spec:
             - name: uwu-port
               containerPort: 8080
               protocol: TCP
+          # First-run DB migrations (2026-10-30 build and later) run before the
+          # HTTP listener opens, so probes see a dead port while a migration is
+          # in flight; a liveness kill mid-migration loops the pod because the
+          # run-once marker only writes on completion. This budget
+          # (60 x 10s = 10m) keeps the other probes off until startup finishes;
+          # ks.yaml timeout is raised to cover it.
+          startupProbe:
+            tcpSocket:
+              port: 8080
+            periodSeconds: 10
+            failureThreshold: 60
           readinessProbe:
             tcpSocket:
               port: 8080

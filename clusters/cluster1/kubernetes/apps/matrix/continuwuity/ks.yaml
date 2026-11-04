@@ -16,4 +16,6 @@ spec:
   wait: true
   interval: 3m
   retryInterval: 1m
-  timeout: 2m
+  # 15m: covers the startupProbe budget (10m) for first-run DB migrations
+  # plus rollout settle time.
+  timeout: 15m
