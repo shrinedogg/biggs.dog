@@ -155,12 +155,6 @@
       "enabled": false
     },
     {
-      "description": "Do NOT track ghcr.io/silo-server/silo-server. Upstream #3319 (2026-10-31, c3115d4) repointed latest/build-N/commit tags at the omnibus image (ENTRYPOINT /init, PUID 911, /var/lib/silo -> /config/silo), which the media/silo deployment (root, drop ALL caps) cannot run: re-resolving latest lands an omnibus digest and the pod crash-loops on the Recreate rollout (P0 on PRs #695/#708). The pin in apps/media/silo/app/silo-deployment.yaml is the last pre-omnibus base build (build-1874, upstream 7ee9615f) and is manual. Remove this rule only after a deliberate omnibus-migration PR reworks that manifest (entrypoint/caps/PUID, /config volume, media readability for the silo uid, one-time re-ownership of silo-data).",
-      "matchDatasources": ["docker"],
-      "matchPackageNames": ["ghcr.io/silo-server/silo-server"],
-      "enabled": false
-    },
-    {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
