@@ -30,9 +30,18 @@ spec:
       containers:
         - name: silo
           # Pre-1.0: the `latest` tag moves, so pin the image index digest for
-          # deterministic rollouts. To update, re-resolve the latest index
-          # digest (docker-content-digest header) and bump it here.
-          image: ghcr.io/silo-server/silo-server:latest@sha256:c7b19fe7db6588d6e63c92d08a140c1566b6f94206a84fae1a14f8bec521bad5
+          # deterministic rollouts. This pin is MANUAL and must not be
+          # re-resolved from latest: upstream #3319 (2026-10-31, c3115d4)
+          # repointed latest/build-N/commit tags at the omnibus image
+          # (ENTRYPOINT /init, PUID 911, /var/lib/silo -> /config/silo), which
+          # this deployment (root, drop ALL caps) cannot run, so an omnibus
+          # digest crash-loops the pod on the Recreate rollout. Pinned at the
+          # last pre-omnibus base build (build-1874, upstream 7ee9615f).
+          # ghcr.io/silo-server/silo-server is excluded in renovate.json until
+          # a deliberate omnibus-migration PR reworks this manifest
+          # (entrypoint/caps/PUID, /config volume, media readability for the
+          # silo uid, one-time re-ownership of silo-data).
+          image: ghcr.io/silo-server/silo-server:latest@sha256:822d85129c35f50a74b36413df0737f12102292c1c85ce88748e002415a4bbc2
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
