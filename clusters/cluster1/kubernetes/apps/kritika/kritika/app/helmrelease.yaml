@@ -9,9 +9,10 @@
 # Postgres: external, CNPG cluster cnpg-kritika (3 instances, host-path,
 # PG 18 + VectorChord) - see
 # clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/cnpg-kritika.yaml.
-# The chart reads only the `uri` key of three basic-auth Secrets rendered by
+# The chart reads only the `uri` key of two basic-auth Secrets rendered by
 # app/external-secrets.yaml (1Password items kritika-user-password,
-# kritika-app-password, kritika-runner-password).
+# kritika-app-password). Since chart 0.0.116 the runner holds no database
+# credential.
 #
 # Serve env (admin password, OpenRouter key, GitHub App private key + webhook
 # secret) comes from the kritika-credentials ExternalSecret (1Password items
@@ -49,15 +50,16 @@ spec:
       # the fallback when the chart ships no digest.
       tag: "0.0.90"
     database:
-      # Three basic-auth Secrets in this namespace, each with username /
+      # Two basic-auth Secrets in this namespace, each with username /
       # password / uri keys, rendered by app/external-secrets.yaml. The chart
-      # reads only the `uri` key.
+      # reads only the `uri` key. Since chart 0.0.116 (breaking) the chart
+      # no longer takes database.runner: runners report through the serve
+      # gateway and hold no database credential, so the
+      # kritika-postgres-runner ExternalSecret was removed with it.
       owner:
         existingSecret: kritika-postgres-credentials
       app:
         existingSecret: kritika-postgres-app
-      runner:
-        existingSecret: kritika-postgres-runner
     config:
       webUrl: https://kritika.biggs.dog
       auth:
@@ -127,8 +129,10 @@ spec:
       egressPorts:
         - 443
         - 8000
-      # Postgres lives in cnpg-system, NOT the release namespace: the runner
-      # policy must name its pods or every run fails to connect (database.md).
+      # Postgres lives in cnpg-system, NOT the release namespace: this
+      # selector scopes the kritika serve pods' Postgres egress. Since chart
+      # 0.0.116 the runner policy opens no Postgres egress at all — runners
+      # report through the serve gateway and hold no database credential.
       postgres:
         namespace: cnpg-system
         podSelector:
