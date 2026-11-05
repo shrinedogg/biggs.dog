@@ -8,4 +8,9 @@ spec:
   interval: 1h
   url: oci://ghcr.io/agentgateway/charts/agentgateway-crds
   ref:
-    tag: "0.0.0-alpha.a655af15"
+    # Bumped 0.0.0-alpha.a655af15 -> v1.7.0 for the 1.x train cutover
+    # (issues #745/#747). Additive: adds the agentgatewaymodels CRD; all
+    # fields biggs.dog uses are unchanged. Safe for the legacy v2.2.1
+    # controller (same v1alpha1, superset schema) and safe to keep during
+    # any controller rollback. See docs/agentgateway-1x-migration/02.
+    tag: "v1.7.0"
