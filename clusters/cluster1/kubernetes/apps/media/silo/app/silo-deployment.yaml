@@ -70,6 +70,10 @@ spec:
               add:
                 - CHOWN
                 - FOWNER
+                # DAC_READ_SEARCH: root without CAP_DAC_OVERRIDE gets EACCES
+                # traversing the 0700 root-owned plugin install-<n> dirs (see
+                # #735); read/search bypass only, no DAC_OVERRIDE.
+                - DAC_READ_SEARCH
           resources:
             requests:
               cpu: 100m
