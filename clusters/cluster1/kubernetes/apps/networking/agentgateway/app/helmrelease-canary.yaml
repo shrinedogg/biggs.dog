@@ -28,6 +28,12 @@ spec:
     name: agentgateway-canary
     namespace: flux-system
   interval: 3m
+  # Long post-install health-check window: the first install attempt stalled
+  # (RetriesExceeded) when the canary controller crash-looped on a missing
+  # Cilium egress allow (fixed in #758) and its Deployment health check
+  # timed out. Bumping the spec re-triggers the install; 10m also covers the
+  # slow first pulls of the v1.7.0 images.
+  timeout: 10m
   values:
     # Multi-controller identity: separate from the legacy class so both
     # controllers can reconcile in the same cluster.
