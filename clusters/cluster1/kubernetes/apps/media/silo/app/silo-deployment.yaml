@@ -91,9 +91,14 @@ spec:
           # #3319, 2026-10-31, c3115d4): ENTRYPOINT is the s6-overlay /init,
           # so pid 1 MUST start as root - do NOT add runAsUser/runAsNonRoot,
           # either one stops /init. s6 then drops the silo SERVICE process to
-          # PUID/PGID 911. Keep allowPrivilegeEscalation:false + drop ALL:
-          # svc-silo falls back cleanly when it cannot grant NET_ADMIN, and
-          # the stage-1 init scripts need no capabilities.
+          # PUID/PGID 911. Keep allowPrivilegeEscalation:false + drop ALL,
+          # but add CHOWN/FOWNER/SETUID/SETGID: the /init stage-1 scripts
+          # need them (verified against build-1969, #737) - usermod -aG
+          # rewrites /etc/gshadow (CHOWN), s6-applyuidgid setgroups before
+          # the uid drop (SETGID/SETUID), install/chown own the service
+          # dirs (CHOWN/FOWNER). s6 then drops every service to its own
+          # account and no_new_privs bars re-acquisition, so the silo
+          # process (911) holds none of these in its effective set.
           # Inside the image /var/lib/silo is a symlink to /config/silo, so
           # silo-data is mounted at /config (never at /var/lib/silo, which
           # would shadow the symlink): the ownership marker
@@ -108,6 +113,11 @@ spec:
             capabilities:
               drop:
                 - ALL
+              add:
+                - CHOWN
+                - FOWNER
+                - SETUID
+                - SETGID
           ports:
             - containerPort: 8080
               name: web
