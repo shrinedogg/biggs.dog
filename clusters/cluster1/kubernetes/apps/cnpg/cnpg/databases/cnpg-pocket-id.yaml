@@ -32,15 +32,14 @@ spec:
       max_parallel_maintenance_workers: "2"
       # bound WAL retention from replication slots (was uncapped; pg_wal grew to 49 GB)
       max_slot_wal_keep_size: "1GB"
-      # hints force full-page writes for every changed page (was on; not needed here)
-      wal_log_hints: "off"
+      # CNPG requires wal_log_hints=on when instances > 1 (safe failover/basebackup);
+      # the operator also sets it by default, so keep it explicit and at the required value
+      wal_log_hints: "on"
       # let standbys apply WAL promptly instead of buffering to 30 min
       max_standby_streaming_delay: "30s"
       # do not pin full-page images for standby snapshots; CNPG rebuilds a standby
       # from basebackup when it needs to resync
       hot_standby_feedback: "off"
-      # after crash recovery, exit instead of retrying forever in a tight loop
-      restart_after_crash: "on"
   storage:
     storageClass: host-path
     size: 5Gi
