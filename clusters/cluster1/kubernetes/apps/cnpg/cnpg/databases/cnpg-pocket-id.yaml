@@ -9,6 +9,10 @@ spec:
   # Re-enable after API readiness, CNPG recovery, and replication are verified.
   enablePDB: false
   failoverDelay: 60
+  # a 1h startDelay/switchoverDelay is what slowed the failover in the
+  # 2026-11-04 incident (incident item 5): drop both to 5min
+  startDelay: 300
+  switchoverDelay: 300
   primaryUpdateMethod: switchover
   bootstrap:
     initdb:
@@ -32,6 +36,13 @@ spec:
       max_parallel_maintenance_workers: "2"
       # bound WAL retention from replication slots (was uncapped; pg_wal grew to 49 GB)
       max_slot_wal_keep_size: "1GB"
+      # the HA slots already bound retention, so drop the per-instance WAL keep
+      # window (the 512MB operator default was redundant and a contributor to
+      # the pg_wal growth; incident item 3)
+      wal_keep_size: "0"
+      # force an archive attempt every 60s instead of the 5min operator default
+      # (incident item 3)
+      archive_timeout: "60s"
       # CNPG requires wal_log_hints=on when instances > 1 (safe failover/basebackup);
       # the operator also sets it by default, so keep it explicit and at the required value
       wal_log_hints: "on"
