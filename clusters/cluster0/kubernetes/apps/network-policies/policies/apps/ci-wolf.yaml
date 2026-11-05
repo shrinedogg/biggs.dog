@@ -1,0 +1,39 @@
+# Namespace: ci  (github-runner-wolf — self-hosted GitHub Actions runner for
+# the shrinedogg/wolf fork builds, biggs.dog#744)
+#
+# The shared ci.yaml policies (endpointSelector: {}, i.e. every ci pod) already
+# cover DNS, the GitHub control plane + git/action downloads, and the
+# container registries the build pulls from (ghcr.io, docker.io,
+# zot.biggs.dog, ...). This policy adds ONLY the wolf-build hosts that no
+# current policy carries, and it is scoped to the wolf runner pod by label so
+# the other runners' egress is unchanged:
+#   - *.fedoraproject.org : Fedora dnf repositories — the docker/wolf.Dockerfile
+#                           base is Fedora; dnf metadata + package files are
+#                           served from dl./mirrors./download. subdomains
+#   - static.rustup.rs    : the rustup toolchain installer (the sh.rustup.rs
+#                           entry point is served from this host)
+#   - index.crates.io     : the crates.io index for cargo
+#   - static.crates.io    : crate file downloads for cargo
+#
+# The allowlist is iterated per observed pull (matching the ci.yaml /
+# ci-talos.yaml policy history): if the first CI run is blocked on another
+# host, add it here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-wolf-build
+  namespace: ci
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner-wolf
+  egress:
+    - toFQDNs:
+        - matchPattern: "*.fedoraproject.org"
+        - matchName: static.rustup.rs
+        - matchName: index.crates.io
+        - matchName: static.crates.io
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
