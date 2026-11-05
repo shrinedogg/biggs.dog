@@ -19,6 +19,7 @@ resources:
   - gpu-arbiter-operator-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
+  - agentgateway-canary-oci.yaml
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
   - barman-oci.yaml
