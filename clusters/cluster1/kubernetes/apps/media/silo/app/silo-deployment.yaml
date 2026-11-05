@@ -27,21 +27,76 @@ spec:
       # Intel GPU nodes only (VA-API transcoding via the i915 device plugin).
       nodeSelector:
         intel.feature.node.kubernetes.io/gpu: "true"
+      # One-time migration of the pre-omnibus silo-data layout: artwork/ and
+      # plugins/ sit at the PVC top level (the old /var/lib/silo layout) and
+      # are root-owned; the omnibus app expects them under /config/silo owned
+      # by 911:911. This initContainer restructures the top level into
+      # silo/, re-owns the tree to 911:911 and writes the /config/.silo-owner
+      # marker so the image's own walk is skipped on first boot. On every
+      # later pod start it is a no-op (one cat + stat).
+      # It runs inside the pod that holds the RWO silo-data attach, so the
+      # restructure cannot race a separate Job for the volume and it always
+      # completes before /init starts the app. It needs CHOWN/FOWNER because
+      # the main container drops all capabilities, whose own ownership walk
+      # would silently fail to chown.
+      initContainers:
+        - name: silo-data-migrate
+          image: ghcr.io/silo-server/silo-server:latest@sha256:9064658ca8f577ad4d2c3ac05b8e150064bd682176004510b8e1c940527cf22f
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              if [ -f /config/.silo-owner ] \
+                 && [ "$(cat /config/.silo-owner)" = "911:911" ] \
+                 && [ "$(stat -c '%u %g' /config/silo 2>/dev/null)" = "911 911" ]; then
+                echo "silo-data already restructured and owned by 911:911; skipping migration"
+                exit 0
+              fi
+              mkdir -p /config/silo
+              for d in artwork plugins compat; do
+                if [ -d "/config/$d" ] && [ ! -e "/config/silo/$d" ]; then
+                  mv "/config/$d" "/config/silo/"
+                fi
+              done
+              find /config/silo \( ! -user 911 -o ! -group 911 \) -exec chown -h 911:911 {} +
+              printf '911:911' > /config/.silo-owner
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+              add:
+                - CHOWN
+                - FOWNER
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 128Mi
+          volumeMounts:
+            - name: silo-data
+              mountPath: /config
       containers:
         - name: silo
-          # Pre-1.0: the `latest` tag moves, so pin the image index digest for
-          # deterministic rollouts. This pin is MANUAL and must not be
-          # re-resolved from latest: upstream #3319 (2026-10-31, c3115d4)
-          # repointed latest/build-N/commit tags at the omnibus image
-          # (ENTRYPOINT /init, PUID 911, /var/lib/silo -> /config/silo), which
-          # this deployment (root, drop ALL caps) cannot run, so an omnibus
-          # digest crash-loops the pod on the Recreate rollout. Pinned at the
-          # last pre-omnibus base build (build-1874, upstream 7ee9615f).
-          # ghcr.io/silo-server/silo-server is excluded in renovate.json until
-          # a deliberate omnibus-migration PR reworks this manifest
-          # (entrypoint/caps/PUID, /config volume, media readability for the
-          # silo uid, one-time re-ownership of silo-data).
-          image: ghcr.io/silo-server/silo-server:latest@sha256:822d85129c35f50a74b36413df0737f12102292c1c85ce88748e002415a4bbc2
+          # Pre-1.0: the `latest` tag moves, so pin the image index digest
+          # for deterministic rollouts. This is the omnibus image (upstream
+          # #3319, 2026-10-31, c3115d4): ENTRYPOINT is the s6-overlay /init,
+          # so pid 1 MUST start as root - do NOT add runAsUser/runAsNonRoot,
+          # either one stops /init. s6 then drops the silo SERVICE process to
+          # PUID/PGID 911. Keep allowPrivilegeEscalation:false + drop ALL:
+          # svc-silo falls back cleanly when it cannot grant NET_ADMIN, and
+          # the stage-1 init scripts need no capabilities.
+          # Inside the image /var/lib/silo is a symlink to /config/silo, so
+          # silo-data is mounted at /config (never at /var/lib/silo, which
+          # would shadow the symlink): the ownership marker
+          # /config/.silo-owner then persists on the PVC and the image's
+          # ownership walk runs once instead of re-walking ~300k artwork
+          # files on every pod recreation.
+          image: ghcr.io/silo-server/silo-server:latest@sha256:9064658ca8f577ad4d2c3ac05b8e150064bd682176004510b8e1c940527cf22f
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
@@ -79,7 +134,7 @@ spec:
               value: redis://dragonfly-silo.dragonfly.svc.cluster.local:6379
             # Keep the plugin cache on the durable data PVC.
             - name: SILO_PLUGIN_CACHE_DIR
-              value: /var/lib/silo/plugins
+              value: /config/silo/plugins
             # CNPG owns the postgres config; silo's ALTER SYSTEM auto-tune
             # would fight the operator.
             - name: POSTGRES_TUNE
@@ -95,7 +150,7 @@ spec:
           # liveness window would restart it mid-setup.
           volumeMounts:
             - name: silo-data
-              mountPath: /var/lib/silo
+              mountPath: /config
             - name: media-nfs
               mountPath: /mnt/media
               readOnly: true
