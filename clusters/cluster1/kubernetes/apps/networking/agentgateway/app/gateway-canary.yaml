@@ -10,12 +10,17 @@
 # LoadBalancer Service. No UDM WAN forward is added for that VIP, so the
 # canary is LAN/VPN-only, matching the internal-gateway pattern.
 #
+# Named agentgateway1x-canary (not agentgateway-canary) because the 1.x
+# deployer names the data-plane Deployment/Service/ServiceAccount after the
+# Gateway, and agentgateway-canary is already taken by the chart's own
+# controller resources (same name as the HelmRelease/nameOverride).
+#
 # Temporary: deleted in the cutover commit, after the post-cutover
 # verification sweep passes.
 apiVersion: gateway.networking.k8s.io/v1
 kind: Gateway
 metadata:
-  name: agentgateway-canary
+  name: agentgateway1x-canary
   namespace: networking
 spec:
   gatewayClassName: agentgateway-canary

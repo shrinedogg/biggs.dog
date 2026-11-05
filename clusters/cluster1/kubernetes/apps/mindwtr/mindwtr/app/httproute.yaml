@@ -25,7 +25,7 @@ spec:
     # gateway (mindwtr is internal; the canary is LAN-only). Exercises the
     # /health, /v1 and extAuth (pwa) paths on 1.x. Removed in the cutover
     # commit.
-    - name: agentgateway-canary
+    - name: agentgateway1x-canary
       namespace: networking
   rules:
     - matches:
