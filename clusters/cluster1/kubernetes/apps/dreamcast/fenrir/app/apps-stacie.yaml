@@ -279,7 +279,7 @@ spec:
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
             # NVIDIA GBM backend in /usr/local/lib/gbm but Mesa's libgbm only
             # searches its own backend dir: /usr/lib64/gbm on the Fedora base
-            # (firefox:fedora), /usr/lib/x86_64-linux-gnu/gbm on the old
+            # (steam:fedora-43), /usr/lib/x86_64-linux-gnu/gbm on the old
             # Ubuntu base. Without it Sway falls back to dumb buffers
             # (rejected by NVIDIA render nodes), no output gets created, and
             # Steam never launches -> black stream.
