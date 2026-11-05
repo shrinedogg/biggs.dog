@@ -19,7 +19,7 @@ spec:
     # gateway while both listen on zot.biggs.dog. Production traffic keeps
     # hitting wildcard-biggs-dog; the canary attachment is removed in the
     # cutover commit.
-    - name: agentgateway-canary
+    - name: agentgateway1x-canary
       namespace: networking
   rules:
     - matches:
