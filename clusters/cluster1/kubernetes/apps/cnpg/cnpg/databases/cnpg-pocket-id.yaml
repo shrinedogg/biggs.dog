@@ -9,7 +9,7 @@ spec:
   # Re-enable after API readiness, CNPG recovery, and replication are verified.
   enablePDB: false
   failoverDelay: 60
-  primaryUpdateMethod: unsupervised
+  primaryUpdateMethod: switchover
   bootstrap:
     initdb:
       database: pocketid
