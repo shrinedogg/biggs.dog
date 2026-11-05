@@ -41,8 +41,16 @@ metadata:
   namespace: networking
 spec:
   endpointSelector:
-    matchLabels:
-      app.kubernetes.io/name: agentgateway
+    # app.kubernetes.io/name matches the controller Deployment's app label.
+    # agentgateway-canary is the 1.x canary controller (issue #748, cutover
+    # commit A): same egress/ingress needs as the legacy controller. Remove
+    # its value when the canary is retired in the cutover commit.
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values:
+          - agentgateway
+          - agentgateway-canary
   ingress:
     - fromEntities:
         - world
@@ -72,8 +80,16 @@ metadata:
   namespace: networking
 spec:
   endpointSelector:
-    matchLabels:
-      gateway.networking.k8s.io/gateway-class-name: agentgateway
+    # gateway-class-name labels the per-Gateway data-plane Deployments.
+    # agentgateway-canary is the 1.x canary data plane (issue #748, cutover
+    # commit A): same egress/ingress needs as the production planes. Remove
+    # its value when the canary is retired in the cutover commit.
+    matchExpressions:
+      - key: gateway.networking.k8s.io/gateway-class-name
+        operator: In
+        values:
+          - agentgateway
+          - agentgateway-canary
   ingress:
     - fromEntities:
         - world
