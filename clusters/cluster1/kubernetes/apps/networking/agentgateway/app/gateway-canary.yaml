@@ -1,0 +1,34 @@
+# Canary Gateway for the agentgateway 1.x train cutover (issues #745/#748).
+#
+# Served by the 1.7.0 canary controller (GatewayClass agentgateway-canary).
+# One TLS listener on the *.biggs.dog wildcard so canary-attached routes keep
+# their real hostnames (zot.biggs.dog, mindwtr.biggs.dog): Gateway API only
+# attaches a route when the route hostname matches the listener hostname, and
+# the existing biggs-dog-tls wildcard cert covers it.
+#
+# No pinned address: UDM assigns the next free 192.168.6.x VIP on the
+# LoadBalancer Service. No UDM WAN forward is added for that VIP, so the
+# canary is LAN/VPN-only, matching the internal-gateway pattern.
+#
+# Temporary: deleted in the cutover commit, after the post-cutover
+# verification sweep passes.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: agentgateway-canary
+  namespace: networking
+spec:
+  gatewayClassName: agentgateway-canary
+  listeners:
+    - hostname: "*.biggs.dog"
+      name: canary-https
+      port: 443
+      protocol: HTTPS
+      allowedRoutes:
+        namespaces:
+          from: All
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: biggs-dog-tls

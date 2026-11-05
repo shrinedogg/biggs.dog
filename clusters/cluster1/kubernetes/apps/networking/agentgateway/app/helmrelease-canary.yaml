@@ -1,0 +1,56 @@
+# Canary for the agentgateway 1.x train cutover (issues #745/#748, plan in
+# docs/agentgateway-1x-migration/04-breaking-changes-and-cutover-plan.md).
+#
+# Runs a 1.7.0 controller in parallel with the legacy v2.2.1 controller under
+# its own GatewayClass identity (agentgateway-canary /
+# agentgateway.dev/agentgateway-canary), the chart's documented multi-
+# controller pattern. The legacy controller cannot deploy a 1.x data plane,
+# so this is the only way to prove the 1.7.0 data plane with real routes
+# before any production listener moves.
+#
+# xds mode is intentionally left at the 1.7.0 default (tls): the canary
+# exercises the 1.x TLS xDS chain (kgateway-xds-cert) while production keeps
+# plaintext xds.mode for parity with the legacy train (see the cutover
+# HelmRelease in the follow-up commit).
+#
+# Retired in the cutover commit: the canary Gateway is deleted, the
+# zot/mindwtr canary parentRefs are removed, and THIS HelmRelease becomes the
+# permanent 1.x controller (optionally rebranded to the original class names
+# in a later commit).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: agentgateway-canary
+  namespace: networking
+spec:
+  chartRef:
+    kind: OCIRepository
+    name: agentgateway-canary
+    namespace: flux-system
+  interval: 3m
+  values:
+    # Multi-controller identity: separate from the legacy class so both
+    # controllers can reconcile in the same cluster.
+    nameOverride: agentgateway-canary
+    gatewayClassName: agentgateway-canary
+    controllerName: agentgateway.dev/agentgateway-canary
+    controller:
+      extraEnv:
+        # 1.x controllers read AGW_* only; the legacy
+        # KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES is a silent no-op.
+        # The 1.x default is true; set explicitly to preserve intent.
+        AGW_ENABLE_EXPERIMENTAL_GATEWAY_API_FEATURES: "true"
+    # Same hardening as the production HelmRelease. Kept explicit because
+    # omitting securityContext would make the 1.7.0 chart inject a stricter
+    # default (runAsNonRoot, readOnlyRootFilesystem) that the legacy release
+    # deliberately did not set.
+    podSecurityContext:
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities:
+        drop:
+          - ALL
+      seccompProfile:
+        type: RuntimeDefault

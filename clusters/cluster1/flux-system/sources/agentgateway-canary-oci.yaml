@@ -1,0 +1,14 @@
+# Canary chart source for the agentgateway 1.x train cutover (issues #745/#748).
+# Same ghcr.io chart repo as the legacy source, tag v1.7.0 (verified
+# anonymously pullable). The legacy source stays until the verification
+# gates pass; rollback is a revert of the canary commit, not a source swap.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: OCIRepository
+metadata:
+  name: agentgateway-canary
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: oci://ghcr.io/agentgateway/charts/agentgateway
+  ref:
+    tag: "v1.7.0"
