@@ -48,11 +48,13 @@ spec:
           value: all
         # The gpu-operator (CDI mode) injects the driver under /usr/local/lib
         # and creates the GBM backend symlink at /usr/local/lib/gbm/, but the
-        # image's Mesa libgbm only searches /usr/lib/x86_64-linux-gnu/gbm.
-        # Without the nvidia backend, waylanddisplaysrc cannot allocate
-        # DMA-BUFs ("Failed to create GsCUDABuf" panic -> no video stream).
+        # image's Mesa libgbm only searches its own backend dir: /usr/lib64/gbm
+        # on the Fedora base (wolf >= v0.2.9), /usr/lib/x86_64-linux-gnu/gbm on
+        # the old Ubuntu base. Without the nvidia backend, waylanddisplaysrc
+        # cannot allocate DMA-BUFs ("Failed to create GsCUDABuf" panic -> no
+        # video stream).
         - name: GBM_BACKENDS_PATH
-          value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+          value: /usr/local/lib/gbm:/usr/lib64/gbm
         # HDR/HEVC Main10 chain (wolf v0.2.0) stays dormant unless this env is
         # the exact string "TRUE" (configTOML.cpp string compare); quoted so
         # YAML does not coerce unquoted TRUE to boolean true -> "true". The
@@ -153,11 +155,13 @@ spec:
           value: all
         # The gpu-operator (CDI mode) injects the driver under /usr/local/lib
         # and creates the GBM backend symlink at /usr/local/lib/gbm/, but the
-        # image's Mesa libgbm only searches /usr/lib/x86_64-linux-gnu/gbm.
-        # Without the nvidia backend, waylanddisplaysrc cannot allocate
-        # DMA-BUFs ("Failed to create GsCUDABuf" panic -> no video stream).
+        # image's Mesa libgbm only searches its own backend dir: /usr/lib64/gbm
+        # on the Fedora base (wolf >= v0.2.9), /usr/lib/x86_64-linux-gnu/gbm on
+        # the old Ubuntu base. Without the nvidia backend, waylanddisplaysrc
+        # cannot allocate DMA-BUFs ("Failed to create GsCUDABuf" panic -> no
+        # video stream).
         - name: GBM_BACKENDS_PATH
-          value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+          value: /usr/local/lib/gbm:/usr/lib64/gbm
         # HDR/HEVC Main10 chain (wolf v0.2.0) stays dormant unless this env is
         # the exact string "TRUE" (configTOML.cpp string compare); quoted so
         # YAML does not coerce unquoted TRUE to boolean true -> "true". The

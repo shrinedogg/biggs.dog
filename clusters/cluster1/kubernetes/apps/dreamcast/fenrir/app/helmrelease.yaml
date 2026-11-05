@@ -83,17 +83,20 @@ spec:
               # Built from https://github.com/shrinedogg/fenrir (tag v0.1.3).
               AGENT_IMAGE: docker.io/shrinedogg/wolf-agent:v0.1.3
               # Forked wolf: built from https://github.com/shrinedogg/wolf
-              # (branch feat/hdr-hevc-main10) = upstream beta tip plus the
-              # HDR/HEVC Main10 chain. gst-wayland-display is built from
+              # (branch feat/hdr-hevc-main10) = upstream v2026.11 (db709cf,
+              # Fedora base, C++20) plus the HDR/HEVC Main10 chain.
+              # gst-wayland-display is built from
               # https://github.com/shrinedogg/gst-wayland-display @ 1a1d765
               # (upstream stable 016b4fc + 10-bit HDR chain), which keeps the
               # wl_drm conditional-advertise fix (Sway nested-compositor
               # workaround, opt-back via GST_WAYLAND_DISPLAY_ADVERTISE_WL_DRM=1)
-              # and adds the upstream stable fixes (RTSP crash on client reset,
-              # resume instead of relaunch, input isolation).
+              # and the upstream stable fixes (RTSP crash on client reset,
+              # resume instead of relaunch, input isolation). v0.2.9 re-applies
+              # the fork's Dockerfile customizations on the Fedora base (gst
+              # fork pin, ninja -j2, GST_WAYLAND_DISPLAY_ENABLE_10BIT=1).
               # v0.2.4-v0.2.8 were diag builds for biggs.dog#622 (gamescope
               # EGL import crashloop on 615.78.08); evidence trail in the issue.
-              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.0
+              WOLF_IMAGE: docker.io/shrinedogg/wolf:v0.2.9
       moonlight_proxy:
         containers:
           proxy:
