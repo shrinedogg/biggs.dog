@@ -46,7 +46,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: app
-          image: ghcr.io/games-on-whales/firefox:edge
+          image: ghcr.io/games-on-whales/firefox:fedora
           resources:
             limits:
               nvidia.com/gpu: "1"
@@ -275,11 +275,13 @@ spec:
               value: "1"
             # Same fix as the wolf sidecar (user.yaml): the CDI hook drops the
             # NVIDIA GBM backend in /usr/local/lib/gbm but Mesa's libgbm only
-            # searches /usr/lib/x86_64-linux-gnu/gbm. Without it Sway falls back
-            # to dumb buffers (rejected by NVIDIA render nodes), no output gets
-            # created, and Steam never launches -> black stream.
+            # searches its own backend dir: /usr/lib64/gbm on the Fedora base
+            # (steam:fedora-43), /usr/lib/x86_64-linux-gnu/gbm on the old
+            # Ubuntu base. Without it Sway falls back to dumb buffers
+            # (rejected by NVIDIA render nodes), no output gets created, and
+            # Steam never launches -> black stream.
             - name: GBM_BACKENDS_PATH
-              value: /usr/local/lib/gbm:/usr/lib/x86_64-linux-gnu/gbm
+              value: /usr/local/lib/gbm:/usr/lib64/gbm
             # Pin the Vulkan loader to the NVIDIA ICD only. The privileged
             # container sees both of nv-01's GPUs (/dev/dri/renderD128 = AMD
             # 7800X3D iGPU via Mesa's radeon_icd.json, and renderD129 = RTX 5090

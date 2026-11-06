@@ -1,0 +1,40 @@
+# Cutover values for the agentgateway 1.7.0 chart (controller chart).
+# Maps the legacy 2.2.1 HelmRelease values 1:1 where the schema is unchanged,
+# and translates the rest to the 1.x equivalents.
+#
+# Decision notes:
+# - controller.xds.mode: the 1.7.0 chart defaults to "tls" (AGW_XDS_MODE=tls),
+#   which would make the control plane serve TLS-only xDS. The legacy 2.2.1
+#   controller served plaintext xDS (data plane XDS_ADDRESS=http://...).
+#   Set "plaintext" for behavior parity at cutover. Revisit TLS later.
+# - controller.extraEnv: the legacy KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES
+#   is a no-op on 1.x (the controller now reads AGW_* env vars only). Its
+#   1.x equivalent, AGW_ENABLE_EXPERIMENTAL_GATEWAY_API_FEATURES, defaults to
+#   true in the 1.7.0 controller; set it explicitly to preserve intent.
+# - securityContext: kept explicit (legacy shape). If omitted, the 1.7.0 chart
+#   injects a stricter default (runAsNonRoot, readOnlyRootFilesystem, drop ALL,
+#   allowPrivilegeEscalation false) that was deliberately NOT set on the legacy
+#   release pending verification of the controller image.
+# - gatewayClassName/controllerName: pinned to the exact values of the existing
+#   live GatewayClass so the new controller adopts it (same as chart defaults).
+controller:
+  xds:
+    mode: plaintext
+  extraEnv:
+    AGW_ENABLE_EXPERIMENTAL_GATEWAY_API_FEATURES: "true"
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
+# Ownership of the data plane: the 1.x controller creates/manages a
+# GatewayClass named "agentgateway" with controllerName
+# "agentgateway.dev/agentgateway" - identical to the existing live one, so it
+# takes over the existing data-plane deployments.
+gatewayClassName: agentgateway
+controllerName: agentgateway.dev/agentgateway

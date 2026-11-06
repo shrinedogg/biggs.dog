@@ -20,6 +20,13 @@ spec:
   parentRefs:
     - name: internal-biggs-dog
       namespace: networking
+    # Temporary canary attachment for the agentgateway 1.x cutover
+    # (issues #745/#748): the route is ALSO served by the 1.7.0 canary
+    # gateway (mindwtr is internal; the canary is LAN-only). Exercises the
+    # /health, /v1 and extAuth (pwa) paths on 1.x. Removed in the cutover
+    # commit.
+    - name: agentgateway1x-canary
+      namespace: networking
   rules:
     - matches:
         - path:
