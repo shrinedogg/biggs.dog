@@ -10,7 +10,11 @@
 # apiKeySecret) send:
 #   Authorization: Bearer ***
 #
-# Fails closed (401) until the model-api-keys Secret exists.
+# On agentgateway controller v2.2.1 / data plane 0.12.0 the policy is
+# dropped from xDS while the model-api-keys Secret is absent, so the route
+# serves UNAUTHENTICATED (fail-open, issue #704); 401 only once the Secret
+# exists. Fixed upstream by agentgateway#1245 semantics (controller
+# >= v1.0.1).
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
 metadata:

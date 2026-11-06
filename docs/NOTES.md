@@ -335,6 +335,8 @@ kagent is configured with vectorized memory backed by CNPG Postgres + pgvector, 
 
 The MCP endpoint is the `kagent-mcp` HTTPRoute (`https://mcp.biggs.dog/mcp`) on the internal gateway `internal-biggs-dog` (VIP `192.168.6.15`). k8s-gateway split-horizon resolves `mcp.biggs.dog` to `.6.15` for LAN/VPN clients; TLS terminates at the gateway with the wildcard cert. WAN clients hitting the public gateway get a 404 (no route).
 
+The model routes (minimax, mistral, glm) and the kagent actor routes (model-actors, model-actors-glm, model-actors-vllm) are served WITHOUT authentication by agentgateway 0.12.0 / controller v2.2.1 while the ExternalSecret `model-api-keys` is not SecretSynced: the controller drops the `AgentgatewayPolicy` from xDS instead of failing closed (fail-open, issue #704; upstream issue draft against agentgateway/agentgateway pending). Guard before assuming a model route is closed: `kubectl -n ai-system get externalsecret model-api-keys` (must be READY/SecretSynced) and the policy `Attached` condition (`kubectl -n ai-system get agentgatewaypolicy`), because the `agentgateway-ai` Flux Kustomization's `wait: true` does not gate on this (AgentgatewayPolicy has no Ready condition and is not health-checked).
+
 ## Cluster Bootstrapping
 
 Each cluster bootstraps via its own **Flux Operator** syncing from `https://github.com/shrinedogg/biggs.dog.git` (main branch).
