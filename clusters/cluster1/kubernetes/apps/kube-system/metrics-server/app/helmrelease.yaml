@@ -1,12 +1,20 @@
 ---
 # metrics-server: feeds the metrics.k8s.io API (kubectl top, HPA).
 # Chart 3.14.0 ships image v0.9.0 (supports k8s 1.34+; cluster runs 1.37.2).
-# Defaults are used except the kubelet address preference: Talos signs
-# kubelet serving certs per node with hostname-only SANs (no IP SANs), so the
-# chart default InternalIP-first address preference fails x509 name validation
-# and every node scrape is rejected. defaultArgs is overridden as a whole
-# (repeating the flag via args would only append to the pflag StringSlice
-# value, leaving InternalIP first); the other defaults are kept verbatim.
+#
+# Kubelet scraping: Talos signs each node's kubelet serving cert with its own
+# per-node CA (CN=<node>-ca), hostname SAN only, no IP SANs. The cluster CA
+# cannot verify those certs, and the per-node CAs live only on the node
+# disks, so they cannot be maintained through git. The chart default address
+# preference (InternalIP first; every node publishes one) is therefore paired
+# with --kubelet-insecure-tls, the upstream-documented escape for
+# non-cluster-CA-signed kubelet certs: TLS stays on, only server-cert
+# verification is skipped. The kubelet still authenticates metrics-server
+# with its service account token (verified live: an SA without the
+# system:metrics binding gets a 403 authz denial, not a 401).
+# args only APPENDS to the chart's defaultArgs (pflag StringSlice), so the
+# flag is added here and the chart defaults (cert-dir, InternalIP-first
+# address preference, node-status port, 15s resolution) are used as-is.
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -32,8 +40,5 @@ spec:
   uninstall:
     keepHistory: false
   values:
-    defaultArgs:
-      - --cert-dir=/tmp
-      - --kubelet-preferred-address-types=Hostname
-      - --kubelet-use-node-status-port
-      - --metric-resolution=15s
+    args:
+      - --kubelet-insecure-tls
