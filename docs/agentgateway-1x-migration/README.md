@@ -47,7 +47,8 @@ back to the original names is the optional commit C.
 5. Flux charts stay on ghcr.io (v1.7.0 tags verified anonymously pullable;
    cr.agentgateway.dev 401s anonymous). Pod images stay on
    cr.agentgateway.dev; the only hard unknown is the preflight node pull gate
-   (P1), because the v1.7.0 tags force real pulls.
+   (P1): a v1.7.0 tag is absent from each node's image cache until that node's
+   first pull, and IfNotPresent never re-verifies a tag it has already cached.
 6. Breakage audit: nothing in the v1.7.0 breaking-change list affects this
    stack except the env-var rename (behavior-preserving by default) and
    redacted error bodies (ops note). MCP session encryption and the ToolOutput

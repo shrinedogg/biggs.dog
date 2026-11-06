@@ -2,9 +2,10 @@
 
 Issue #746 (pre-migration inventory), umbrella #745.
 Target: unified 1.x train v1.7.0 (released 2026-10-27). Source of truth: v1.7.0 release
-notes (fetched via gh api, 55 KB) + the v1.7.0 source clone at
-`/Users/shrinedogg/.hermes/cache/scratch/inv/agentgateway-v170` + live cluster state
-(read-only) + biggs.dog repo manifests.
+notes (fetched via gh api, 55 KB; re-fetch with
+`gh api repos/agentgateway/agentgateway/releases/tags/v1.7.0`) + the v1.7.0 source tree
+(shallow clone of agentgateway/agentgateway at tag v1.7.0, not tracked; re-clone as
+needed) + live cluster state (read-only) + biggs.dog repo manifests.
 
 Note on upgrade docs: the v1.7.0 clone has no docs/ directory and no upgrade or migration
 document since 1.0 (checked: no files matching upgrade/migrate/breaking/changelog at repo
@@ -243,10 +244,16 @@ Commit A (canary + CRDs, one commit, revertable as a unit):
    - gatewayClassName: agentgateway-canary
    - controllerName: agentgateway.dev/agentgateway-canary
    - controller.extraEnv: AGW_ENABLE_EXPERIMENTAL_GATEWAY_API_FEATURES: "true"
+   - fullnameOverride: agentgateway-canary-ctrl  # chart's controller
+     Deployment/Service/SA; the Gateway and its deployer-created
+     Service/Deployment/SA keep the name agentgateway-canary
    - the same podSecurityContext/securityContext hardening as the production HR.
    The controller creates GatewayClass agentgateway-canary (Accepted=True expected).
-   Its own resources are named agentgateway-canary-* (no collision with the legacy
-   agentgateway-* resources).
+   The Gateway name and the chart fullname must differ: without fullnameOverride the
+   chart fullname would equal the release name agentgateway-canary, colliding with the
+   deployer's Gateway-named data-plane objects. With it, the controller's
+   Deployment/Service/SA are named agentgateway-canary-ctrl-*; the Gateway's data-plane
+   Service/Deployment/SA are named agentgateway-canary (no collision).
 4. New Gateway agentgateway-canary (ns networking), gatewayClassName agentgateway-canary:
    single listener:
    - name: canary-https, port: 443, protocol: HTTPS, hostname: "*.biggs.dog",
@@ -280,8 +287,8 @@ Status:
 - GatewayClass agentgateway-canary Accepted=True.
 - Data plane pod agentgateway-canary-*: Running, image
   cr.agentgateway.dev/agentgateway:1.7.0, SESSION_KEY env present, no restarts.
-- Controller pod agentgateway-canary-*: Ready; controller logs show no xDS errors, no
-  translation errors for zot/mindwtr.
+- Controller pod agentgateway-canary-ctrl-*: Ready; controller logs show no xDS errors,
+  no translation errors for zot/mindwtr.
 - New Secrets present: agentgateway-canary-session-key, kgateway-xds-cert (ns networking).
 - Legacy gateways untouched: wildcard-biggs-dog and internal-biggs-dog still on
   0.12.0 data plane images, status unchanged.
@@ -452,8 +459,10 @@ cr.agentgateway.dev for the controller (controller:1.7.0) and the deployer defau
 data plane to cr.agentgateway.dev/agentgateway:1.7.0, and the registry rejects anonymous
 pulls (verified 401). Today the nodes run cr.agentgateway.dev images without any
 pod-level imagePullSecrets, which means either node-level registry credentials exist or
-the images are simply cached (pullPolicy IfNotPresent). The 1.7.0 tags force real pulls
-on the nodes, so the preflight P1 gate (section 4) is mandatory: verify a fresh-tag pull
+the images are simply cached (pullPolicy IfNotPresent). A v1.7.0 tag is absent from
+every node's cache until that node's first successful pull, and IfNotPresent never
+re-verifies a tag it has already cached, so the preflight P1 gate (section 4) is
+mandatory: verify a fresh-tag pull
 from a production node before cutover, and if it fails, create a docker-registry secret
 in ns networking and wire it via imagePullSecrets on the HelmRelease (controller pod)
 and via attachment to the data plane ServiceAccounts (agentgateway-canary/agentgateway,

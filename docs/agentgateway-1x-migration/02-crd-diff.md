@@ -7,13 +7,14 @@ CRDs.
 
 Inputs:
 
-- Legacy chart: `/Users/shrinedogg/.hermes/cache/scratch/inv/charts/legacy-crds/agentgateway-crds` (version `0.0.0-alpha.a655af15`)
-- New chart: `/Users/shrinedogg/.hermes/cache/scratch/inv/charts/new-crds/agentgateway-crds` (version `v1.7.0`)
-- Live CRDs: `kubectl get crd -o yaml` from cluster1 (read-only), snapshot under `live/`
+- Legacy chart: `agentgateway-crds` version `0.0.0-alpha.a655af15`, pulled with
+  `helm pull oci://ghcr.io/agentgateway/charts/agentgateway-crds` (anonymous pull verified)
+- New chart: `agentgateway-crds` version `v1.7.0` from the same registry
+- Live CRDs: `kubectl get crd -o yaml` from cluster1 (read-only)
 - Manifests: `~/Code/biggs.dog/clusters/cluster1`
 - Method: recursive walk of each CRD's `openAPIV3Schema` (v1alpha1), comparing every path's type, enum,
-  default, min/max, pattern, required, list type, and CEL validations. Raw machine-readable diff in
-  `crd_diff.json`; scripts in `scripts/`.
+  default, min/max, pattern, required, list type, and CEL validations (walk and diff kept
+  locally, not tracked).
 
 ## 1. CRDs in each chart version
 
@@ -231,10 +232,13 @@ for k in agentgateway-ai kagent mindwtr bookboss silo rook-ceph-operator; do
   flux get kustomization "$k" -n flux-system
 done
 
-# 7. Data plane health and model-route smoke tests (LAN-only endpoints)
+# 7. Controller health and model-route smoke tests (LAN-only endpoints)
 kubectl -n networking get deploy agentgateway
-kubectl -n networking logs deploy/agentgateway --tail=200 | grep -iE 'error|fail' || echo "no data-plane errors"
-TOKEN=*** -n ai-system get secret model-api-keys -o jsonpath='{.data.apiKey}' | base64 -d)
+kubectl -n networking logs deploy/agentgateway --tail=200 | grep -iE 'error|fail' || echo "no controller errors"
+kubectl -n networking get deploy internal-biggs-dog wildcard-biggs-dog
+kubectl -n networking logs deploy/internal-biggs-dog --tail=200
+kubectl -n networking logs deploy/wildcard-biggs-dog --tail=200
+TOKEN=$(kubectl -n ai-system get secret model-api-keys -o jsonpath='{.data.editor}' | base64 -d)
 curl -sS -o /dev/null -w 'minimax /v1/models -> %{http_code}\n' \
   -H "Authorization: Bearer $TOKEN" https://minimax.biggs.dog/v1/models
 curl -sS -o /dev/null -w 'mistral /v1/models -> %{http_code}\n' \

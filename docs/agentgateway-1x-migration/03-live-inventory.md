@@ -2,7 +2,7 @@
 
 Issue #746 (umbrella #745): pre-migration inventory for moving agentgateway from the legacy train (chart v2.2.1, controller v2.2.1, data plane 0.12.0) to the 1.x train (v1.7.0).
 
-Captured live from cluster1 (read-only kubectl, KUBECONFIG biggs-dog) on 2026-11-05 ~20:40 EET, cross-checked against `~/Code/biggs.dog` (`clusters/cluster1/`). Raw JSON dumps: `/Users/shrinedogg/.hermes/cache/scratch/inv/raw/`. Secret values were never read; names and keys only.
+Captured live from cluster1 (read-only kubectl, KUBECONFIG biggs-dog) on 2026-11-05 ~20:40 EET, cross-checked against `~/Code/biggs.dog` (`clusters/cluster1/`). Raw JSON dumps are not tracked in the repo; re-derive them with the read-back commands in 02-crd-diff.md (section 6) plus the per-surface `kubectl get ... -o yaml` read-backs used above. Secret values were never read; names and keys only.
 
 | # | Surface | Live read-back | Verdict |
 |---|---------|----------------|---------|
