@@ -1,0 +1,16 @@
+# Exact copy of spec.values from
+# clusters/cluster1/kubernetes/apps/networking/agentgateway/app/helmrelease.yaml
+# (legacy chart v2.2.1)
+controller:
+  extraEnv:
+    KGW_ENABLE_GATEWAY_API_EXPERIMENTAL_FEATURES: "true"
+podSecurityContext:
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
