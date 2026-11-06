@@ -61,9 +61,16 @@ spec:
   endpointSelector: {}
   egress:
     - toEndpoints:
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            gateway.networking.k8s.io/gateway-class-name: agentgateway
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
       toPorts:
         - ports:
             - port: "443"
@@ -81,9 +88,16 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             app.kubernetes.io/name: agentgateway
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            gateway.networking.k8s.io/gateway-class-name: agentgateway
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
 ---
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy

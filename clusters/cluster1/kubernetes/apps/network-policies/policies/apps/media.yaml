@@ -116,9 +116,16 @@ spec:
             - port: "443"
               protocol: TCP
     - toEndpoints:
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            gateway.networking.k8s.io/gateway-class-name: agentgateway
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
       toPorts:
         - ports:
             - port: "443"
@@ -136,9 +143,16 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             app.kubernetes.io/name: agentgateway
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            gateway.networking.k8s.io/gateway-class-name: agentgateway
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
 ---
 # In-cluster NFS server (app=nfs, ClusterIP :2049). Nodes/kubelet mount it for
 # media volumes, so the mount traffic arrives from host/remote-node (post
