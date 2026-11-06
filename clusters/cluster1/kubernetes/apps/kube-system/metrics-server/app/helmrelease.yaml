@@ -1,0 +1,31 @@
+---
+# metrics-server: feeds the metrics.k8s.io API (kubectl top, HPA).
+# Chart 3.14.0 ships image v0.9.0 (supports k8s 1.34+; cluster runs 1.37.2).
+# Defaults are used: self-signed TLS (tls.type: metrics-server), APIService
+# with insecureSkipTLSVerify, RBAC + ServiceAccount created by the chart,
+# kubelet preferred address types InternalIP,ExternalIP,Hostname.
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: metrics-server
+  namespace: kube-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: metrics-server
+      version: 3.14.0
+      sourceRef:
+        kind: HelmRepository
+        name: metrics-server
+        namespace: flux-system
+  install:
+    remediation:
+      retries: -1
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  uninstall:
+    keepHistory: false
+  values: {}
