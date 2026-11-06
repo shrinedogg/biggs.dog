@@ -13,4 +13,4 @@ spec:
     # fields biggs.dog uses are unchanged. Safe for the legacy v2.2.1
     # controller (same v1alpha1, superset schema) and safe to keep during
     # any controller rollback. See docs/agentgateway-1x-migration/02.
-    tag: "v1.7.0"
+    tag: "v2.2.1"
