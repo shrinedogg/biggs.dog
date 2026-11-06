@@ -233,7 +233,11 @@ spec:
           emptyDir:
             sizeLimit: 150Gi
         # dockerd config: registry-mirrors -> zot.biggs.dog (pull-through
-        # cache on cluster1; the GHCR edge 403's this node's egress IP).
+        # cache on cluster1). registry-mirrors only applies to Docker Hub,
+        # so the ghcr.io pull (the wolf base image) goes direct — allowed by
+        # the ci.yaml registry policy, and verified from the live
+        # github-runner-talos pod on this node: anonymous-token manifest
+        # fetch of games-on-whales/gstreamer:1.26.7 returns 200 (2026-11-06).
         - name: docker-daemon-mirror
           configMap:
             name: docker-daemon-mirror
