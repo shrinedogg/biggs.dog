@@ -155,6 +155,10 @@
       "enabled": false
     },
     {
+      "matchPackageNames": ["ghcr.io/agentgateway/charts/agentgateway-crds"],
+      "enabled": false
+    },
+    {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
@@ -177,18 +181,26 @@
     },
     {
       "description": "Group media app container images",
-      "matchManagers": ["kubernetes"],
+      "matchManagers": ["kubernetes", "helm-values"],
       "matchDatasources": ["docker"],
       "matchFileNames": ["clusters/**/media/**"],
       "groupName": "media-apps"
     },
     {
       "description": "Auto-merge patch updates for media apps",
-      "matchManagers": ["kubernetes"],
+      "matchManagers": ["kubernetes", "helm-values"],
       "matchDatasources": ["docker"],
       "matchFileNames": ["clusters/**/media/**"],
       "matchUpdateTypes": ["patch"],
       "automerge": true
+    },
+    {
+      "description": "agentgateway canary tracks the 1.x train; 2.x is the legacy train, not an upgrade for this source",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["ghcr.io/agentgateway/charts/agentgateway"],
+      "matchFileNames": ["clusters/cluster1/flux-system/sources/agentgateway-canary-oci.yaml"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
     }
   ]
 }
