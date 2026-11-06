@@ -155,6 +155,10 @@
       "enabled": false
     },
     {
+      "matchPackageNames": ["ghcr.io/agentgateway/charts/agentgateway-crds"],
+      "enabled": false
+    },
+    {
       "description": "Track floating tags by digest. Tags like latest/edge/main are not versions, so Renovate skips them as invalid-value; pinning the digest lets it raise update PRs when the tag is rebuilt. (nsyncd is also semver-tracked; the digest pin just adds rebuild-level updates.)",
       "matchDatasources": ["docker"],
       "matchPackageNames": [
