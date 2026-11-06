@@ -1,0 +1,147 @@
+# Namespace: ci  (github-runner-wolf — self-hosted GitHub Actions runner for
+# the shrinedogg/wolf fork builds, biggs.dog#744)
+#
+# The shared ci.yaml policies (endpointSelector: {}, i.e. every ci pod) already
+# cover DNS, the GitHub control plane + git/action downloads, and the
+# container registries the build pulls from (ghcr.io, docker.io,
+# zot.biggs.dog, ...). This policy adds ONLY the wolf-build hosts that no
+# current policy carries, and it is scoped to the wolf runner pod by label so
+# the other runners' egress is unchanged.
+#
+# Fedora dnf (docker/wolf.Dockerfile: the base is Fedora 44 with 7 enabled
+# repos — fedora, updates, fedora-cisco-openh264, rpmfusion-free,
+# rpmfusion-free-updates, rpmfusion-nonfree, rpmfusion-nonfree-updates).
+# Every enabled repo file uses metalink= with baseurl commented out, so dnf
+# fetches the metalink XML first, then downloads repodata + RPMs from
+# whichever mirror the metalink lists. *.fedoraproject.org alone does NOT
+# cover this: the fedora-44 and updates-released-f44 metalinks list
+# third-party mirrors only (no *.fedoraproject.org https entries;
+# dl.fedoraproject.org appears as rsync only), so a fedoraproject-only
+# allowlist fails the first `dnf install` with 'Usable URL not found' /
+# Curl errors. The allowlist below is the full http/https mirror set of the
+# 7 enabled repos' metalinks, enumerated live from the repo files shipped in
+# ghcr.io/games-on-whales/gstreamer:1.26.7 (2026-11-06 fetch; mirror
+# hostnames rotate, so this is a point-in-time snapshot):
+#   - *.fedoraproject.org : the mirrors.fedoraproject.org metalink endpoint,
+#                           plus codecs.fedoraproject.org (openh264 repo,
+#                           the only fedoraproject mirror in any metalink)
+#   - mirrors.rpmfusion.org : the metalink endpoint of the 4 rpmfusion repos
+#   - 60 third-party mirror hosts : the http/https union of the fedora-44,
+#                           updates-released-f44, and rpmfusion free /
+#                           nonfree (released) metalinks
+# The fedora metalinks also carry protocol="http" entries (13 hosts appear
+# as http only), so TCP 80 is allowed alongside 443; dnf5 tries mirrors in
+# metalink order, so a blocked http mirror would otherwise stall the step
+# ~30s per mirror before falling to the next. rsync/ftp-only metalink
+# entries are excluded (dnf downloads over http/https only).
+#
+# Rust toolchain (docker/wolf.Dockerfile: `curl https://sh.rustup.rs | sh`,
+# then `rustup install 1.96.0`):
+#   - sh.rustup.rs         : the rustup installer script
+#   - static.rust-lang.org : RUSTUP_UPDATE_ROOT default (rustup binary +
+#                            toolchain tarballs); the Dockerfile sets no
+#                            RUSTUP_* override
+# (The first revision listed static.rustup.rs, which is NXDOMAIN —
+# authoritative NXDOMAIN from the rustup.rs zone, re-verified 2026-11-06 via
+# 1.1.1.1 / 8.8.8.8.)
+#
+# cargo (gst-wayland-display checkout + `cargo install cargo-c` / cinstall):
+#   - index.crates.io    : the crates.io sparse index
+#   - static.crates.io   : crate file downloads
+#
+# The allowlist is iterated per observed pull (matching the ci.yaml /
+# ci-talos.yaml policy history): if the first CI run is blocked on another
+# host, add it here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-wolf-build
+  namespace: ci
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner-wolf
+  egress:
+    # Fedora dnf metalink endpoints + third-party mirrors (see header).
+    # Ports 80 + 443: 13 of the mirrors are listed with protocol="http"
+    # only, so 80 is carried as well.
+    - toFQDNs:
+        - matchPattern: "*.fedoraproject.org"
+        - matchName: ask4.mm.fcix.net
+        - matchName: b4sh.mm.fcix.net
+        - matchName: distrohub.kyiv.ua
+        - matchName: divergentnetworks.mm.fcix.net
+        - matchName: download1.rpmfusion.org
+        - matchName: eu.edge.kernel.org
+        - matchName: fedora.ip-connect.info
+        - matchName: fedora.ipacct.com
+        - matchName: fedora.mirror.garr.it
+        - matchName: fedora.mirror.liteserver.nl
+        - matchName: fedora.mirror.wearetriple.com
+        - matchName: fedora.mirrorservice.org
+        - matchName: fedora.tu-chemnitz.de
+        - matchName: fedora.uib.no
+        - matchName: fr2.rpmfind.net
+        - matchName: ftp-stud.hs-esslingen.de
+        - matchName: ftp.cc.uoc.gr
+        - matchName: ftp.fau.de
+        - matchName: ftp.fi.muni.cz
+        - matchName: ftp.otenet.gr
+        - matchName: ftp.uni-stuttgart.de
+        - matchName: ftp.upjs.sk
+        - matchName: ipng.mm.fcix.net
+        - matchName: linus.iyte.edu.tr
+        - matchName: mirror.23m.com
+        - matchName: mirror.accum.se
+        - matchName: mirror.bahnhof.net
+        - matchName: mirror.cov.ukservers.com
+        - matchName: mirror.de.leaseweb.net
+        - matchName: mirror.dogado.de
+        - matchName: mirror.host.ag
+        - matchName: mirror.i3d.net
+        - matchName: mirror.imt-systems.com
+        - matchName: mirror.in2p3.fr
+        - matchName: mirror.init7.net
+        - matchName: mirror.karneval.cz
+        - matchName: mirror.netone.nl
+        - matchName: mirror.netsite.dk
+        - matchName: mirror.netzwerge.de
+        - matchName: mirror.nl.leaseweb.net
+        - matchName: mirror.plusline.net
+        - matchName: mirror.slu.cz
+        - matchName: mirror.stadtwerke-soest.de
+        - matchName: mirror.ufdroht.net
+        - matchName: mirror.vpsnet.com
+        - matchName: mirror.zyner.org
+        - matchName: mirrors.chroot.ro
+        - matchName: mirrors.coreix.net
+        - matchName: mirrors.n-ix.net
+        - matchName: mirrors.neterra.net
+        - matchName: mirrors.netix.net
+        - matchName: mirrors.nxthost.com
+        - matchName: mirrors.rpmfusion.org
+        - matchName: mirrors.xtom.de
+        - matchName: mirrors.xtom.ee
+        - matchName: repo.fedora.md
+        - matchName: rpmfusion.ip-connect.info
+        - matchName: rpmfusion.ip-connect.vn.ua
+        - matchName: www.fedora.is
+        - matchName: www.mirrorservice.org
+        - matchName: www.nic.funet.fi
+      toPorts:
+        - ports:
+            - port: "80"
+              protocol: TCP
+            - port: "443"
+              protocol: TCP
+    # rustup installer + update root, and the crates.io index + file hosts
+    # (see header).
+    - toFQDNs:
+        - matchName: sh.rustup.rs
+        - matchName: static.rust-lang.org
+        - matchName: index.crates.io
+        - matchName: static.crates.io
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
