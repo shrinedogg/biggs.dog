@@ -15,10 +15,10 @@
 # fetches the metalink XML first, then downloads repodata + RPMs from
 # whichever mirror the metalink lists. *.fedoraproject.org alone does NOT
 # cover this: the fedora-44 and updates-released-f44 metalinks list
-# third-party mirrors only (no *.fedoraproject.org https entries;
-# dl.fedoraproject.org appears as rsync only), so a fedoraproject-only
-# allowlist fails the first `dnf install` with 'Usable URL not found' /
-# Curl errors. The allowlist below is the full http/https mirror set of the
+# third-party mirrors only (no *.fedoraproject.org entries in the
+# http/https sets; dl.fedoraproject.org appears only inside rsync
+# URLs), so a fedoraproject-only allowlist fails the first `dnf install`
+# with 'Usable URL not found' / Curl errors. The allowlist below is the full http/https mirror set of the
 # 7 enabled repos' metalinks, enumerated live from the repo files shipped in
 # ghcr.io/games-on-whales/gstreamer:1.26.7 (2026-11-06 fetch; mirror
 # hostnames rotate, so this is a point-in-time snapshot):
@@ -29,11 +29,11 @@
 #   - 60 third-party mirror hosts : the http/https union of the fedora-44,
 #                           updates-released-f44, and rpmfusion free /
 #                           nonfree (released) metalinks
-# The fedora metalinks also carry protocol="http" entries (13 hosts appear
-# as http only), so TCP 80 is allowed alongside 443; dnf5 tries mirrors in
-# metalink order, so a blocked http mirror would otherwise stall the step
-# ~30s per mirror before falling to the next. rsync/ftp-only metalink
-# entries are excluded (dnf downloads over http/https only).
+# The metalinks also list 13 mirrors with protocol="http" only, so TCP 80
+# is allowed alongside 443; a blocked http mirror would otherwise cost the
+# step a full transfer timeout (~30s default) per mirror before dnf5 falls
+# to another mirror. rsync/ftp-only metalink entries are excluded (dnf
+# downloads over http/https only).
 #
 # Rust toolchain (docker/wolf.Dockerfile: `curl https://sh.rustup.rs | sh`,
 # then `rustup install 1.96.0`):
