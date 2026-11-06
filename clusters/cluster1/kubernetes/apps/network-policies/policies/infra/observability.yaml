@@ -95,9 +95,16 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
             app.kubernetes.io/name: agentgateway
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            gateway.networking.k8s.io/gateway-class-name: agentgateway
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
 ---
 # kagent's grafana-mcp server (ai-system/grafana-mcp) queries the Grafana HTTP
 # API on :3000. Without this, grafana ingress is locked to the gateway only and
