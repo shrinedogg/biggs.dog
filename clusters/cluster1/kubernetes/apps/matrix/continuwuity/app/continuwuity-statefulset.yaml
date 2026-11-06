@@ -33,7 +33,10 @@ spec:
                     values:
                       - worker-01
       containers:
-        - image: ghcr.io/continuwuity/continuwuity:main@sha256:f3a3c5dbeb930d505433882d1a4dedfe2e24ce9e319eb2d5dc3455a0ae6f946f
+        # Rolling :main is deliberate (renovate.json "Track floating tags by digest"):
+        # digest bumps carry upstream main commits without release notes, so evaluation
+        # is by the digest delta, not release notes.
+        - image: ghcr.io/continuwuity/continuwuity:main@sha256:7bf599deea343e550dad65206af31b8835961d1a997643416cd22a10d3e4620e
           imagePullPolicy: Always
           name: continuwuity
           env:
@@ -49,8 +52,8 @@ spec:
               value: "4"
             - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
               value: "false"
-            - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
-              value: "false"
+            # - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
+            #   value: "false"
             # - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
             #   value: |
             #     ["matrix.org"]
@@ -88,7 +91,7 @@ spec:
               value: "0.0.0.0"
             - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
               value: ""
-            - name: ALLOW_LEGACY_MEDIA
+            - name: CONTINUWUITY_ALLOW_LEGACY_MEDIA
               value: "true"
             # MatrixRTC / LiveKit — tells clients where to find the SFU backend.
             # Value MUST be TOML syntax (not JSON): figment's Env provider parses
