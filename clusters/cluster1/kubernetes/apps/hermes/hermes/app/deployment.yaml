@@ -114,11 +114,22 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
-              add: ["SETUID", "SETGID", "CHOWN"]
+              add: ["SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE"]
             seccompProfile:
               type: RuntimeDefault
-          # NOTE: image starts as root and drops privileges in the entrypoint
+          # NOTE: image boots as root and drops privileges in the entrypoint
           # (s6 + setuid), so runAsNonRoot is NOT set (would break boot).
+          # Boot contract (all PSA-baseline-legal, verified vs k8s v1.36.0):
+          #   SETUID/SETGID - s6 entrypoint drops root -> hermes (setuidgid)
+          #   CHOWN         - stage2/supervise-perms hooks chown /opt/data and
+          #                   the supervise/ trees to hermes
+          #   DAC_OVERRIDE  - root s6-supervise/s6-svlisten operate the
+          #                   hermes-owned trees and PVC state
+          # Tradeoff: container root can bypass file perms on mounted volumes
+          # (can read hermes-owned 0600 runtime state). Accepted 2026-11-07
+          # for this single-user LAN cluster; the container already carries
+          # the hermes-gateway secret set in env. Long-term upstream ask:
+          # non-privileged boot without these caps.
           volumeMounts:
             - name: data
               mountPath: /opt/data
