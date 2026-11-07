@@ -1,0 +1,33 @@
+# Pattern: auth/pocket-id/app/route.yaml. internal-biggs-dog Gateway
+# (networking ns) allows *.biggs.dog from all namespaces, same
+# biggs-dog-tls LE cert, VIP 192.168.6.15 — LAN/VPN only, NOT in the UDM
+# WAN port-forward (see networking/agentgateway/app/internal-gateway.yaml:
+# public DNS still resolves the host to Cloudflare -> wildcard-biggs-dog,
+# which has no hermes route, so external access 404s; issue #773 AC2).
+# LAN DNS is dynamic, not a static record: the k8s-gateway CoreDNS
+# (apps/networking/k8s-gateway/app/helmrelease.yaml: apex
+# k8s-gateway.networking, resources HTTPRoute Service, fallthrough
+# biggs.dog) serves the hermes.biggs.dog A record from this HTTPRoute,
+# because internal-biggs-dog pins spec.addresses 192.168.6.15 — LAN
+# clients resolve to the VIP with no split-horizon entry (same as
+# mcp.biggs.dog, docs/NOTES.md:336).
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: hermes
+  namespace: hermes
+spec:
+  hostnames:
+    - hermes.biggs.dog
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+  rules:
+    - backendRefs:
+        - name: hermes
+          port: 9119
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
