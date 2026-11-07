@@ -62,6 +62,15 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+              # stage2 (gateway boot) chowns /opt/data on the PVC to the
+              # hermes user, and this init runs as root with all caps
+              # dropped: without DAC_OVERRIDE it cannot mkdir on the
+              # hermes-owned /opt/data (EACCES) nor fetch into a
+              # hermes-owned .git. Observed 2026-11-07 during the Mac ->
+              # cluster cutover, when the vault tree was absent from the
+              # PVC and the re-clone hit this wall. Short-lived init only;
+              # the gateway container's caps are unchanged.
+              add: ["DAC_OVERRIDE"]
             seccompProfile:
               type: RuntimeDefault
       containers:
