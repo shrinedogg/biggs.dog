@@ -7,5 +7,6 @@ resources:
   # Flux-Kustomizations
   - ./docker-daemon-mirror/ks.yaml
   - ./github-runner/ks.yaml
+  - ./github-runner-hermes/ks.yaml
   - ./github-runner-talos/ks.yaml
   - ./github-runner-wolf/ks.yaml

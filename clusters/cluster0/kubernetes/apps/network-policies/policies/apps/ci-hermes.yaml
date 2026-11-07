@@ -1,0 +1,60 @@
+# Namespace: ci  (github-runner-hermes — self-hosted GitHub Actions runner
+# for the shrinedogg/hermes-agent fork, NousResearch/hermes-agent)
+#
+# The shared ci.yaml policies (endpointSelector: {}, i.e. every ci pod)
+# already cover DNS, the GitHub control plane + git/action downloads, and
+# the container registries the image build pulls from (ghcr.io, docker.io,
+# zot.biggs.dog, ...). This policy adds ONLY the hermes-build hosts the
+# krops e2e allowlist does not carry, and it is scoped to the hermes runner
+# pod by label so the other runners' egress is unchanged:
+#   - hermes-assets.nousresearch.com : the pm toolchain mirror
+#                         (pm/artifact-mirror.json): Python/uv, Node/npm
+#                         and pnpm toolchains downloaded by the
+#                         .github/actions/setup-pm action; R2-backed, same
+#                         shape as apk.cgr.dev's presigned redirects
+#   - deb.debian.org, security.debian.org : apt archives for the Dockerfile
+#                         (FROM debian:trixie) apt-get layers (build-
+#                         essential, python3, cmake, libolm, docker-cli,
+#                         s6 overlay deps)
+#   - pypi.org, files.pythonhosted.org : uv's package index (the pm/
+#                         lock-file installs in the CI test lanes)
+#   - index.crates.io, static.crates.io : cargo sparse index + crate files
+#                         (the rust-tests lane, mirroring ci-wolf.yaml's
+#                         cargo allowlist)
+#   - sqlite.org, sources.buildroot.net : sqlite-autoconf tarball, pinned
+#                         by Dockerfile ARG SQLITE_AUTOCONF_VERSION
+#                         (sqlite.org primary, buildroot fallback)
+#   - playwright-akamai.azureedge.net, cdn.playwright.dev : the
+#                         pre-built Chromium the Dockerfile bakes in
+#                         (PLAYWRIGHT_BROWSERS_PATH=/opt/hermes/tools;
+#                         Playwright's CDN + fastly-npm fallback)
+#
+# The allowlist is iterated per observed pull (matching the ci.yaml /
+# ci-talos.yaml policy history): if the first CI run is blocked on another
+# host, add it here.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-hermes-build
+  namespace: ci
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: github-runner-hermes
+  egress:
+    - toFQDNs:
+        - matchName: hermes-assets.nousresearch.com
+        - matchName: deb.debian.org
+        - matchName: security.debian.org
+        - matchName: pypi.org
+        - matchName: files.pythonhosted.org
+        - matchName: index.crates.io
+        - matchName: static.crates.io
+        - matchName: sqlite.org
+        - matchName: sources.buildroot.net
+        - matchName: playwright-akamai.azureedge.net
+        - matchName: cdn.playwright.dev
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
