@@ -1,0 +1,251 @@
+# Namespace: hermes  (Hermes gateway pod, label app.kubernetes.io/name=hermes)
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+# agentgateway data plane dials the dashboard service (ClusterIP reverse-NAT)
+# to serve the hermes.biggs.dog HTTPRoute. Same shape as rook-ceph.yaml /
+# ai-system.yaml allow-ingress-from-gateway: controller pod by name + data
+# plane pods by gateway-class-name (wildcard-biggs-dog + internal-biggs-dog
+# planes carry agentgateway; the 1.x canary carries agentgateway-canary).
+# A netpol that misses these breaks the route (502).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: hermes
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: hermes
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
+      toPorts:
+        - ports:
+            - port: "9119"
+              protocol: TCP
+---
+# Direct LAN ingress to the pod IP (LAN-only homelab exposure; the normal
+# entry point is the agentgateway VIP 192.168.6.15 — internal-biggs-dog —
+# in the LAN MetalLB pool).
+# Covers both documented LAN segments: 192.168.2.0/24
+# (nodes/workstations) and 192.168.6.0/24 (client-facing LB/DHCP +
+# the .6.15 VIP this route serves), so direct access works from
+# either; still LAN-only (no WAN exposure).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-lan
+  namespace: hermes
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: hermes
+  ingress:
+    - fromCIDR:
+        - 192.168.2.0/24
+        - 192.168.6.0/24
+      toPorts:
+        - ports:
+            - port: "9119"
+              protocol: TCP
+---
+# L7 DNS proxy rule (mandatory house pattern): without it Go/Python resolvers
+# behind default-deny break (conntrack reply-drop) and toFQDNs never match.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# Internet egress for the general-purpose agent: GitHub (vault initContainer
+# clone + GITHUB_TOKEN skill work), Slack (slack.com + wss), Matrix
+# (matrix.biggs.dog), PocketID (id.biggs.dog), Exa, and model-provider APIs.
+# matrix.biggs.dog / id.biggs.dog are served by the agentgateway with the
+# letsencrypt-prod cert (certificate wildcard-biggs-dog, verified 2026-11-06),
+# so the image's stock CA store verifies them — no custom CA mount needed.
+# No 1Password egress: ESO/Connect runs in the external-secrets controller.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-internet
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# *.biggs.dog names the pod dials (id.biggs.dog — the dashboard's OIDC issuer
+# for discovery/token/JWKS — and matrix.biggs.dog) resolve in-cluster via
+# kube-dns -> k8s-gateway to the wildcard-biggs-dog agentgateway MetalLB VIP.
+# That VIP is a cluster endpoint (Cilium DNATs to the data-plane pod
+# identity), not `world`, so allow-egress-internet above does not cover it —
+# same failure the matrix namespace hit (see policies/apps/matrix.yaml
+# allow-egress-to-gateway). Allow :443 egress to the gateway data plane pods.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-gateway
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Model traffic: in-cluster vLLM (the migrated config.yaml switches
+# model.base_url from https://vllm.biggs.dog/v1 to
+# http://vllm.ai-system.svc.cluster.local:8000/v1 — one less gateway hop on
+# the hottest path). ClusterIP reverse-NAT needs the return-path rule below.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-vllm
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app: vllm
+      toPorts:
+        - ports:
+            - port: "8000"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-vllm
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app: vllm
+---
+# Embeddings for the pgvector memory plugin (Infinity, BAAI/bge-m3, 1024-dim).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-embeddings
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: embeddings
+      toPorts:
+        - ports:
+            - port: "7997"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-embeddings
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: embeddings
+---
+# pgvector memory store (sibling #774: cnpg-hermes-memory, db hermesmemory).
+# Inert (selects nothing) until that cluster exists; the pinned image has
+# no pgvector provider (built-in fallback), so this egress is for when a
+# pgvector-capable image lands.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-hermes-memory
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hermes-memory
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hermes-memory
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hermes-memory
+---
+# VictoriaMetrics scraping (house pattern).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-prometheus-scraping
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: observability
