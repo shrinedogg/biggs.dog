@@ -41,8 +41,10 @@ spec:
 # Direct LAN ingress to the pod IP (LAN-only homelab exposure; the normal
 # entry point is the agentgateway VIP 192.168.6.15 — internal-biggs-dog —
 # in the LAN MetalLB pool).
-# If the operator's workstation is not in 192.168.2.0/24 during AC2
-# verification, add its CIDR here (one line).
+# Covers both documented LAN segments: 192.168.2.0/24
+# (nodes/workstations) and 192.168.6.0/24 (client-facing LB/DHCP +
+# the .6.15 VIP this route serves), so direct access works from
+# either; still LAN-only (no WAN exposure).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -55,6 +57,7 @@ spec:
   ingress:
     - fromCIDRs:
         - 192.168.2.0/24
+        - 192.168.6.0/24
       toPorts:
         - ports:
             - port: "9119"

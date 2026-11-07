@@ -24,6 +24,7 @@ spec:
         app.kubernetes.io/name: hermes
     spec:
       hostUsers: false
+      automountServiceAccountToken: false
       initContainers:
         # 1) Vault: clone/pull the private Obsidian vault repo into
         #    $HERMES_HOME/vaults/Shrinedoggs using a dedicated read-only
@@ -38,10 +39,11 @@ spec:
               set -e
               DEST=/opt/data/vaults/Shrinedoggs
               if [ -d "$DEST/.git" ]; then
-                git -C "$DEST" pull --ff-only
+                git -C "$DEST" fetch origin
+                git -C "$DEST" reset --hard FETCH_HEAD
               else
                 mkdir -p "$(dirname "$DEST")"
-                git clone "https://x-access-token:${GITHUB_VAULT_TOKEN}" "$DEST"
+                git clone "https://x-access-token:${GITHUB_VAULT_TOKEN}@github.com/shrinedogg/Shrinedoggs.git" "$DEST"
                 git -C "$DEST" remote set-url origin "https://github.com/shrinedogg/Shrinedoggs.git"
               fi
           env:
