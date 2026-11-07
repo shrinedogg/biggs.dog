@@ -108,7 +108,13 @@ spec:
         # the model class; docs caps: timeout 2h35m (tokens 4M default).
         # A review/follow-up runner Job's deadline is derived from this
         # timeout, so no runner.jobTemplate override is needed.
-        timeout: 45m
+        # 2026-11-07: 45m -> 90m. Two runs of biggs.dog PR #781 head
+        # 829b2f7 (9 changed files, deep verification pass, ~68k in-tokens
+        # per step) died at the 45m wall at step 59 with nothing posted;
+        # the second carried a 16-min stalled zai model call (endpoint
+        # healthy again afterwards, ~2s TTFB). 90m covers the full pass
+        # with headroom for one such stall; docs cap is 2h35m.
+        timeout: 90m
         tokens: 8000000
       review:
         # Runs on the Z.ai GLM Coding Plan: provider key `zai`, model
