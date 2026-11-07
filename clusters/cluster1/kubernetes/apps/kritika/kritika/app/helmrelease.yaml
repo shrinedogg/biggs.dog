@@ -101,6 +101,19 @@ spec:
           apiKey: { env: ZAI_API_KEY }
           pricing:
             glm-5.3-flash: { input: 0, output: 0 }
+        # Mistral platform route to the same model (zai-glm-5-3-flash, 1M
+        # context, tool calls): per-token at Mistral list price ($0.15 in /
+        # $0.50 out per 1M; pricing values are dollars per 1M tokens). Key:
+        # 1Password item mistral-api-key in the biggs-dog vault
+        # (MISTRAL_API_KEY). Alternate pipe for when the direct Z.ai
+        # coding-plan endpoint degrades (2026-11-07: completions hung ~40m
+        # with 0 tokens).
+        mistral:
+          type: openai
+          baseUrl: https://mistral.biggs.dog/v1
+          apiKey: { env: MISTRAL_API_KEY }
+          pricing:
+            zai-glm-5-3-flash: { input: 0.15, output: 0.5 }
       agent:
         # GLM 5.3 Flash is a reasoning model: the first real review ran
         # 57 steps / 3.2M tokens and hit the 20m default wall time
@@ -111,12 +124,15 @@ spec:
         timeout: 45m
         tokens: 8000000
       review:
-        # Runs on the Z.ai GLM Coding Plan: provider key `zai`, model
-        # glm-5.3-flash (1M context, flat subscription). Rollback: point
-        # this at "local/qwen 3.8 - local" (on-cluster, zero marginal
-        # cost) or the openrouter floating alias. Embeddings off,
-        # pollInterval default (10m).
-        model: "zai/glm-5.3-flash"
+        # 2026-11-07: the direct Z.ai coding-plan endpoint hung completions
+        # for ~40m (0-token steps, "context deadline exceeded") mid-wave;
+        # switched to the same model via the Mistral platform route
+        # (per-token, small cost per review). Rollback: point this at
+        # "zai/glm-5.3-flash" (direct, flat subscription),
+        # "local/qwen 3.8 - local" (on-cluster, zero marginal cost) or the
+        # openrouter floating alias. Embeddings off, pollInterval default
+        # (10m).
+        model: "mistral/zai-glm-5-3-flash"
     envFrom:
       - secretRef:
           name: kritika-credentials
