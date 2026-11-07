@@ -1,0 +1,135 @@
+# Hermes gateway (issue #773). The image's entrypoint-dispatch.sh runs the
+# s6 supervision tree that supervises `gateway run` + the dashboard
+# (HERMES_DASHBOARD=1) — NO command override; overriding it breaks s6.
+# HERMES_HOME=/opt/data is baked into the image.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes
+spec:
+  replicas: 1
+  # RWO PVC: never let two pods attach during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes
+    spec:
+      hostUsers: false
+      automountServiceAccountToken: false
+      initContainers:
+        # 1) Vault: clone/pull the private Obsidian vault repo into
+        #    $HERMES_HOME/vaults/Shrinedoggs using a dedicated read-only
+        #    GitHub PAT (1Password item hermes-gateway, prop vault-github-token).
+        #    Token is stripped from the stored remote URL afterwards.
+        - name: vault-clone
+          image: docker.io/alpine/git:v2.54.0
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+              DEST=/opt/data/vaults/Shrinedoggs
+              if [ -d "$DEST/.git" ]; then
+                git -C "$DEST" fetch "https://x-access-token:${GITHUB_VAULT_TOKEN}@github.com/shrinedogg/Shrinedoggs.git"
+                git -C "$DEST" reset --hard FETCH_HEAD
+              else
+                mkdir -p "$(dirname "$DEST")"
+                git clone "https://x-access-token:${GITHUB_VAULT_TOKEN}@github.com/shrinedogg/Shrinedoggs.git" "$DEST"
+                git -C "$DEST" remote set-url origin "https://github.com/shrinedogg/Shrinedoggs.git"
+              fi
+          env:
+            - name: GITHUB_VAULT_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-gateway
+                  key: vault-github-token
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+      containers:
+        - name: gateway
+          image: docker.io/nousresearch/hermes-agent:v2026.9.24
+          # amd64 manifest digest (verified via crane, 2026-11-06):
+          # sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
+          env:
+            # Dashboard on, bound 0.0.0.0 by image default; public URL pinned
+            # so the OIDC redirect URI = https://hermes.biggs.dog/auth/callback.
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_PUBLIC_URL
+              value: "https://hermes.biggs.dog"
+            # PocketID (live discovery verified 2026-11-06). Confidential
+            # client: id + secret come from the secret (envFrom); the
+            # self-hosted OIDC provider layers the secret on top of PKCE
+            # (v2026.9.24 supports public and confidential clients).
+            - name: HERMES_DASHBOARD_OIDC_ISSUER
+              value: "https://id.biggs.dog"
+            # Obsidian skill resolved vault path (issue #773).
+            - name: OBSIDIAN_VAULT_PATH
+              value: "/opt/data/vaults/Shrinedoggs"
+          envFrom:
+            - secretRef:
+                name: hermes-gateway
+          ports:
+            - name: http-dashboard
+              containerPort: 9119
+              protocol: TCP
+          # tcpSocket probes: every /api/ route is session-token gated, so an
+          # HTTP probe would fight the auth gate; s6 restarts the gateway if
+          # the process dies, liveness only catches a wedged listener.
+          readinessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          # NOTE: image starts as root and drops privileges in the entrypoint
+          # (s6 + setuid), so runAsNonRoot is NOT set (would break boot).
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-data
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
