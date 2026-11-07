@@ -73,8 +73,10 @@ spec:
               value: "1"
             - name: HERMES_DASHBOARD_PUBLIC_URL
               value: "https://hermes.biggs.dog"
-            # PocketID (live discovery verified 2026-11-06). Public PKCE
-            # client; client id comes from the secret (envFrom), no secret key.
+            # PocketID (live discovery verified 2026-11-06). Confidential
+            # client: id + secret come from the secret (envFrom); the
+            # self-hosted OIDC provider layers the secret on top of PKCE
+            # (v2026.9.24 supports public and confidential clients).
             - name: HERMES_DASHBOARD_OIDC_ISSUER
               value: "https://id.biggs.dog"
             # Obsidian skill resolved vault path (issue #773).
