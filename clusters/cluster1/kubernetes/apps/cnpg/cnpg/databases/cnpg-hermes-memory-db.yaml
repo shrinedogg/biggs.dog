@@ -1,0 +1,17 @@
+# Declaratively enable pgvector in the hermesmemory database. The stock operand
+# bundles the extension binaries (pgvector 0.8.1); CREATE EXTENSION requires
+# superuser, which the Database CR provides (issue #774).
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: cnpg-hermes-memory-db
+  namespace: cnpg-system
+spec:
+  name: hermesmemory
+  owner: hermesmemory
+  cluster:
+    name: cnpg-hermes-memory
+  extensions:
+    - name: vector
+      version: "0.8.1"
+      ensure: present

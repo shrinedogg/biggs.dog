@@ -1,0 +1,64 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-hermes-memory
+  namespace: cnpg-system
+spec:
+  instances: 3
+  # Mirrors the incident-hardened cnpg-pocket-id.yaml (2026-11-04 incident
+  # follow-ups); per-parameter rationale is preserved from that file.
+  enablePDB: false
+  failoverDelay: 60
+  # 5min startDelay/switchoverDelay: the 1h values are what slowed the
+  # 2026-11-04 failover (incident item 5)
+  startDelay: 300
+  switchoverDelay: 300
+  primaryUpdateMethod: switchover
+  bootstrap:
+    initdb:
+      database: hermesmemory
+      owner: hermesmemory
+      dataChecksums: true
+      secret:
+        name: hermes-memory-user-password
+  # Stock operand bundles pgvector 0.8.1 (verified vector.so + vector.control
+  # default_version 0.8.1); the extension itself is created by the
+  # cnpg-hermes-memory-db Database CR (issue #774).
+  imageName: ghcr.io/cloudnative-pg/postgresql:18.1
+  resources:
+    requests:
+      memory: 2Gi
+      cpu: 250m
+    limits:
+      memory: 2Gi
+  postgresql:
+    parameters:
+      # cap parallelism to the container (was unbounded: 32)
+      max_worker_processes: "8"
+      max_parallel_workers: "4"
+      max_parallel_maintenance_workers: "2"
+      # bound WAL retention from replication slots (was uncapped; pg_wal grew to 49 GB)
+      max_slot_wal_keep_size: "1GB"
+      # the HA slots already bound retention, so drop the per-instance WAL keep
+      # window (the 512MB operator default was redundant and a contributor to
+      # the pg_wal growth; incident item 3)
+      wal_keep_size: "0"
+      # force an archive attempt every 60s instead of the 5min operator default
+      # (incident item 3)
+      archive_timeout: "60s"
+      # CNPG requires wal_log_hints=on when instances > 1 (safe failover/basebackup);
+      # the operator also sets it by default, so keep it explicit and at the required value
+      wal_log_hints: "on"
+      # let standbys apply WAL promptly instead of buffering to 30 min
+      max_standby_streaming_delay: "30s"
+      # do not pin full-page images for standby snapshots; CNPG rebuilds a standby
+      # from basebackup when it needs to resync
+      hot_standby_feedback: "off"
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  plugins:
+  - name: barman-cloud.cloudnative-pg.io
+    isWALArchiver: true
+    parameters:
+      barmanObjectName: barman-object-store
