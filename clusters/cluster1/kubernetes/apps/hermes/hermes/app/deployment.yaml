@@ -61,7 +61,17 @@ spec:
           securityContext:
             allowPrivilegeEscalation: false
             capabilities:
+              # DAC_OVERRIDE: the gateway's s6 stage2 chowns /opt/data (PVC
+              # root) to the hermes user on first boot (non-recursive
+              # top-level chown; `vaults` is not in the recursive chown
+              # list), so a cap-less root init cannot create
+              # /opt/data/vaults on any pod start after the first gateway
+              # boot: `mkdir: can't create directory '/opt/data/vaults':
+              # Permission denied`. Init-only, seconds-lived container;
+              # same accepted tradeoff as the gateway container (see its
+              # NOTE below).
               drop: ["ALL"]
+              add: ["DAC_OVERRIDE"]
             seccompProfile:
               type: RuntimeDefault
       containers:
