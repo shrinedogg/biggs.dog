@@ -36,7 +36,7 @@ spec:
         # Rolling :main is deliberate (renovate.json "Track floating tags by digest"):
         # digest bumps carry upstream main commits without release notes, so evaluation
         # is by the digest delta, not release notes.
-        - image: ghcr.io/continuwuity/continuwuity:main@sha256:7bf599deea343e550dad65206af31b8835961d1a997643416cd22a10d3e4620e
+        - image: ghcr.io/continuwuity/continuwuity:main@sha256:dba068e07db0b824fdab69e5524ebdd0ff5091c052899bf34654ab81687d7929
           imagePullPolicy: Always
           name: continuwuity
           env:
