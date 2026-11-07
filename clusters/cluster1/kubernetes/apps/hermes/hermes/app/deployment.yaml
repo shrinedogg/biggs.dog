@@ -114,6 +114,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: ["ALL"]
+              add: ["SETUID", "SETGID"]
             seccompProfile:
               type: RuntimeDefault
           # NOTE: image starts as root and drops privileges in the entrypoint
