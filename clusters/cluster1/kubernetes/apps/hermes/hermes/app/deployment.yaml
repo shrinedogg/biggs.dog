@@ -30,7 +30,7 @@ spec:
         #    GitHub PAT (1Password item hermes-gateway, prop vault-github-token).
         #    Token is stripped from the stored remote URL afterwards.
         - name: vault-clone
-          image: docker.io/library/alpine/git:v2.54.0
+          image: docker.io/alpine/git:v2.54.0
           command:
             - /bin/sh
             - -c
@@ -41,7 +41,7 @@ spec:
                 git -C "$DEST" pull --ff-only
               else
                 mkdir -p "$(dirname "$DEST")"
-                git clone "https://x-access-token:${GITH...git" "$DEST"
+                git clone "https://x-access-token:${GITHUB_VAULT_TOKEN}" "$DEST"
                 git -C "$DEST" remote set-url origin "https://github.com/shrinedogg/Shrinedoggs.git"
               fi
           env:
@@ -59,44 +59,6 @@ spec:
               drop: ["ALL"]
             seccompProfile:
               type: RuntimeDefault
-        # 2) Config patch: inject the pgvector memory provider block into
-        #    /opt/data/config.yaml from the ESO-materialized DSN env var, on
-        #    every boot (idempotent; the DSN never lands in the PVC file).
-        #    If the DSN env is empty (1Password item hermes-memory-user-password
-        #    not yet created by sibling #774) the block is still written with
-        #    an empty dsn -> plugin fails soft (documented, AC6).
-        - name: patch-config
-          image: docker.io/nousresearch/hermes-agent:v2026.9.24
-          command:
-            - python3
-            - -c
-            - |
-              import os, pathlib
-              import yaml
-              p = pathlib.Path("/opt/data/config.yaml")
-              cfg = yaml.safe_load(p.read_text()) or {} if p.exists() else {}
-              dsn = os.environ.get("HERMES_MEMORY_PGVECTOR_DSN", "").strip()
-              mem = cfg.setdefault("memory", {})
-              mem["provider"] = "pgvector"
-              pl = cfg.setdefault("plugins", {}).setdefault("pgvector", {})
-              if dsn:
-                  pl["dsn"] = dsn
-              pl.setdefault("embed_url", "http://embeddings.ai-system.svc.cluster.local:7997")
-              pl.setdefault("embed_model", "bge-m3")
-              pl.setdefault("embed_dim", 1024)
-              pl.setdefault("embed_protocol", "auto")
-              pl.setdefault("embed_api_key_env", "EMBED_API_KEY")
-              if p.parent.exists():
-                  p.write_text(yaml.safe_dump(cfg, sort_keys=False))
-          env:
-            - name: HERMES_MEMORY_PGVECTOR_DSN
-              valueFrom:
-                secretKeyRef:
-                  name: hermes-gateway
-                  key: HERMES_MEMORY_PGVECTOR_DSN
-          volumeMounts:
-            - name: data
-              mountPath: /opt/data
       containers:
         - name: gateway
           image: docker.io/nousresearch/hermes-agent:v2026.9.24

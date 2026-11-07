@@ -1,6 +1,12 @@
-# Pattern: auth/pocket-id/app/route.yaml. wildcard-biggs-dog Gateway
-# (networking ns) allows *.biggs.dog from all namespaces, LE cert
-# biggs-dog-tls, VIP 192.168.6.7 (LAN MetalLB pool).
+# Pattern: auth/pocket-id/app/route.yaml. internal-biggs-dog Gateway
+# (networking ns) allows *.biggs.dog from all namespaces, same
+# biggs-dog-tls LE cert, VIP 192.168.6.15 — LAN/VPN only, NOT in the UDM
+# WAN port-forward (see networking/agentgateway/app/internal-gateway.yaml:
+# public DNS still resolves the host to Cloudflare -> wildcard-biggs-dog,
+# which has no hermes route, so external access 404s; issue #773 AC2).
+# LAN clients need the split-horizon record hermes.biggs.dog ->
+# 192.168.6.15 (same place the mindwtr/vllm records live; outside this
+# repo).
 ---
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
@@ -11,7 +17,7 @@ spec:
   hostnames:
     - hermes.biggs.dog
   parentRefs:
-    - name: wildcard-biggs-dog
+    - name: internal-biggs-dog
       namespace: networking
   rules:
     - backendRefs:

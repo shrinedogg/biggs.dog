@@ -39,7 +39,8 @@ spec:
               protocol: TCP
 ---
 # Direct LAN ingress to the pod IP (LAN-only homelab exposure; the normal
-# entry point is the agentgateway VIP 192.168.6.7 in the LAN MetalLB pool).
+# entry point is the agentgateway VIP 192.168.6.15 — internal-biggs-dog —
+# in the LAN MetalLB pool).
 # If the operator's workstation is not in 192.168.2.0/24 during AC2
 # verification, add its CIDR here (one line).
 apiVersion: cilium.io/v2
@@ -171,8 +172,9 @@ spec:
             app.kubernetes.io/name: embeddings
 ---
 # pgvector memory store (sibling #774: cnpg-hermes-memory, db hermesmemory).
-# Inert (selects nothing) until that cluster exists — the provider then
-# reports connection failure, which the issue marks acceptable.
+# Inert (selects nothing) until that cluster exists; the pinned image has
+# no pgvector provider (built-in fallback), so this egress is for when a
+# pgvector-capable image lands.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:

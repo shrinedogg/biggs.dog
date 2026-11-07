@@ -8,8 +8,9 @@ spec:
   dependsOn:
     # ClusterSecretStore (onepassword-connect) must exist for the ExternalSecret.
     # cnpg-databases is NOT a dependency: the pgvector memory cluster
-    # (cnpg-hermes-memory) lands via sibling #774 and the gateway tolerates
-    # its absence (memory provider reports connection failure, fail-soft).
+    # (cnpg-hermes-memory) lands via sibling #774; the pinned image has no
+    # pgvector provider, so the agent falls back to the built-in memory
+    # provider (the DSN is env-wired, inert).
     - name: secretstore
   commonMetadata:
     labels:

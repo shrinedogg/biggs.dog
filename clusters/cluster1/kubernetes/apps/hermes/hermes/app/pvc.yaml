@@ -7,6 +7,12 @@ kind: PersistentVolumeClaim
 metadata:
   name: hermes-data
   namespace: hermes
+  # Flux prune protection: this Kustomization keeps prune: true (issue
+  # #773); ceph-block reclaimPolicy is Delete, so a pruned PVC would delete
+  # the RBD and the migrated state. Pattern:
+  # clusters/cluster1/kubernetes/apps/renovate/namespace.yaml.
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 spec:
   accessModes:
     - ReadWriteOnce
