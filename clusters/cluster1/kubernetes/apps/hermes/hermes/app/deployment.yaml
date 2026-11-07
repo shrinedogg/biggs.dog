@@ -63,7 +63,7 @@ spec:
               type: RuntimeDefault
       containers:
         - name: gateway
-          image: docker.io/nousresearch/hermes-agent:v2026.9.24
+          image: docker.io/nousresearch/hermes-agent:v2026.9.24@sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
           # amd64 manifest digest (verified via crane, 2026-11-06):
           # sha256:2fd023efbb8d3d2b0ce1a73d028b07370cff34f567cfe0e999553e8c327ea283
           env:
