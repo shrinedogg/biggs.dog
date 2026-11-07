@@ -109,6 +109,35 @@ spec:
             - port: "443"
               protocol: TCP
 ---
+# *.biggs.dog names the pod dials (id.biggs.dog — the dashboard's OIDC issuer
+# for discovery/token/JWKS — and matrix.biggs.dog) resolve in-cluster via
+# kube-dns -> k8s-gateway to the wildcard-biggs-dog agentgateway MetalLB VIP.
+# That VIP is a cluster endpoint (Cilium DNATs to the data-plane pod
+# identity), not `world`, so allow-egress-internet above does not cover it —
+# same failure the matrix namespace hit (see policies/apps/matrix.yaml
+# allow-egress-to-gateway). Allow :443 egress to the gateway data plane pods.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-gateway
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
 # Model traffic: in-cluster vLLM (the migrated config.yaml switches
 # model.base_url from https://vllm.biggs.dog/v1 to
 # http://vllm.ai-system.svc.cluster.local:8000/v1 — one less gateway hop on
