@@ -55,7 +55,7 @@ spec:
     matchLabels:
       app.kubernetes.io/name: hermes
   ingress:
-    - fromCIDRs:
+    - fromCIDR:
         - 192.168.2.0/24
         - 192.168.6.0/24
       toPorts:
