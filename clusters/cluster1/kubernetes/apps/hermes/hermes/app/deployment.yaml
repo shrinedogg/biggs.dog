@@ -28,7 +28,10 @@ spec:
       initContainers:
         # 1) Vault: clone/pull the private Obsidian vault repo into
         #    $HERMES_HOME/vaults/Shrinedoggs using a dedicated read-only
-        #    GitHub PAT (1Password item hermes-gateway, prop vault-github-token).
+        #    GitHub PAT (1Password item hermes-gateway, prop
+        #    vault-github-token) from the init-only hermes-vault-token
+        #    secret (issue #790: the PAT is NOT in the gateway container's
+        #    envFrom surface).
         #    Token is stripped from the stored remote URL afterwards.
         - name: vault-clone
           image: docker.io/alpine/git:v2.54.0
@@ -50,7 +53,7 @@ spec:
             - name: GITHUB_VAULT_TOKEN
               valueFrom:
                 secretKeyRef:
-                  name: hermes-gateway
+                  name: hermes-vault-token
                   key: vault-github-token
           volumeMounts:
             - name: data
@@ -131,13 +134,14 @@ spec:
           # Tradeoff: container root can bypass file perms on mounted
           # volumes (can read hermes-owned 0600 runtime state). Accepted
           # 2026-11-07 for this single-user LAN cluster. The container env
-          # carries the hermes-gateway secret set, but the long-lived
-          # vault-github-token PAT in it is consumed only by the vault-clone
-          # init container; splitting it into a dedicated init-only secret
-          # is tracked in #790. Root still acts on hermes-owned files at
-          # boot (stage2 chmod 600 on .env/auth.json), so DAC_OVERRIDE
-          # cannot be dropped independently of CHOWN. Upstream ask:
-          # non-privileged boot without these caps.
+          # carries the hermes-gateway secret set, which no longer includes
+          # the long-lived vault-github-token PAT; the PAT lives in the
+          # init-only hermes-vault-token secret consumed solely by the
+          # vault-clone init container (split per issue #790). Root still
+          # acts on hermes-owned files at boot (stage2 chmod 600 on
+          # .env/auth.json), so DAC_OVERRIDE cannot be dropped
+          # independently of CHOWN. Upstream ask: non-privileged boot
+          # without these caps.
           volumeMounts:
             - name: data
               mountPath: /opt/data
