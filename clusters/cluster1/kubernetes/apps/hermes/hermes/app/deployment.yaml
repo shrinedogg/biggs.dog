@@ -39,7 +39,7 @@ spec:
               set -e
               DEST=/opt/data/vaults/Shrinedoggs
               if [ -d "$DEST/.git" ]; then
-                git -C "$DEST" fetch origin
+                git -C "$DEST" fetch "https://x-access-token:${GITHUB_VAULT_TOKEN}@github.com/shrinedogg/Shrinedoggs.git"
                 git -C "$DEST" reset --hard FETCH_HEAD
               else
                 mkdir -p "$(dirname "$DEST")"
