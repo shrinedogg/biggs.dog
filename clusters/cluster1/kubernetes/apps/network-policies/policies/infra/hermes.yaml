@@ -249,3 +249,26 @@ spec:
     - fromEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: observability
+---
+# kagent A2A + MCP (svc kagent-controller in ai-system, :8083): lets the agent
+# verify and invoke the local kagent fleet (agent cards, SendMessage canaries,
+# the substrate sandbox/session MCP surface) in-cluster. The controller side is
+# unauthenticated; the auth'd LAN-only path stays mcp.biggs.dog/mcp (editor key
+# from secret kagent-mcp-api-keys). Service selection (k8s:k8s-app) mirrors the
+# allow-egress-dns house pattern; ClusterIP reverse-NAT is handled by Cilium.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-kagent
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            k8s:k8s-app: kagent-controller
+      toPorts:
+        - ports:
+            - port: "8083"
+              protocol: TCP
