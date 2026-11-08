@@ -49,38 +49,61 @@ spec:
           image: docker.io/vllm/vllm-openai:v0.33.0
           args:
             # ----------------------------------------------------------------
-            # MODEL: Alibaba's official FP8 (W8A8, dynamic activation scaling)
-            # checkpoint of dense Qwen3.8-27B:
-            #   https://huggingface.co/Qwen/Qwen3.8-27B-FP8
-            # ~28.7GB safetensors incl. the MTP draft head. A 27B DENSE model
-            # with a Gated-DeltaNet / gated-attention hybrid (only 16 of 64
-            # layers keep paged KV, so long context stays cheap) and 262K
-            # native context. FP8 is native on Blackwell (sm_120).
+            # MODEL: Minima NVFP4 W4A4 of Qwen3.8-27B (post-training quant
+            # only; paper: https://huggingface.co/papers/2609.04098):
+            #   https://huggingface.co/minima-ai/mnma_qwen3.8_27b_nvfp4
+            # ALL 496 linear layers at NVFP4 (group 16, FP8 scales) -- all 48
+            # Gated-DeltaNet layers including their gate projections -- plus
+            # calibrated STATIC FP8 KV scales (k_scale/v_scale, 32 tensors).
+            # BF16 parity within seed noise; fastest prefill of the recipes
+            # the paper compares (+14-19% vs partial quants). Single
+            # model.safetensors = 18,788,354,104 bytes (~17.5GiB) incl. the
+            # MTP draft head; global scales are harmonized for vLLM's fused
+            # in_proj GEMMs, so it serves correctly out of the box. Built
+            # with llm-compressor (compressed-tensors, nvfp4-pack-quantized);
+            # the card requires vLLM >= 0.27 on SM120/Blackwell -- this image
+            # is v0.33.0 (CUDA 13.0), so no image bump is needed.
             #
-            # WHY FP8 + TP=2 (2026-09-09): nv-01 now carries TWO RTX 5090s
-            # (32GB each). FP8 is the highest-fidelity quant that fits the
-            # pair: ~14.4GiB of weights per card leaves an estimated ~10GiB
-            # fp8 KV pool PER CARD (~20GiB total), versus the 5.91GiB the
-            # single-card unsloth NVFP4 quant had. That is enough for the full
-            # 262K native window AND real long-context concurrency, and it
-            # avoids the tool-call/coding accuracy loss of 4-bit weight quants
-            # on a dense 27B.
-            # History: rdtand/Qwen3.6-27B-PrismaSCOUT NVFP4 (~18GiB resident),
+            # WHY NVFP4 + TP=2 (2026-11-08): TP=2 is kept unchanged -- a 262K
+            # sequence needs ~8.5GiB of fp8 KV, which does not fit a single
+            # card's pool with room for concurrency, and the 262K window with
+            # real long-context concurrency is the requirement (largest
+            # observed session ~164K). NVFP4 roughly halves per-card weights
+            # vs the old FP8 checkpoint: ~8.75GiB of weights per card (vs
+            # ~14.4GiB) leaves an estimated ~15.5GiB fp8 KV pool PER CARD
+            # (~31GiB total) at 0.92 util, up from ~20GiB total. Against
+            # ~8.5GiB per max-length 262K sequence, ~3.5 full-length sessions
+            # fit at once (was ~2.4). ESTIMATE, not measurement: re-read the
+            # first-boot log -- "Available KV cache memory: N GiB" and "GPU
+            # KV cache size: N tokens, Maximum concurrency for 262,144 tokens
+            # per request: N.NNx" are the authoritative numbers; rewrite
+            # these estimates to match.
+            # KEPT, and why: --tensor-parallel-size=2 (KV math above),
+            # --kv-cache-dtype=fp8 (now picks up the checkpoint's calibrated
+            # static scales -- performance-free, no dynamic-scaling drift),
+            # MTP speculative decode (the draft head is IN this checkpoint
+            # too, mtp_num_hidden_layers=1; the main decode speedup for agent
+            # traffic), qwen3_coder tool + qwen3 reasoning parsers (verified
+            # for this family), the 262144 window, 0.92 util, 16-way batch
+            # caps, prefix caching. Quantization is AUTO-DETECTED from the
+            # checkpoint's quantization_config (compressed-tensors) -- do
+            # NOT pass --quantization.
+            # History: Qwen/Qwen3.8-27B-FP8 (previous config, 2026-09-09),
+            # rdtand/Qwen3.6-27B-PrismaSCOUT NVFP4 (~18GiB resident),
             # unsloth/Qwen3.6-27B-NVFP4 (~23GiB), unsloth/Qwen3.8-27B-NVFP4
-            # (~21.8GB on disk, 177184-token ceiling on one card). The unsloth
-            # 3.8 weights stay cached on the PVC for a single-card fallback.
-            # Quantization is fp8 and AUTO-DETECTED from the checkpoint's
-            # quantization_config -- do NOT pass --quantization.
+            # (~21.8GB on disk, 177184-token ceiling on one card). The old
+            # FP8 weights stay cached on the PVC for rollback / single-card
+            # fallback.
             # --served-model-name must match the kagent HelmRelease provider.
             # ----------------------------------------------------------------
-            - --model=Qwen/Qwen3.8-27B-FP8
+            - --model=minima-ai/mnma_qwen3.8_27b_nvfp4
             # served-model-name is intentionally different from --model:
             # the slash in the HuggingFace path (Qwen/) gets stripped by some
             # clients (e.g. Zed), causing 404s. A slash-free alias fixes all
             # clients; kagent and Zed both use this name, not the weights path.
             # NOTE: the id literally contains spaces ("qwen 3.8 - local"), per
             # request; clients must send it exactly. Unchanged across the
-            # NVFP4 -> FP8 swap so no client or kagent edit is needed.
+            # FP8 -> NVFP4 swap so no client or kagent edit is needed.
             - --served-model-name=qwen 3.8 - local
             # Split the model across both 5090s. PCIe-only (PHB topology, no
             # NVLink, no GeForce P2P), so the per-layer allreduce rides host
@@ -90,12 +113,15 @@ spec:
             # explicitly instead of letting NCCL probe P2P).
             - --tensor-parallel-size=2
             # fp8 KV cache + hybrid attention keep the KV pool small even at
-            # long context. The checkpoint has no static KV scales, so vLLM
-            # uses dynamic fp8 KV scaling (same as the NVFP4 quants ran).
+            # long context. Unlike the old FP8 checkpoint (no static KV
+            # scales -> dynamic fp8 KV scaling), this checkpoint ships
+            # calibrated STATIC fp8 k/v scales (32 tensors) and this flag
+            # picks them up -- performance-free, no dynamic-scaling drift.
+            # The model card's serving command requires exactly this flag.
             - --kv-cache-dtype=fp8
             # FULL native 262K window. ESTIMATE, not measurement: a 262K
             # sequence needs ~8.5GiB of fp8 KV (measured 0.0323 GiB per 1K
-            # tokens on v0.28.0 with this arch), against an estimated ~20GiB
+            # tokens on v0.28.0 with this arch), against an estimated ~31GiB
             # pool across both cards. vLLM v1 HARD-FAILS startup if the pool
             # cannot hold one full max-model-len sequence; if that happens,
             # the EngineCore ValueError in `kubectl logs --previous` states the
@@ -123,8 +149,8 @@ spec:
             # kagent fan-out (prefill of many long prompts compute-locked
             # /health for 3+ min and the pod restarted); 32-way on the 131K
             # window was stable; 8-way was forced by the 5.91GiB single-card
-            # pool at 177184. With an estimated ~20GiB pool and ~8.5GiB per
-            # max-length sequence, ~2.5 full 262K sessions fit at once and
+            # pool at 177184. With an estimated ~31GiB pool and ~8.5GiB per
+            # max-length sequence, ~3.5 full 262K sessions fit at once and
             # 16-way lets vLLM admit a burst of short/medium agent prompts
             # while QUEUEING (not compute-locking) when several long sessions
             # land together. Keep capture-size == max-num-seqs; a capture size
@@ -143,9 +169,11 @@ spec:
             # which matches agent traffic (few long sessions). Measure
             # acceptance rate in the vLLM metrics before moving to 3 or 1.
             - --speculative-config={"method":"mtp","num_speculative_tokens":2}
-            # Qwen3.8's hybrid (Gated-DeltaNet) arch may ship custom modeling
-            # code; the model card sets trust-remote-code. NOTE: executes repo
-            # Python.
+            # Kept from the previous checkpoint for this model family. The
+            # Minima config.json does NOT set trust_remote_code (natively
+            # supported as Qwen3_5ForCausalLM), so nothing executes here --
+            # a harmless no-op. NOTE: if a future checkpoint DID ship remote
+            # code, this flag would execute repo Python.
             - --trust-remote-code
             # Qwen3.8 tool-call + reasoning parsers, verified against the vLLM
             # recipe for Qwen/Qwen3.8-27B (recipes.vllm.ai/Qwen/Qwen3.8-27B):
@@ -155,8 +183,10 @@ spec:
             - --tool-call-parser=qwen3_coder
             - --reasoning-parser=qwen3
             # Text-only kagent traffic: skip the vision encoder + multimodal
-            # profiling entirely. The vision tower is BF16 in this checkpoint;
-            # loading it would cost ~1.5GiB of KV per card for nothing.
+            # profiling entirely. This checkpoint is a text-only
+            # Qwen3_5ForCausalLM extraction (no vision tower), so the flag is
+            # a no-op safeguard here; keep it so a future vision checkpoint
+            # cannot silently cost ~1.5GiB of KV per card.
             - --language-model-only
             # Keep port 8000 to match the Service and the kagent provider baseUrl.
             - --host=0.0.0.0
@@ -196,16 +226,21 @@ spec:
               # (the default); setting it true rejects this pod. A gpu:8
               # request also works but starves every other GPU pod.
               nvidia.com/gpu: 5
-              # Two TP worker processes + a 28.7GB safetensors load (page
+              # Two TP worker processes + an 18.8GB safetensors load (page
               # cache is charged to the cgroup during the mmap read). 22Gi
-              # was enough for the single 21.8GB NVFP4 worker; sized up for
-              # the larger checkpoint and the second worker. Node has 64GB.
+              # was enough for the single 21.8GB NVFP4 worker; 36Gi was sized
+              # up for the larger 28.7GB FP8 checkpoint and still covers this
+              # 18.8GB one. Node has 64GB.
               memory: 36Gi
           startupProbe:
             httpGet:
               path: /health
               port: http
-            # First boot downloads weights (~28.7GB); allow up to ~30 min.
+            # First boot downloads the weights (~18.8GB) and compiles the
+            # NVFP4 kernels (a quantization change means no warm compile
+            # cache despite VLLM_CACHE_ROOT); allow up to ~30 min. If the
+            # startup probe kills the pod on the very first boot, the
+            # restart is faster -- the weights are already on the PVC.
             periodSeconds: 15
             failureThreshold: 120
             # /health can be briefly slow even once serving; default 1s is tight.
