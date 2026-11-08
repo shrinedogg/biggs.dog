@@ -254,8 +254,10 @@ spec:
 # verify and invoke the local kagent fleet (agent cards, SendMessage canaries,
 # the substrate sandbox/session MCP surface) in-cluster. The controller side is
 # unauthenticated; the auth'd LAN-only path stays mcp.biggs.dog/mcp (editor key
-# from secret kagent-mcp-api-keys). Service selection (k8s:k8s-app) mirrors the
-# allow-egress-dns house pattern; ClusterIP reverse-NAT is handled by Cilium.
+# from secret kagent-mcp-api-keys). Endpoint selection is by pod identity (the
+# controller Deployment's labels; the svc/dep do NOT carry a k8s-app label),
+# same house pattern as allow-egress-to-vllm: Cilium DNATs the ClusterIP to
+# the pod, and the egress policy is evaluated against the pod identity.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -267,7 +269,8 @@ spec:
     - toEndpoints:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: ai-system
-            k8s:k8s-app: kagent-controller
+            app.kubernetes.io/name: kagent
+            app.kubernetes.io/component: controller
       toPorts:
         - ports:
             - port: "8083"
