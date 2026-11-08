@@ -77,16 +77,16 @@ spec:
       containers:
         - name: gateway
           # Custom build from github.com/shrinedogg/hermes-agent branch
-          # build/dockerhub-catalog-harness2 @ e7f73467 (catalog-harness2
+          # build/dockerhub-catalog-harness2 @ cdc83cc0 (catalog-harness2
           # tree = upstream main 2026-11-08, i.e. v0.23.0 + 1 commit):
           # 0.23.0-generation core + the harness2 plugin catalog entry
           # (plugin-catalog/harness2.yaml) + harness2 vendored
           # (plugins-vendor/harness2 @ shrinedogg/harness2-hermes 51acf02,
           # the catalog pin) which the image seeds into $HERMES_HOME/plugins
           # on first boot (never overwriting an existing install).
-          # Digest pin to be added once the first GH build publishes
-          # (watchdog: hermes-0.23-cutover-watchdog).
-          image: docker.io/shrinedogg/hermes-agent:catalog-harness2-e7f73467
+          # Built by GH run 42452094419 (2026-11-08, success); digest pinned
+          # from registry-1.docker.io manifest (oci image index, amd64).
+          image: docker.io/shrinedogg/hermes-agent:catalog-harness2-cdc83cc@sha256:43bf33dbedeb4e0277dde9d7d04960cc9402b271ae56e65440a96a7b38cdf804
           env:
             # Dashboard on, bound 0.0.0.0 by image default; public URL pinned
             # so the OIDC redirect URI = https://hermes.biggs.dog/auth/callback.
