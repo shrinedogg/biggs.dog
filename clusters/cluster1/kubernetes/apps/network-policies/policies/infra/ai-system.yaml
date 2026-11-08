@@ -504,3 +504,30 @@ spec:
         - ports:
             - port: "8000"
               protocol: TCP
+---
+# Hermes (hermes ns) verifies/invokes the kagent fleet in-cluster: A2A
+# (SendMessage canaries, agent cards) + the substrate MCP surface, both on
+# kagent-controller:8083. Sending side: hermes.yaml allow-egress-to-kagent;
+# this is the receiver-side grant -- allow-intra-namespace above otherwise
+# default-denies ingress into ai-system from outside the namespace, which is
+# why egress alone left the dial blackholed. Cross-namespace ingress house
+# pattern per allow-ingress-from-kritika.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hermes
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: kagent
+      app.kubernetes.io/component: controller
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hermes
+            app.kubernetes.io/name: hermes
+      toPorts:
+        - ports:
+            - port: "8083"
+              protocol: TCP
