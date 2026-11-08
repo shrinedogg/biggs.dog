@@ -15,4 +15,6 @@ spec:
     # controller in the operator v0.1.1.
     # 3cf5c34 adds status.ports.agent to the Session CRD (per-session
     # wolf-agent port), needed by the operator v0.1.2 concurrent-session fix.
+    # 37a1dbd is CI/lint/test plumbing only (workflows, .golangci.yml, Makefile,
+    # renovate.json); no crds/ changes, keeping the pin on the feat/multi-user tip.
     commit: 37a1dbd9caa8a9bb15c418726e90686100b5e277
