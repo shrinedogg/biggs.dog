@@ -38,6 +38,7 @@ clusters/
 │   └── kubernetes/apps/
 │       ├── auth/dex/              # Dex OIDC IdP (root identity for edge apps)
 │       ├── cert-manager/          # Certificate issuance (ACME + CA issuers)
+│       ├── ci/                    # Self-hosted GitHub Actions runners (org-scoped krops e2e; repo-scoped talos/wolf/hermes-agent) + docker-daemon-mirror
 │       ├── external-secrets/      # External Secrets + 1Password Connect
 │       ├── kube-system/cilium/    # Cilium CNI (L2 announcement, 192.168.2.31/32)
 │       ├── network-policies/      # CiliumNetworkPolicies (two-tier: apps + infra)
@@ -49,7 +50,7 @@ clusters/
 └── cluster1/                      # On-prem bare-metal workload cluster (6 nodes)
     ├── flux-system/               # FluxInstance + sources
     └── kubernetes/apps/
-        ├── ai-system/             # vLLM + kagent agents + substrate runtime + MCP servers
+        ├── ai-system/             # vLLM + kagent agents + substrate runtime + MCP servers + agentgateway model routes (agentgateway-ai)
         ├── auth/                  # SSO stack (Pocket ID + OAuth2 Proxy)
         ├── biggs/                 # Tribute
         ├── cert-manager/          # Certificate issuance (ACME + CA issuers)
@@ -58,6 +59,8 @@ clusters/
         ├── dreamcast/             # GPU game streaming (Fenrir/Wolf + NVIDIA GPU Operator + GPU Arbiter)
         ├── external-secrets/      # External Secrets + 1Password Connect
         ├── games/                 # Dedicated game servers (Windrose)
+        ├── hermes/                # Hermes gateway (hermes.biggs.dog; hermes-agent + CNPG hermes-memory/state)
+        ├── kritika/               # Kritika AI PR reviewer (kritika.biggs.dog + cnpg-kritika)
         ├── kube-system/           # Cilium (BGP), CoreDNS, NFD, GPU plugins, storage
         ├── liquidctl/             # NZXT Kraken Elite AIO fan/pump control (nv-01)
         ├── livekit/               # LiveKit SFU (WebRTC media server for MatrixRTC)
@@ -69,7 +72,8 @@ clusters/
         ├── observability/         # VictoriaMetrics/Logs, Grafana Operator
         ├── openebs/               # Container-attached storage
         ├── renovate/              # Automated dependency updates
-        └── rook-ceph/             # Distributed storage (Rook v1.20 + Ceph CSI driver)
+        ├── rook-ceph/             # Distributed storage (Rook v1.20 + Ceph CSI driver)
+        └── zot/                   # Zot pull-through cache registry (zot.biggs.dog, ceph-block)
 ```
 
 ## Cluster Nodes
@@ -105,7 +109,7 @@ A single-node Talos management cluster (`talos-mgmt-01` / `cluster0-cp-01`) on t
 | `cluster1` | [k8s-gateway](https://github.com/ori-edge/k8s_gateway) | Split-horizon DNS authoritative for `*.biggs.dog` (LB `192.168.6.6`, ClusterIP `10.101.183.97`, 2 replicas). Contains a hosts block mapping `omni.biggs.dog`, `dex.biggs.dog`, `factory.biggs.dog` to `192.168.2.31` locally before fallthrough to NextDNS. |
 | `cluster1` | lan-dns | LAN resolver (CoreDNS, LB `192.168.6.16`): contains a hosts block for cluster0 edge names to `192.168.2.31`, forwards `biggs.dog` to k8s-gateway's ClusterIP (`10.101.183.97`), and forwards everything else to NextDNS over DoT (`tls://45.90.28.0`, `tls://45.90.30.0`). The UDM hands out `.6.16` via per-VLAN DHCP. |
 | both | [Gateway API](https://gateway-api.sigs.k8s.io/) | Kubernetes ingress using Gateway API. `cluster1` runs `wildcard-biggs-dog` (LB `192.168.6.7`), fronted by UDM port forwards on 80/443. `cluster0` runs `cluster0-gateway` (LB `192.168.2.31`). |
-| both | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation with OCI charts pinned to a verified build. |
+| both | [AgentGateway](https://github.com/kgateway-dev/kgateway) | Gateway API implementation with OCI charts pinned to a verified build (`v2.2.1`). The 1.x train cutover runs in parallel: a 1.7.0 canary controller + `agentgateway1x-canary` Gateway (GatewayClass `agentgateway-canary`) with CRDs bumped to v1.7.0; plan in [`docs/agentgateway-1x-migration/`](docs/agentgateway-1x-migration/). |
 
 `cluster1` DNS: LAN clients resolve `biggs.dog` via **lan-dns** (`192.168.6.16`), which forwards to k8s-gateway for internal VIPs and to NextDNS over DoT for everything else. In-cluster, **CoreDNS** (kube-dns, Talos-managed) forwards `biggs.dog` to k8s-gateway's ClusterIP (`10.101.183.97`), so pods resolve `*.biggs.dog` internally instead of hairpinning through Cloudflare. Both forward targets use the ClusterIP (not the LB VIP) to avoid a Cilium same-node LB hairpin failure when a resolver pod is co-located with k8s-gateway.
 
@@ -129,8 +133,8 @@ A single-node Talos management cluster (`talos-mgmt-01` / `cluster0-cp-01`) on t
 
 | Component | Description |
 | --- | --- |
-| [CloudNativePG](https://cloudnative-pg.io/) | PostgreSQL operator for in-cluster databases (chart `0.29.0`, PG18 minimal Trixie image catalog). |
-| [Barman Cloud](https://pgbarman.org/) | CNPG plugin (`0.7.1`) for PostgreSQL backup and recovery to object storage. |
+| [CloudNativePG](https://cloudnative-pg.io/) | PostgreSQL operator for in-cluster databases (chart `0.29.1`, PG18 minimal Trixie image catalog). Clusters: pocket-id, renovate, bookboss, kagent, silo (3 instances, WAL archive + daily plugin backup), kritika, hermes-memory (pgvector), hermes-state, and substrate (BYO store for the substrate runtime). |
+| [Barman Cloud](https://pgbarman.org/) | CNPG plugin (`0.8.1`) for PostgreSQL backup and recovery to object storage. |
 | [Dragonfly](https://www.dragonflydb.io/) | Redis-compatible in-memory datastore. |
 
 ### Security and Secrets (both)
@@ -146,7 +150,7 @@ A single-node Talos management cluster (`talos-mgmt-01` / `cluster0-cp-01`) on t
 
 Both clusters run a least-privilege [CiliumNetworkPolicy](https://docs.cilium.io/en/stable/security/policy/) posture. Policies live centrally in `apps/network-policies/policies/` and are wired through **two independent Flux Kustomizations** so the rollout can be staged and rolled back per-tier:
 
-- **`cluster1`** - `network-policies-apps` (`policies/apps/`) covers application namespaces (auth, biggs, dragonfly, dreamcast, games, livekit, matrix, media, mindwtr, renovate). `network-policies-infra` (`policies/infra/`) covers infrastructure namespaces (networking, ai-system, cnpg-system, observability, rook-ceph, plus a scoped `kube-system` policy covering Hubble relay/UI pods).
+- **`cluster1`** - `network-policies-apps` (`policies/apps/`) covers application namespaces (auth, biggs, dragonfly, dreamcast, games, livekit, matrix, media, mindwtr, renovate). `network-policies-infra` (`policies/infra/`) covers infrastructure namespaces (networking, ai-system, cnpg-system, hermes, observability, rook-ceph, plus a scoped `kube-system` policy covering Hubble relay/UI pods). The `kritika` and `zot` namespaces are selected by the cnpg-system / ai-system infra policies (egress to CNPG and the gateway data planes) rather than their own files.
 - **`cluster0`** - `network-policies-apps` covers auth (Dex) and omni. `network-policies-infra` covers networking (agentgateway), cert-manager, external-secrets, flux-system, and capi. Suspend independently with `flux suspend kustomization network-policies-infra` if the control plane regresses.
 
 ### Identity and SSO
@@ -205,9 +209,12 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | Category | Applications | Notes |
 | --- | --- | --- |
 | **Authentication** | Pocket ID, OAuth2 Proxy | Passkey-first OIDC SSO for applications |
-| **Media** | Silo, Bookboss, Nsyncd | Content and book management (`bookboss:v0.8.34`) |
-| **Communication** | LiveKit SFU, Continuwuity, Sable | WebRTC media server (`livekit:v1.13.6`), Matrix homeserver, Sable Matrix web client |
+| **Media** | Silo, Bookboss, Nsyncd | Content and book management (Silo on the omnibus image, digest-pinned; `bookboss:v0.8.40`) |
+| **Communication** | LiveKit SFU, Continuwuity, Sable | WebRTC media server (`livekit:v1.13.11`), Matrix homeserver, Sable Matrix web client |
 | **Task Management** | Mindwtr, mindwtr-agent | Offline PWA + self-hosted sync server; GTD agent with MCP tools |
+| **AI Gateway** | hermes | Hermes agent gateway (`hermes.biggs.dog` on the LAN-only internal gateway, custom hermes-agent `0.23` image from the `catalog-harness2` fork branch, OIDC dashboard via Pocket ID). Backed by CNPG `hermes-memory` (pgvector) + `hermes-state`; talks A2A/MCP to the kagent controller (`kagent-controller:8083`) |
+| **AI Review** | kritika | Self-hosted AI PR reviewer at `kritika.biggs.dog` (chart `0.0.117`, reviews run on the local vLLM / Z.ai GLM coding plan, Postgres in CNPG `cnpg-kritika` with VectorChord) |
+| **CI & Registry** | GitHub Actions runners, docker-daemon-mirror, zot | Self-hosted CI on `cluster0` (org-scoped krops e2e runner + repo-scoped runners for talos-nvidia-open-extension, wolf, and hermes-agent) and the `zot` pull-through cache registry on `cluster1` (`zot.biggs.dog`, `ghcr.io` + `cgr.dev` + `docker.io` through ceph-block, `v2.1.23`, 24h gcDelay) |
 | **Game Streaming** | Fenrir / Wolf | GPU-accelerated Moonlight streaming (see [Dreamcast Game Streaming Stack](#dreamcast-game-streaming-stack)) |
 | **Game Servers** | Windrose Online | Dedicated MMO server on Wine backend (`windrose:0.10.0.7.33-372c3516`) |
 | **Hardware** | liquidctl | NZXT Kraken Elite AIO fan and pump curves on `nv-01` (privileged, raw USB HID) |
@@ -224,8 +231,8 @@ The `dreamcast` namespace is an on-demand, GPU-accelerated game-streaming platfo
 | Component | Description |
 | --- | --- |
 | [NVIDIA GPU Operator](https://github.com/NVIDIA/gpu-operator) | `gpu-operator` Helm chart (`v26.7.1`) with `driver` and `toolkit` disabled. On Talos the driver ships via the custom `nvidia-open-modules` system extension (from [shrinedogg/talos-nvidia-open-extension](https://github.com/shrinedogg/talos-nvidia-open-extension)) and the container toolkit via the matching `nvidia-open-toolkit` extension + machine config, so the operator only runs NFD + device plugin (its end-to-end CUDA workload validation is skipped: production vLLM holds nearly all VRAM, so the `vectorAdd` check cannot pass). The dual physical RTX 5090 GPUs are **time-sliced into 4 replicas each (8 total `nvidia.com/gpu` replicas)**. vLLM requests five replicas (tensor-parallel 2 across both cards) and two replicas serve an active session's Wolf sidecar + game container. vLLM is scaled to 0 during gaming sessions by the [GPU Arbiter](#gpu-arbiter) to maintain thermal and power stability across the dual-card chassis. |
-| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`. Forked as `docker.io/shrinedogg/operator` (v0.1.3: multi-user pairing, per-session RTP port blocks so concurrent sessions share the `direwolf` VIP, and reconciliation retries) and `docker.io/shrinedogg/moonlight-proxy` (v0.1.2: multi-user pairing, 120s `/launch` wait). Session pods get a pod-private `/dev/input` populated per-session by `docker.io/shrinedogg/wolf-agent` (v0.1.3), so concurrent sessions never see each other's controllers. |
-| [Wolf](https://games-on-whales.github.io/wolf/) | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input. Forked as `docker.io/shrinedogg/wolf:v0.1.0` (wl_drm patch). |
+| [Fenrir / direwolf-operator](https://github.com/games-on-whales/fenrir) | Operator (OCI HelmRelease) that reconciles `App`/`User`/`Session`/`Pairing` CRDs and creates session pods. Fronted by `moonlight-proxy`. Forked as `docker.io/shrinedogg/operator` (v0.1.7: multi-user pairing, per-session RTP port blocks, pod-private `/dev/input` via wolf-agent, ready-pod gate + wolf API timeouts, and per-App `NVIDIA_VISIBLE_DEVICES` GPU pinning) and `docker.io/shrinedogg/moonlight-proxy` (v0.1.6: multi-user pairing, 120s `/launch` wait, HEVC Main10 advertisement for HDR). Session pods get a pod-private `/dev/input` populated per-session by `docker.io/shrinedogg/wolf-agent` (v0.1.3), so concurrent sessions never see each other's controllers. |
+| [Wolf](https://games-on-whales.github.io/wolf/) | Per-session streaming sidecar: Wayland compositor, GStreamer + NVENC video pipeline, PulseAudio capture, and virtual input. Forked as `docker.io/shrinedogg/wolf:v0.2.9` (upstream v2026.11, Fedora base, HDR/HEVC Main10 chain with `WOLF_ENABLE_HDR` enabled). |
 | [gpu-arbiter-operator](https://github.com/shrinedogg/gpu-arbiter-operator) (custom) | controller-runtime operator (`docker.io/shrinedogg/gpu-arbiter-operator:v0.1.1`) that reconciles a cluster-scoped `GPUArbiter` CR: scales the `vllm` Deployment to 0 whenever a `direwolf-worker` session pod appears in `dreamcast`, and back to 1 when idle, then lifts the `gpu.biggs.dog/await-vram` scheduling gate once VRAM is free. See [GPU Arbiter](#gpu-arbiter). |
 
 ### GPU Arbiter
@@ -253,24 +260,24 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack:
 
 | Component | Description |
 | --- | --- |
-| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server (`docker.io/vllm/vllm-openai:v0.32.0`, CUDA 13.0 for Blackwell) pinned to `nv-01`, running tensor-parallel 2 across both RTX 5090s (requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas so the CDI device plugin spans both cards). Scaled to 0 during [Dreamcast](#dreamcast-game-streaming-stack) sessions by the [GPU Arbiter](#gpu-arbiter) and back to 1 when idle. Serves [`Qwen/Qwen3.8-27B-FP8`](https://huggingface.co/Qwen/Qwen3.8-27B-FP8) (served as `qwen 3.8 - local`) - a **27B dense** model with a Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep paged KV), official W8A8 FP8 (~28.7 GB, ~14.4 GiB weights per card). **Full native 262K context** served (`--max-model-len=262144` against an estimated ~20 GiB aggregate fp8 KV pool). `--gpu-memory-utilization 0.92` per card, `--max-num-seqs 16`, `--max-cudagraph-capture-size 16`, `--max-num-batched-tokens 8192`, MTP speculative decoding (`{"method":"mtp","num_speculative_tokens":2}`), `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3`, `--enable-auto-tool-choice`, `--enable-prefix-caching`, `--trust-remote-code`, `--language-model-only` (skips the vision encoder). |
-| [kagent](https://kagent.dev/) | Agent framework and controller (chart `0.9.12`). Configured with ModelConfig `qwen 3.8 - local` -> local vLLM. Exposes an MCP server over a LAN-only HTTPRoute (`kagent-mcp` at `https://mcp.biggs.dog/mcp` on the internal gateway `internal-biggs-dog`, VIP 192.168.6.15) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term vector memory. Embedding model: `BAAI/bge-m3` via the `embeddings` service (CPU-only Infinity deployment). |
-| **Substrate runtime** (kagent ATE / actor runtime) | Control plane for **sandboxed agent code execution via gVisor**, deployed in `ai-system` (charts `substrate` and `substrate-crds` at `0.0.21`). Components: `ate-controller`, `ate-api-server` (digest-pinned fork `shrinedogg/ateapi@sha256:78d90103f3054bf6544bf3726fa63800a47b970b3425a3e60f4efbfff9bbdad3` with `--client-jwt-jwks-url`), `atelet` worker DaemonSet, and `atenet-router`. gVisor `runsc` (`20260622.0`) staged in rustfs `ate-snapshots` bucket and pre-cached per node via `runsc-cache` DaemonSet. A `WorkerPool` (`kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21`) is managed by kagent. Postgres and rustfs storage are patched to `host-path`. `ate-system` namespace manifest included for chart RBAC. |
+| [vLLM](https://github.com/vllm-project/vllm) | OpenAI-compatible inference server (`docker.io/vllm/vllm-openai:v0.33.0`, untagged = CUDA 13.0 build for Blackwell; v0.33.0 dropped the `-cu129` variants) pinned to `nv-01`, running tensor-parallel 2 across both RTX 5090s (requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas so the CDI device plugin spans both cards). Scaled to 0 during [Dreamcast](#dreamcast-game-streaming-stack) sessions by the [GPU Arbiter](#gpu-arbiter) and back to 1 when idle. Serves [`minima-ai/mnma_qwen3.8_27b_nvfp4`](https://huggingface.co/minima-ai/mnma_qwen3.8_27b_nvfp4) (served as `qwen 3.8 - local`) - the Minima NVFP4 W4A4 post-training quant of the **27B dense** Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep paged KV): all 496 linear layers at NVFP4 plus calibrated static FP8 KV scales, single `model.safetensors` ~17.5 GiB, ~8.75 GiB weights per card (vs ~14.4 GiB for the previous FP8 checkpoint) leaving an estimated ~15.5 GiB fp8 KV pool per card (~31 GiB total), ~3.5 concurrent full-length 262K sessions. **Full native 262K context** served (`--max-model-len=262144`). `--gpu-memory-utilization 0.92` per card, `--max-num-seqs 16`, `--max-cudagraph-capture-size 16`, `--max-num-batched-tokens 8192`, MTP speculative decoding (`{"method":"mtp","num_speculative_tokens":2}`), `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3`, `--enable-auto-tool-choice`, `--enable-prefix-caching`, `--trust-remote-code`, `--language-model-only` (skips the vision encoder). |
+| [kagent](https://kagent.dev/) | Agent framework and controller (chart `1.0.0-alpha11`, CRDs git-sourced `kagent-dev/kagent` v1.0.0-rc3, API group `api.kagent.dev/v1alpha3`). Agents are `kind: Agent` CRs on shared `Harness`es (golang-adk) instead of the old built-in chart agents. Modeled via ModelConfig `default-model-config` (`qwen 3.8 - local`) which routes through agentgateway (`internal-biggs-dog` data plane, port 8445, `/v1`) to the local vLLM. Exposes an MCP server over a LAN-only HTTPRoute (`kagent-mcp` at `https://mcp.biggs.dog/mcp` on the internal gateway `internal-biggs-dog`, VIP 192.168.6.15) plus a UI (`kagent.biggs.dog`) behind OAuth2 Proxy forward-auth. Backed by CNPG Postgres with pgvector for long-term vector memory. Embedding model: `BAAI/bge-m3` via the `embeddings` service (CPU-only Infinity deployment). |
+| **Substrate runtime** (kagent ATE / actor runtime) | Control plane for **sandboxed agent code execution via gVisor**, deployed in `ai-system` (charts `substrate` and `substrate-podcert` at `0.5.0-alpha2`, plus git-sourced `substrate-crds` from `kagent-dev/substrate` v1.0.1). Components: `ate-controller`, `ate-api-server`, `atelet` worker DaemonSet (re-pointed at the release-local `api` service, `api.ai-system.svc:443`), and `atenet-router`/atenet egress. Pod identity is mTLS via the `substrate-podcert` podcertificate controller (no JWT/JWKS; the old digest-pinned `ateapi` fork is gone). Snapshots and the gVisor runtime asset live on durable Backblaze B2 (`biggs-dog/substrate/...`); the in-cluster rustfs store is disabled. Postgres is BYO via CNPG `cnpg-substrate`. A `WorkerPool` (`kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.5.0-alpha2`, pinned in lockstep with the control plane) is managed by kagent. Torn down 2026-10-09 and re-enabled with this stack on 2026-10-10 (issue #594). |
 | flux-mcp / `flux-agent` | Custom read-only kagent `Agent` wired to the Flux Operator MCP server for GitOps inspection and reconciliation root-cause analysis (`clusters/cluster1/kubernetes/apps/ai-system/flux-mcp/`). Per-agent memory disabled to avoid saturating context with tool schemas. |
-| victoria-metrics-mcp / `vm-agent` | Custom kagent `Agent` backed by the VictoriaMetrics MCP server (`v1.20.2`): PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis (`clusters/cluster1/kubernetes/apps/ai-system/victoria-metrics-mcp/`). |
+| victoria-metrics-mcp / `vm-agent` | Custom kagent `Agent` backed by the VictoriaMetrics MCP server (`v1.120.1`): PromQL/MetricsQL query access, alerting rule inspection, TSDB cardinality analysis (`clusters/cluster1/kubernetes/apps/ai-system/victoria-metrics-mcp/`). |
 | exa-mcp / `exa-agent` | Custom kagent `Agent` backed by the Exa MCP server (`3.2.1`): web search, code discovery, company research (`clusters/cluster1/kubernetes/apps/ai-system/exa-mcp/`). Long-term memory enabled with context compaction at 80K tokens. |
-| codebase-memory-mcp / `codebase-agent` | Custom kagent `Agent` backed by codebase-memory-mcp (`v0.9.0`): structural code intelligence over indexed repos (biggs.dog), auto-synced via git-sync sidecar. stdio-only upstream wrapped in `mcp-proxy` bridge (`clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`). |
+| codebase-memory-mcp / `codebase-agent` | Custom kagent `Agent` backed by codebase-memory-mcp (`v0.10.4`): structural code intelligence over indexed repos (biggs.dog), auto-synced via git-sync sidecar. stdio-only upstream wrapped in `mcp-proxy` bridge (`clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`). |
 | mindwtr-mcp / `mindwtr-agent` | Custom kagent `Declarative` Agent backed by the Mindwtr MCP server (`mindwtr-mcp`): GTD task management with CRUD access to the Mindwtr SQLite database. Runs with `executeCodeBlocks` enabled, 30-day vector memory, and context compaction at 80K tokens (`clusters/cluster1/kubernetes/apps/ai-system/mindwtr-mcp/`). |
 | [agent-sandbox](https://github.com/kubernetes-sigs/agent-sandbox) | SIG-Apps `Sandbox` CRD + controller (`agents.x-k8s.io`, GitRepository ref `v1.0.10`, `controller.extensions: true`). Provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks`. |
 | embeddings | CPU-only Infinity embedding server serving `BAAI/bge-m3` for kagent's long-term vector memory. CPU-only to reserve dual-GPU VRAM for LLM inference and game streaming while avoiding contention. |
+| agentgateway-ai model routes | AgentGateway (0.12.0 data plane) routes for external model providers - `minimax`, `mistral`, `glm` (Z.ai) - and kagent actor routes `model-actors` / `model-actors-glm` / `model-actors-vllm`, all LAN-only on `internal-biggs-dog` with API-key auth via the `model-api-keys` ExternalSecret (`clusters/cluster1/kubernetes/apps/ai-system/agentgateway-ai/`). |
 
-**Available agents** (`kubectl get agents,sandboxagents -n ai-system`):
+**Available agents** (`kubectl get agents -n ai-system`):
 
-The 12 agents split across two deployment patterns:
+All 12 agents are `kind: Agent` CRs (`api.kagent.dev/v1alpha3`) running on shared golang-adk `Harness`es (git-managed in `kagent/app/harnesses.yaml`), invocable via the kagent MCP server:
 
-- **Classic `kind: Agent` CRs** (invocable via MCP): `flux-agent`, `vm-agent`, `exa-agent`, `cilium-debug-agent`, `cilium-policy-agent`, `codebase-agent`, `mindwtr-agent`. The two cilium agents are defined statically in `clusters/cluster1/kubernetes/apps/ai-system/kagent/cilium-agents/` with generic `k8s_*` tools alongside Cilium tools. `codebase-agent` lives in `clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`.
-- **`kind: SandboxAgent` CRs on the substrate runtime** (`clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents/`): `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`. Currently `ReconcileFailed` (since 2026-09-11): kagent 0.10.x renders secret-backed env into ActorTemplates, an API substrate >= 0.0.15 removed, so the agents cannot be created until the paired kagent 1.0.0 + substrate upgrade (#553). Even when running, they are not invocable via the MCP server due to an upstream kagent limitation (`listReadyAgents` lists only `v1alpha2.Agent` with `DeploymentReady`, while substrate agents report `WorkloadReady`). Use the fallbacks in [`.rules`](.rules) or direct `kubectl`.
-- **Disabled chart agents**: `argo-rollouts-agent`, `istio-agent`, `kgateway-agent` (the 5 substrate agents and 2 cilium agents are disabled in chart values to prevent duplicate classic Agent CRs).
+- **MCP custom agents**: `flux-agent`, `vm-agent`, `exa-agent`, `codebase-agent`, `mindwtr-agent`. The two cilium agents (`cilium-debug-agent`, `cilium-policy-agent`) are defined statically in `clusters/cluster1/kubernetes/apps/ai-system/kagent/cilium-agents/` with generic `k8s_*` tools alongside Cilium tools. `codebase-agent` lives in `clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`.
+- **Cluster-ops agents** (formerly `SandboxAgent`s on the substrate runtime, now plain `Agent` CRs in `clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents/`, gVisor-sandboxed via the substrate WorkerPool): `k8s-agent`, `helm-agent`, `promql-agent`, `observability-agent`, `cilium-manager-agent`.
 
 See [`.rules`](.rules) for agent selection by task domain and live invocability status.
 
