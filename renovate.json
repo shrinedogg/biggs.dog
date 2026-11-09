@@ -130,8 +130,8 @@
       ]
     },
     {
-      "description": "Substrate stack must upgrade in lockstep; never automerge. substrate chart + substrate-crds + substrate-podcert + kagent + kagent-crds + ateom-gvisor worker image + golang-adk workload image move as one group because kagent vendors a specific kagent-dev/substrate (check go/go.mod replace at the kagent tag before merging). Paired at 1.0.0-alpha11 + 0.5.0-alpha2 (alpha11 vendors substrate v0.5.0-alpha2).",
-      "matchDatasources": ["docker"],
+      "description": "Substrate stack must upgrade in lockstep; never automerge. substrate chart + substrate-crds + substrate-podcert + kagent + kagent-crds + ateom-gvisor worker image + golang-adk workload image move as one group because kagent vendors a specific kagent-dev/substrate (check go/go.mod replace at the kagent tag before merging). Paired at 1.0.0-alpha11 + 0.5.0-alpha2 (alpha11 vendors substrate v0.5.0-alpha2). Since 2026-11-09 (issue #798) the CRD sources are git-sourced: the github-releases deps kagent-dev/kagent (kagent-crds-git.yaml, CRD templates applied via Kustomization) and kagent-dev/substrate (substrate-crds-git.yaml, git-sourced HelmRelease) join this lockstep group.",
+      "matchDatasources": ["docker", "github-releases"],
       "matchPackageNames": [
         "ghcr.io/kagent-dev/substrate/ateom-gvisor",
         "ghcr.io/kagent-dev/substrate/helm/substrate",
@@ -140,7 +140,9 @@
         "ghcr.io/kagent-dev/kagent/helm/kagent",
         "ghcr.io/kagent-dev/kagent/helm/kagent-crds",
         "ghcr.io/kagent-dev/kagent/golang-adk",
-        "ghcr.io/kagent-dev/kagent/sandbox-guest"
+        "ghcr.io/kagent-dev/kagent/sandbox-guest",
+        "kagent-dev/kagent",
+        "kagent-dev/substrate"
       ],
       "groupName": "substrate-stack",
       "automerge": false,

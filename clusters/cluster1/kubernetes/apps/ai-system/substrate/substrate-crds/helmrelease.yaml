@@ -1,0 +1,34 @@
+---
+# yaml-language-server: $schema=https://raw.githubusercontent.com/fluxcd-community/flux2-schemas/main/helmrelease-helm-v2.json
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: substrate-crds
+  namespace: ai-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      chart: charts/substrate-crds
+      # Git-sourced chart: the inline chart.spec.sourceRef pattern (repo precedent:
+      # agent-sandbox HelmRelease). spec.chartRef does not accept kind GitRepository
+      # (HelmRelease v2 CRD enum: OCIRepository, HelmChart, ExternalArtifact), so no
+      # chartRef is set.
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: GitRepository
+        name: substrate-crds
+        namespace: flux-system
+  install:
+    crds: CreateReplace
+    remediation:
+      retries: 3
+  upgrade:
+    crds: CreateReplace
+    cleanupOnFail: true
+    remediation:
+      retries: 3
+  # Sourced from the upstream git tree (was the OCI ghcr.io/kagent-dev/substrate/helm/substrate-crds
+  # chart). v1.0.1 CRDs serve ate.dev/v1 only; the substrate control-plane chart stays pinned at
+  # 0.5.0-alpha2 (v1alpha1) until the stack moves to the 1.x line — accepted, see issue #798.
+  values: {}

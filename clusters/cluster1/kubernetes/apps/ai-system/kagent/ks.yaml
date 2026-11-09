@@ -2,6 +2,32 @@
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: kagent-crds
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: kagent-crds
+  # CRDs come straight from the upstream git tree: the kagent repo ships no Chart.yaml (only
+  # Chart-template.yaml, rendered by CI for the OCI build), so the CRD templates are applied via
+  # Kustomization, same as the gateway-api-crds precedent. v1.0.0-rc3 adds egresspolicies and
+  # restructures the agents harness schema; the kmcp CRDs are no longer part of the chart — the
+  # in-cluster mcpservers.kagent.dev CRD survives (prune: false) while the kagent app chart
+  # stays on 1.0.0-alpha11 (issue #798).
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: kagent-crds
+  path: "./helm/kagent-crds/templates"
+  prune: false
+  wait: false
+  force: true
+  timeout: 2m
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: &app kagent
   namespace: flux-system
 spec:
