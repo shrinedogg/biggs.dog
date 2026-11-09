@@ -11,8 +11,10 @@
 #     warmup concurrency 5 / 10 requests, profiling concurrency 16 / 96.
 #   - tokenizer.name: builtin (tiktoken, zero-network) so the benchmark is
 #     self-contained and does not fetch an HF tokenizer at runtime.
-#   - API key: endpoint.apiKey uses ${OPENAI_API_KEY}, substituted from the
-#     pod env, which is wired from the aiperf-vllm secret (below).
+#   - API key: endpoint.apiKey is ${OPENAI_API_KEY:aiperf-pod-injected} -- operator-side
+#     substitution resolves the placeholder at CR admission (upstream of
+#     the benchmark pod); the real key enters the benchmark pod via
+#     podTemplate.env (below), wired from the aiperf-vllm secret.
 #   - vllm.biggs.dog is resolved to 192.168.6.15 via podTemplate.hostAliases
 #     (deterministic; does not depend on cluster0's CoreDNS answer for the
 #     name). The egress CNP (network-policies/policies/apps/aiperf.yaml) allows
@@ -30,9 +32,13 @@ spec:
       urls:
         - "https://vllm.biggs.dog/v1"
       streaming: true
-      # Substituted at runtime from the OPENAI_API_KEY env (wired below via
-      # the aiperf-vllm ExternalSecret).
-      apiKey: "${OPENAI_API_KEY}"
+      # ${OPENAI_API_KEY:aiperf-pod-injected}: operator-side substitution resolves the
+      # placeholder at CR admission (the operator pod has no OPENAI_API_KEY
+      # env and the chart has no hook to add one, so a bare ${OPENAI_API_KEY}
+      # would raise MissingEnvironmentVariableError and no JobSet would
+      # be created). The real key is injected into the benchmark pod at
+      # runtime via podTemplate.env (below).
+      apiKey: "${OPENAI_API_KEY:aiperf-pod-injected}"
     datasets:
       - name: main
         type: synthetic
@@ -68,3 +74,14 @@ spec:
       - ip: "192.168.6.15"
         hostnames:
           - "vllm.biggs.dog"
+  # skipEndpointCheck: the operator's pre-deploy endpoint probe dials
+  # https://vllm.biggs.dog/v1 from the operator pod (aiperf-system). The CR's
+  # podTemplate.hostAliases apply to the JobSet pods only, so the probe would
+  # gate on cluster0 DNS resolving the name -- unverified, and public DNS
+  # resolves it to the public gateway, where a 404 counts as reachable (a
+  # false pass) and a SERVFAIL would fail the CR permanently. The benchmark
+  # pods dial the endpoint via hostAliases to the internal gateway VIP
+  # (192.168.6.15:443, allowed by the aiperf CNP), so skipping the operator
+  # probe makes admission deterministic. (Immutable after creation in the
+  # v0.13.0 CRD.)
+  skipEndpointCheck: true
