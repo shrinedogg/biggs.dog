@@ -6,6 +6,14 @@ Date: 2026-11-05. Method: read-only live-cluster read-backs, chart renders
 CRD chart diff, v1.7.0 source inspection (cloned at tag), and repo manifest
 review. No cluster state was changed during this work.
 
+> **Status (2026-11-09):** Commit A of the cutover plan (04) has landed: the
+> 1.7.0 canary controller (`HelmRelease agentgateway-canary`) runs in
+> `networking` alongside the legacy v2.2.1 controller, with CRDs bumped to
+> v1.7.0. The canary Gateway object is named `agentgateway1x-canary` (renamed
+> from the plan's `agentgateway-canary` after an SA/Deployment collision,
+> commit e2f47a15); its GatewayClass stays `agentgateway-canary`. Commits
+> B/C remain pending. The plan text below is kept as point-in-time history.
+
 ## Files
 
 | File | Contents |
