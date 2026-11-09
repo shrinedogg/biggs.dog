@@ -2,7 +2,9 @@
 # NVIDIA AIPerf operator (v0.13.0): manages AIPerfJob/AIPerfSweep CRs and
 # drives a JobSet controller + worker per benchmark run, plus a results-server
 # that aggregates benchmark output. Installs from the aiperf git source
-# (the OCI chart is private). Depends on the JobSet operator (see ks.yaml).
+# (upstream does not publish an OCI chart for aiperf-operator; the in-repo
+# chart path is the documented install, and the git source keeps it
+# release-pinned to v0.13.0). Depends on the JobSet operator (see ks.yaml).
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -45,7 +47,8 @@ spec:
     # default -- Kueue is an optional follow-up, not enabled in v1.
     tests:
       enabled: false
-    # The results-server persists benchmark output to this PVC (20Gi is the
-    # chart default); host-path is cluster0's storage class.
+    # The results-server persists benchmark output to this PVC. The override
+    # intentionally caps the PVC at 20Gi (the chart default storage.size is
+    # 1Ti); host-path is cluster0's storage class.
     storage:
       size: 20Gi

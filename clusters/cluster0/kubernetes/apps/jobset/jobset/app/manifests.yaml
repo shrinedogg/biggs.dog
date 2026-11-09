@@ -6,16 +6,26 @@
 # Deviations from the stock release manifest (documented in the PR body):
 #   1. The `jobset-system` Namespace document is omitted -- it is created by the
 #      sibling ../namespace.yaml per the repo App Structure Pattern.
-#   2. Every admission webhook `failurePolicy: Fail` is flipped to `Ignore`. The
-#      stock manifest expects cert-manager to provision the webhook serving cert
-#      and inject the caBundle (via the `cert-manager.io/inject-ca-from` kustomize
-#      var placeholder), but this repo's Flux raw-kustomize context does not
-#      provision it in-band. An empty caBundle with `failurePolicy: Fail` on the
-#      pod webhooks (vpod.kb.io / mpod.kb.io) would block cluster-wide Pod
-#      creation. The JobSet CRD + controller still install and run: the aiperf
-#      operator creates JobSet CRs via the API (not kubectl), so admission
-#      validation is non-critical. The webhooks become functional only if a
-#      cert is provisioned later.
+#   2. Every admission webhook `failurePolicy: Fail` is flipped to `Ignore`.
+#      The stock manifest's webhook serving cert is not cert-manager-provisioned:
+#      the release ships the `internalcert` component (the
+#      jobset-webhook-server-cert Secret), and the controller's CertsManager
+#      (the OPA cert-controller rotator) provisions the serving cert itself and
+#      patches the caBundle into the mutating + validating webhook configs
+#      (internal cert management is enabled by default,
+#      api/config/v1alpha1/defaults.go). The `cert-manager.io/inject-ca-from`
+#      annotation sits on the CRD and targets only the CRD conversion webhook,
+#      which is never invoked (single stored version v1alpha2).
+#      Trade-off: with an empty caBundle and stock `failurePolicy: Fail`,
+#      cluster-wide Pod creation is rejected for the short install window until
+#      the controller patches the caBundle; `Ignore` tolerates that window but
+#      permanently disables JobSet admission validation and exclusive-placement
+#      ordering. AIPerf sets every field the mutating webhook would default
+#      (successPolicy, network.enableDNSHostnames, completionMode: Indexed,
+#      restartPolicy) and does not use exclusive placement, so `Ignore` is safe
+#      for this workload. The JobSet CRD + controller still install and run:
+#      the aiperf operator creates JobSet CRs via the API (not kubectl), so
+#      admission validation is non-critical.
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:

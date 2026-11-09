@@ -193,7 +193,7 @@ On `cluster1`, protected apps attach an agentgateway `AgentgatewayPolicy` with `
 | [Dex](https://dexidp.io/) | Root OIDC identity provider for Omni and Image Factory. See [Identity and SSO](#identity-and-sso). |
 | [OpenEBS](https://openebs.io/) | Localpv host-path provisioner backing Omni and Image Factory persistent volumes. |
 | Cloudflare DDNS | CronJob (`docker.io/favonia/cloudflare-ddns:1.15.1`) updating dynamic DNS. |
-| [NVIDIA AIPerf](https://github.com/ai-dynamo/aiperf) | LLM inference benchmarking workload on `cluster0`: the AIPerf operator (`v0.13.0`, git-sourced because the OCI chart is private) + JobSet (`v0.8.0`, vendored) benchmark the cluster1 vLLM endpoint (namespaces `aiperf-system` + `aiperf`). GitOps in `clusters/cluster0/kubernetes/apps/aiperf-operator` and `.../aiperf`. |
+| [NVIDIA AIPerf](https://github.com/ai-dynamo/aiperf) | LLM inference benchmarking workload on `cluster0`: the AIPerf operator (`v0.13.0`, git-sourced; upstream does not publish an OCI chart -- the in-repo chart path is the documented install, release-pinned to v0.13.0) + JobSet (`v0.8.0`, vendored) benchmark the cluster1 vLLM endpoint (namespaces `aiperf-system` + `aiperf`). GitOps in `clusters/cluster0/kubernetes/apps/aiperf-operator` and `.../aiperf`. |
 
 ### Automation
 
