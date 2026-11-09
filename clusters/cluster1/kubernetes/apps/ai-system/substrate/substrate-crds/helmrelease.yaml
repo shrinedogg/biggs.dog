@@ -10,10 +10,15 @@ spec:
   chart:
     spec:
       chart: charts/substrate-crds
-  chartRef:
-    kind: GitRepository
-    name: substrate-crds
-    namespace: flux-system
+      # Git-sourced chart: the inline chart.spec.sourceRef pattern (repo precedent:
+      # agent-sandbox HelmRelease). spec.chartRef does not accept kind GitRepository
+      # (HelmRelease v2 CRD enum: OCIRepository, HelmChart, ExternalArtifact), so no
+      # chartRef is set.
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: GitRepository
+        name: substrate-crds
+        namespace: flux-system
   install:
     crds: CreateReplace
     remediation:

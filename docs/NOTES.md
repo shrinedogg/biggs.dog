@@ -292,8 +292,8 @@ There are two sandboxing mechanisms deployed in `ai-system`:
 
 ### Substrate Runtime
 
-The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1/kubernetes/apps/ai-system/substrate/` (+ `substrate-crds/`) and is intended to back the 5 `SandboxAgent` agents (currently blocked, see below).
-- **Charts**: `substrate` and `substrate-crds` at `0.0.21` (`sources/substrate-oci.yaml`, `sources/substrate-crds-oci.yaml`).
+The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1/kubernetes/apps/ai-system/substrate/` (CRDs nested in `substrate/substrate-crds/`) and is intended to back the 5 `SandboxAgent` agents (currently blocked, see below).
+- **Charts**: `substrate` (OCI, `sources/substrate-oci.yaml`) and `substrate-crds` (git-sourced, `sources/substrate-crds-git.yaml`; see the substrate-stack lockstep rule in renovate.json for the pinned tags).
 - **Worker pool**: `kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.0.21` in kagent HelmRelease.
 - **Components**: `ate-controller`, `ate-api-server` (Deployment `ate-api-server-deployment`, running digest-pinned image `docker.io/shrinedogg/ateapi@sha256:78d90103f3054bf6544bf3726fa63800a47b970b3425a3e60f4efbfff9bbdad3` with `--client-jwt-jwks-url`), `atelet` worker DaemonSet, and `atenet-router`.
 - **Storage**: Postgres StatefulSet volumeClaimTemplate and `rustfs-data` PVC are patched to `storageClassName: host-path` via HelmRelease postRenderers.
