@@ -58,7 +58,7 @@ spec:
           effect: NoSchedule
       containers:
         - name: app
-          image: ghcr.io/games-on-whales/firefox:fedora@sha256:13a7ee084acc9c4bde4b12273f223a0d907a2ad7edde44725ceb506b16318151
+          image: ghcr.io/games-on-whales/firefox:fedora@sha256:53bf764ac4d2f938dc5f9888a4c7242eb5db9d2327e525526f7c24dbebd14422
           resources:
             limits:
               nvidia.com/gpu: "1"
