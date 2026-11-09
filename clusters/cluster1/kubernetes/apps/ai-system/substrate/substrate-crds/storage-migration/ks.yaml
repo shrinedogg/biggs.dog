@@ -8,11 +8,18 @@ spec:
   commonMetadata:
     labels:
       app.kubernetes.io/name: substrate-crds-storage-mig
-  # One-shot by design: it applies once (on the source update that lands this
-  # PR) and stays quiet (24h interval) so it cannot flap the CRDs back to
-  # dual-version while the substrate-crds HelmRelease owns them. A follow-up
-  # PR removes this Kustomization once the substrate-crds HelmRelease is
-  # Ready on the git-sourced chart (see the storage-migration dir header).
+  # Suspended: its one-shot job is done (the ate.dev CRDs are dual-version,
+  # v1 storage — verified live; the API-server storage gate is cleared and
+  # the substrate-crds HelmRelease upgrades the CRDs to the chart's v1-only
+  # spec). Suspended (not deleted) because the root flux-system KZ is
+  # prune:false by house policy, so a repo-side removal would leave the KZ
+  # object orphaned in-cluster; a suspended KZ stays quiet and inert.
+  # Optional housekeeping to retire it fully: `kubectl -n flux-system delete
+  # kustomization substrate-crds-storage-mig` (then drop this dir + the
+  # kustomization list entry in a PR).
+  suspend: true
+  # 24h interval kept for history: while active, it could only re-apply once
+  # per day, so it could not flap the CRDs back to dual-version.
   interval: 24h
   retryInterval: 1m
   sourceRef:
