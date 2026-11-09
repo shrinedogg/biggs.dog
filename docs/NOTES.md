@@ -218,6 +218,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 - **GPU**: Tensor-parallel 2 across BOTH of `nv-01`'s RTX 5090s (~14.4 GiB weights per card, estimated ~10 GiB fp8 KV pool per card). The CDI device plugin injects only the allocated card and ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so the pod requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas to pigeonhole across both cards (verified 2026-09-09 with throwaway pods).
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
+- **Benchmark**: the vLLM endpoint is benchmarked from `cluster0` by the NVIDIA AIPerf operator — an `AIPerfJob` CR in the `aiperf` namespace drives a JobSet (controller + worker pods) against `https://vllm.biggs.dog/v1` (internal gateway VIP `192.168.6.15`), model `qwen 3.8 - local`, concurrency capped at the `--max-num-seqs` 16. The operator (`aiperf-system`) and JobSet (`jobset-system`) live on `cluster0`; GitOps in `clusters/cluster0/kubernetes/apps/{aiperf-operator,jobset,aiperf}`.
 
 ### vLLM Configuration and Performance
 
