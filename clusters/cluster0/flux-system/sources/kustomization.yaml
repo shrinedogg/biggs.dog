@@ -11,3 +11,5 @@ resources:
   - gateway-api-crds-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
+  # AIPerf operator chart (v0.13.0) from git; the OCI chart is private.
+  - aiperf-git.yaml

@@ -1,0 +1,15 @@
+---
+# NVIDIA AIPerf operator chart (v0.13.0), sourced from git. The OCI chart
+# (ghcr.io/ai-dynamo/charts/aiperf-operator) is private (anonymous pull denied,
+# verified 2026-11-09), so the chart is pulled from the aiperf repo at
+# deploy/helm/aiperf-operator (Chart.yaml version 0.13.0, verified).
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: aiperf-git
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://github.com/ai-dynamo/aiperf
+  ref:
+    tag: "v0.13.0"
