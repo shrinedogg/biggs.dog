@@ -1,0 +1,28 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: substrate-crds-storage-mig
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: substrate-crds-storage-mig
+  # One-shot by design: it applies once (on the source update that lands this
+  # PR) and stays quiet (24h interval) so it cannot flap the CRDs back to
+  # dual-version while the substrate-crds HelmRelease owns them. A follow-up
+  # PR removes this Kustomization once the substrate-crds HelmRelease is
+  # Ready on the git-sourced chart (see the storage-migration dir header).
+  interval: 24h
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/substrate/substrate-crds/storage-migration
+  # The CRDs already exist (installed by the substrate-crds release), so force
+  # is required for the versions-array update to win over the Helm owner
+  # labels; prune: false keeps the CRDs when this KZ is deleted.
+  force: true
+  prune: false
+  wait: false
+  timeout: 5m
