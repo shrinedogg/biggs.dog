@@ -6,7 +6,12 @@ metadata:
   name: substrate-crds
   namespace: ai-system
 spec:
-  interval: 3m
+  # 1m (was 3m): this spec change doubles as the generation bump that
+  # un-stalls the release — RetriesExceeded does not self-clear, and the
+  # API-server storage gate is cleared (v1 is now the storage version), so
+  # the 0.1.0 upgrade proceeds on the next reconcile. 1m also keeps future
+  # Renovate CRD tag bumps picking up faster.
+  interval: 1m
   chart:
     spec:
       chart: charts/substrate-crds
