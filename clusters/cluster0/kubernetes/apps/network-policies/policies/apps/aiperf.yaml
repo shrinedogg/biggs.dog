@@ -1,0 +1,84 @@
+# Namespace: aiperf (AIPerf benchmark JobSet controller + worker pods)
+#
+# The AIPerfJob CRs (aiperf/aiperf/app/aiperfjob.yaml) create JobSet pods that
+# benchmark the cluster1 vLLM endpoint. Egress is enumerated:
+#   - DNS (kube-dns, L7 proxy) for any FQDN resolution.
+#   - the vLLM gateway VIP 192.168.6.15:443 (the CR's podTemplate maps
+#     vllm.biggs.dog -> 192.168.6.15 via hostAliases, so no DNS is needed for
+#     that host; the dial is a plain 192.168.6.15:443 over the LAN).
+#   - HuggingFace tokenizer hosts (broad :443, repo precedent
+#     allow-egress-vllm-huggingface). The current CR pins tokenizer.name=builtin
+#     (zero-network), so this is a forward-compat allowance in case the
+#     tokenizer is switched to an HF id.
+#
+# NOTE: a selecting endpointSelector ({} = all pods in this dedicated
+# namespace) puts every pod here under implicit egress default-deny; the
+# egress below is the full egress set. There is no ingress policy, so the
+# aiperf operator (aiperf-system) can still reach the worker pods' results
+# ports.
+---
+# DNS for all aiperf pods (kube-dns; L7 proxy avoids the Go-resolver UDP
+# conntrack reply-drop behind default-deny).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: In
+              values: [kube-system]
+            - key: k8s:k8s-app
+              operator: In
+              values: [coredns, kube-dns]
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# vLLM endpoint: 192.168.6.15 is the cluster1 internal gateway VIP (the CR's
+# podTemplate.hostAliases maps vllm.biggs.dog to it). It is a world/CIDR
+# destination from cluster0's perspective, so allow the CIDR directly.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-vllm-gateway
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDR:
+        - 192.168.6.15/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# HuggingFace tokenizer hosts (broad :443, repo precedent
+# allow-egress-vllm-huggingface). Forward-compat: the current CR uses the
+# builtin tokenizer, so this is not exercised today.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-huggingface
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: huggingface.co
+        - matchName: cdn-lfs.huggingface.co
+        - matchPattern: "*.huggingface.co"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

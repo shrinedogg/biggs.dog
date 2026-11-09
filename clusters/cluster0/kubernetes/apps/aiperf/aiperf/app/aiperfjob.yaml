@@ -1,0 +1,70 @@
+---
+# AIPerf benchmark of the cluster1 vLLM endpoint (vllm.biggs.dog -> internal
+# gateway VIP 192.168.6.15, LAN/UDM-WireGuard only). The aiperf operator
+# (aiperf-system) picks this up and drives a JobSet (controller + worker pods)
+# that runs the AIPerf client against the endpoint.
+#
+# Endpoint/config:
+#   - model: "qwen 3.8 - local" VERBATIM (the cluster1 vLLM --served-model-name;
+#     sending an HF id instead is model-not-found).
+#   - concurrency capped at 16 (the cluster1 vLLM --max-num-seqs is 16):
+#     warmup concurrency 5 / 10 requests, profiling concurrency 16 / 96.
+#   - tokenizer.name: builtin (tiktoken, zero-network) so the benchmark is
+#     self-contained and does not fetch an HF tokenizer at runtime.
+#   - API key: endpoint.apiKey uses ${OPENAI_API_KEY}, substituted from the
+#     pod env, which is wired from the aiperf-vllm secret (below).
+#   - vllm.biggs.dog is resolved to 192.168.6.15 via podTemplate.hostAliases
+#     (deterministic; does not depend on cluster0's CoreDNS answer for the
+#     name). The egress CNP (network-policies/policies/apps/aiperf.yaml) allows
+#     that CIDR:443.
+apiVersion: aiperf.nvidia.com/v1alpha1
+kind: AIPerfJob
+metadata:
+  name: vllm-qwen38-bench
+  namespace: aiperf
+spec:
+  benchmark:
+    models:
+      - "qwen 3.8 - local"
+    endpoint:
+      urls:
+        - "https://vllm.biggs.dog/v1"
+      streaming: true
+      # Substituted at runtime from the OPENAI_API_KEY env (wired below via
+      # the aiperf-vllm ExternalSecret).
+      apiKey: "${OPENAI_API_KEY}"
+    datasets:
+      - name: main
+        type: synthetic
+        entries: 1000
+        prompts:
+          isl:
+            mean: 1024
+            stddev: 0
+          osl:
+            mean: 256
+            stddev: 0
+    tokenizer:
+      name: builtin
+    phases:
+      - name: warmup
+        kind: warmup
+        type: concurrency
+        concurrency: 5
+        requests: 10
+      - name: profiling
+        kind: profiling
+        type: concurrency
+        concurrency: 16
+        requests: 96
+  podTemplate:
+    env:
+      - name: OPENAI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: aiperf-vllm
+            key: OPENAI_API_KEY
+    hostAliases:
+      - ip: "192.168.6.15"
+        hostnames:
+          - "vllm.biggs.dog"
