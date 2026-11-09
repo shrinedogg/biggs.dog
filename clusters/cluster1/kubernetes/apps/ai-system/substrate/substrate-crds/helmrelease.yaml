@@ -3,13 +3,16 @@
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
-  name: kagent-crds
+  name: substrate-crds
   namespace: ai-system
 spec:
   interval: 3m
+  chart:
+    spec:
+      chart: charts/substrate-crds
   chartRef:
-    kind: OCIRepository
-    name: kagent-crds
+    kind: GitRepository
+    name: substrate-crds
     namespace: flux-system
   install:
     crds: CreateReplace
@@ -20,5 +23,7 @@ spec:
     cleanupOnFail: true
     remediation:
       retries: 3
-  # Includes the kmcp CRD subchart by default (kmcp.enabled=true).
+  # Sourced from the upstream git tree (was the OCI ghcr.io/kagent-dev/substrate/helm/substrate-crds
+  # chart). v1.0.1 CRDs serve ate.dev/v1 only; the substrate control-plane chart stays pinned at
+  # 0.5.0-alpha2 (v1alpha1) until the stack moves to the 1.x line — accepted, see issue #798.
   values: {}

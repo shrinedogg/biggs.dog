@@ -26,13 +26,15 @@ resources:
   - nvidia-repo.yaml
   - fenrir-git.yaml
   - fenrir-oci.yaml
-  - kagent-crds-oci.yaml
+  - kagent-crds-git.yaml
   - kagent-oci.yaml
   - kritika-oci.yaml
   # The substrate-stack migration (2026-10-10) re-added substrate-crds and
   # the substrate-podcert signer source alongside substrate-oci.yaml.
+  # 2026-11-09: the substrate-crds source migrated from the OCI chart to the
+  # git-sourced GitRepository (substrate-crds-git.yaml, issue #798).
   # Lockstep group — see the substrate-stack rule in renovate.json.
-  - substrate-crds-oci.yaml
+  - substrate-crds-git.yaml
   - substrate-podcert-oci.yaml
   - substrate-oci.yaml
   - agent-sandbox-git.yaml

@@ -4,14 +4,18 @@ kind: Kustomization
 resources:
   # Pre Flux-Kustomizations
   - ./namespace.yaml
-  # Flux-Kustomizations (CRDs must come before agents that depend on them)
+  # Flux-Kustomizations (CRDs must come before agents that depend on them).
+  # 2026-11-09 (issue #798): the CRD Kustomizations moved into the app
+  # ks.yaml files — kagent-crds is now nested in ./kagent/ks.yaml and
+  # substrate-crds in ./substrate/ks.yaml — so each CRD document applies
+  # before its consuming app document within that file.
   - ./vllm/ks.yaml
-  - ./kagent-crds/ks.yaml
   # The substrate-stack migration (2026-10-10, issue #594) re-added the
   # substrate control plane: CRDs first, then the podcertificate signer,
   # then the control plane itself (dependsOn substrate-crds,
-  # substrate-podcert, cnpg-databases).
-  - ./substrate-crds/ks.yaml
+  # substrate-podcert, cnpg-databases). 2026-11-09 (issue #798): the
+  # substrate-crds Kustomization is nested in ./substrate/ks.yaml (before
+  # the substrate document), so that ordering still holds.
   - ./substrate-podcert/ks.yaml
   - ./substrate/ks.yaml
   - ./csi-driver/ks.yaml
