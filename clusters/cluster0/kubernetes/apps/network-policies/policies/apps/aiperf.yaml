@@ -107,7 +107,9 @@ spec:
 # event-bus XPUB/XSUB (5663/5664), raw-inference PUSH/PULL (5665/5666),
 # control ROUTER/DEALER (5667), credit-return router (5668), credit-return
 # PUSH/PULL fan-in (5669); health/readiness probes 8080-8088 (all benchmark
-# pods -> controller).
+# pods -> controller); controller dataset API 9090 (worker dataset
+# downloads; aiperf v0.13.0 serves the dataset API at the controller pod's
+# :9090/api/dataset).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
