@@ -1,0 +1,87 @@
+---
+# AIPerf benchmark of the cluster1 vLLM endpoint (vllm.biggs.dog -> internal
+# gateway VIP 192.168.6.15, LAN/UDM-WireGuard only). The aiperf operator
+# (aiperf-system) picks this up and drives a JobSet (controller + worker pods)
+# that runs the AIPerf client against the endpoint.
+#
+# Endpoint/config:
+#   - model: "qwen 3.8 - local" VERBATIM (the cluster1 vLLM --served-model-name;
+#     sending an HF id instead is model-not-found).
+#   - concurrency capped at 16 (the cluster1 vLLM --max-num-seqs is 16):
+#     warmup concurrency 5 / 10 requests, profiling concurrency 16 / 96.
+#   - tokenizer.name: builtin (tiktoken, zero-network) so the benchmark is
+#     self-contained and does not fetch an HF tokenizer at runtime.
+#   - API key: endpoint.apiKey is ${OPENAI_API_KEY:aiperf-pod-injected} -- operator-side
+#     substitution resolves the placeholder at CR admission (upstream of
+#     the benchmark pod); the real key enters the benchmark pod via
+#     podTemplate.env (below), wired from the aiperf-vllm secret.
+#   - vllm.biggs.dog is resolved to 192.168.6.15 via podTemplate.hostAliases
+#     (deterministic; does not depend on cluster0's CoreDNS answer for the
+#     name). The egress CNP (network-policies/policies/apps/aiperf.yaml) allows
+#     that CIDR:443.
+apiVersion: aiperf.nvidia.com/v1alpha1
+kind: AIPerfJob
+metadata:
+  name: vllm-qwen38-bench
+  namespace: aiperf
+spec:
+  benchmark:
+    models:
+      - "qwen 3.8 - local"
+    endpoint:
+      urls:
+        - "https://vllm.biggs.dog/v1"
+      streaming: true
+      # ${OPENAI_API_KEY:aiperf-pod-injected}: operator-side substitution resolves the
+      # placeholder at CR admission (the operator pod has no OPENAI_API_KEY
+      # env and the chart has no hook to add one, so a bare ${OPENAI_API_KEY}
+      # would raise MissingEnvironmentVariableError and no JobSet would
+      # be created). The real key is injected into the benchmark pod at
+      # runtime via podTemplate.env (below).
+      apiKey: "${OPENAI_API_KEY:aiperf-pod-injected}"
+    datasets:
+      - name: main
+        type: synthetic
+        entries: 1000
+        prompts:
+          isl:
+            mean: 1024
+            stddev: 0
+          osl:
+            mean: 256
+            stddev: 0
+    tokenizer:
+      name: builtin
+    phases:
+      - name: warmup
+        kind: warmup
+        type: concurrency
+        concurrency: 5
+        requests: 10
+      - name: profiling
+        kind: profiling
+        type: concurrency
+        concurrency: 16
+        requests: 96
+  podTemplate:
+    env:
+      - name: OPENAI_API_KEY
+        valueFrom:
+          secretKeyRef:
+            name: aiperf-vllm
+            key: OPENAI_API_KEY
+    hostAliases:
+      - ip: "192.168.6.15"
+        hostnames:
+          - "vllm.biggs.dog"
+  # skipEndpointCheck: the operator's pre-deploy endpoint probe dials
+  # https://vllm.biggs.dog/v1 from the operator pod (aiperf-system). The CR's
+  # podTemplate.hostAliases apply to the JobSet pods only, so the probe would
+  # gate on cluster0 DNS resolving the name -- unverified, and public DNS
+  # resolves it to the public gateway, where a 404 counts as reachable (a
+  # false pass) and a SERVFAIL would fail the CR permanently. The benchmark
+  # pods dial the endpoint via hostAliases to the internal gateway VIP
+  # (192.168.6.15:443, allowed by the aiperf CNP), so skipping the operator
+  # probe makes admission deterministic. (Immutable after creation in the
+  # v0.13.0 CRD.)
+  skipEndpointCheck: true

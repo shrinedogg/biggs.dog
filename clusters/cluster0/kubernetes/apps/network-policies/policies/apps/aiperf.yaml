@@ -1,0 +1,160 @@
+# Namespace: aiperf (AIPerf benchmark JobSet controller + worker pods)
+#
+# The AIPerfJob CRs (aiperf/aiperf/app/aiperfjob.yaml) create JobSet pods that
+# benchmark the cluster1 vLLM endpoint. Egress is enumerated:
+#   - DNS (kube-dns, L7 proxy) for any FQDN resolution.
+#   - the vLLM gateway VIP 192.168.6.15:443 (the CR's podTemplate maps
+#     vllm.biggs.dog -> 192.168.6.15 via hostAliases, so no DNS is needed for
+#     that host; the dial is a plain 192.168.6.15:443 over the LAN).
+#   - HuggingFace tokenizer hosts (broad :443, repo precedent
+#     allow-egress-vllm-huggingface). The current CR pins tokenizer.name=builtin
+#     (zero-network), so this is a forward-compat allowance in case the
+#     tokenizer is switched to an HF id.
+#   - the intra-namespace ZMQ + probe mesh (the JobSet controller/worker pods,
+#     all in aiperf; the allow-intra-namespace policy below; port set per
+#     upstream aiperf v0.13.0 rbac-security docs).
+#
+# NOTE: a selecting endpointSelector ({} = all pods in this dedicated
+# namespace) puts every pod here under implicit egress default-deny; the
+# egress below is the full egress set. There is no ingress policy, so the
+# aiperf operator (aiperf-system) can still reach the worker pods' results
+# ports.
+---
+# DNS for all aiperf pods (kube-dns; L7 proxy avoids the Go-resolver UDP
+# conntrack reply-drop behind default-deny).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchExpressions:
+            - key: k8s:io.kubernetes.pod.namespace
+              operator: In
+              values: [kube-system]
+            - key: k8s:k8s-app
+              operator: In
+              values: [coredns, kube-dns]
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# vLLM endpoint: 192.168.6.15 is the cluster1 internal gateway VIP (the CR's
+# podTemplate.hostAliases maps vllm.biggs.dog to it). It is a world/CIDR
+# destination from cluster0's perspective, so allow the CIDR directly.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-vllm-gateway
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDR:
+        - 192.168.6.15/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# HuggingFace tokenizer hosts (broad :443, repo precedent
+# allow-egress-vllm-huggingface). Forward-compat: the current CR uses the
+# builtin tokenizer, so this is not exercised today.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-huggingface
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: huggingface.co
+        - matchName: cdn-lfs.huggingface.co
+        - matchPattern: "*.huggingface.co"
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+---
+# Intra-namespace ZMQ + probe mesh (JobSet controller/worker pods, all in
+# aiperf). The policies above select every pod in this namespace
+# (endpointSelector: {}) and carry egress sections, so the namespace is in
+# egress default-deny and allows only DNS / the vLLM gateway CIDR /
+# HuggingFace. The controller + worker pods talk over ZMQ (worker ->
+# controller) and health/readiness probes, which none of those cover, so the
+# benchmark cannot complete. Allow the mesh here. The policy is additive and
+# the ingress side of the namespace stays open, so the aiperf-system operator
+# still reaches the worker pods' results ports.
+#
+# Port set per upstream ai-dynamo/aiperf v0.13.0 docs/kubernetes/rbac-security.md
+# (required-flows table): ZMQ worker -> controller records push/pull (5557),
+# credit router (5564), dataset-manager proxy DEALER/ROUTER (5661/5662),
+# event-bus XPUB/XSUB (5663/5664), raw-inference PUSH/PULL (5665/5666),
+# control ROUTER/DEALER (5667), credit-return router (5668), credit-return
+# PUSH/PULL fan-in (5669); health/readiness probes 8080-8088 (all benchmark
+# pods -> controller).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-intra-namespace
+  namespace: aiperf
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: aiperf
+      toPorts:
+        - ports:
+            # ZMQ worker -> controller:
+            - port: "5557"
+              protocol: TCP
+            - port: "5564"
+              protocol: TCP
+            - port: "5661"
+              protocol: TCP
+            - port: "5662"
+              protocol: TCP
+            - port: "5663"
+              protocol: TCP
+            - port: "5664"
+              protocol: TCP
+            - port: "5665"
+              protocol: TCP
+            - port: "5666"
+              protocol: TCP
+            - port: "5667"
+              protocol: TCP
+            - port: "5668"
+              protocol: TCP
+            - port: "5669"
+              protocol: TCP
+            # Health/readiness probes (all benchmark pods -> controller):
+            - port: "8080"
+              protocol: TCP
+            - port: "8081"
+              protocol: TCP
+            - port: "8082"
+              protocol: TCP
+            - port: "8083"
+              protocol: TCP
+            - port: "8084"
+              protocol: TCP
+            - port: "8085"
+              protocol: TCP
+            - port: "8086"
+              protocol: TCP
+            - port: "8087"
+              protocol: TCP
+            - port: "8088"
+              protocol: TCP

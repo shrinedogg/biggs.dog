@@ -1,0 +1,54 @@
+---
+# NVIDIA AIPerf operator (v0.13.0): manages AIPerfJob/AIPerfSweep CRs and
+# drives a JobSet controller + worker per benchmark run, plus a results-server
+# that aggregates benchmark output. Installs from the aiperf git source
+# (upstream does not publish an OCI chart for aiperf-operator; the in-repo
+# chart path is the documented install, and the git source keeps it
+# release-pinned to v0.13.0). Depends on the JobSet operator (see ks.yaml).
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: aiperf-operator
+  namespace: aiperf-system
+spec:
+  interval: 3m
+  chart:
+    spec:
+      # The chart lives in-repo at deploy/helm/aiperf-operator.
+      chart: deploy/helm/aiperf-operator
+      # Keep .Chart.Version at the Chart.yaml value (0.13.0) without appending
+      # the Git commit digest (which would break the helm.sh/chart label).
+      # Release is pinned via the GitRepository ref.tag + values, not by
+      # tracking every upstream commit.
+      reconcileStrategy: ChartVersion
+      sourceRef:
+        kind: GitRepository
+        name: aiperf-git
+        namespace: flux-system
+  install:
+    remediation:
+      retries: 3
+  upgrade:
+    cleanupOnFail: true
+    remediation:
+      strategy: rollback
+      retries: 3
+  values:
+    # image.repository override: the chart default (nvcr.io/nvidia/aiperf) is a
+    # private NGC repo (anonymous pull 401, NGC auth required). The org-scoped
+    # image is publicly pullable (verified 2026-11-09: tag 0.13.0 present,
+    # anonymous manifest HEAD 200). The tag defaults to the chart appVersion
+    # (0.13.0), so only the repository is overridden.
+    image:
+      repository: nvcr.io/nvidia/ai-dynamo/aiperf
+    # The chart's post-install smoke tests (Job pods in the release ns) are
+    # enabled by default; disable them on a benchmark host. kueue.createQueues
+    # (optional gang-scheduling) and dashboard.enabled are already false by
+    # default -- Kueue is an optional follow-up, not enabled in v1.
+    tests:
+      enabled: false
+    # The results-server persists benchmark output to this PVC. The override
+    # intentionally caps the PVC at 20Gi (the chart default storage.size is
+    # 1Ti); host-path is cluster0's storage class.
+    storage:
+      size: 20Gi

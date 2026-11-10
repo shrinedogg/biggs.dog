@@ -1,0 +1,17 @@
+---
+# NVIDIA AIPerf operator chart (v0.13.0), sourced from git. Upstream does not
+# publish an OCI chart for aiperf-operator (its helm-chart workflow only
+# packages the chart and uploads it as a workflow artifact; no registry push),
+# so the chart is pulled from the aiperf repo at deploy/helm/aiperf-operator
+# (Chart.yaml version 0.13.0, verified). The git source keeps the release
+# pinned to v0.13.0.
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: aiperf-git
+  namespace: flux-system
+spec:
+  interval: 1h
+  url: https://github.com/ai-dynamo/aiperf
+  ref:
+    tag: "v0.13.0"

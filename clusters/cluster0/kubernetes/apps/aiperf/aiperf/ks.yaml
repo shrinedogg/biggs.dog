@@ -1,0 +1,28 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app aiperf
+  namespace: flux-system
+spec:
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster0/kubernetes/apps/aiperf/aiperf/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  # Do not wait: the AIPerfJob is a benchmark spec the operator runs
+  # asynchronously. Applying it must not block this Kustomization on the
+  # (possibly long-running) benchmark completing.
+  wait: false
+  interval: 3m
+  retryInterval: 1m
+  timeout: 2m
+  dependsOn:
+    # The AIPerfJob CR is processed by the aiperf operator (CRD + controller);
+    # it (transitively) also brings in the JobSet operator the operator drives.
+    - name: aiperf-operator
+    # The aiperf-vllm ExternalSecret resolves via the onepassword-connect
+    # ClusterSecretStore, which this Kustomization creates.
+    - name: secretstore
