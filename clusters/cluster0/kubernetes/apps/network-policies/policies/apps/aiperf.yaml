@@ -13,9 +13,11 @@
 #   - the intra-namespace ZMQ + probe mesh (the JobSet controller/worker pods,
 #     all in aiperf; the allow-intra-namespace policy below; port set per
 #     upstream aiperf v0.13.0 rbac-security docs).
-#   - the Kubernetes API server (toEntities: [kube-apiserver]; house pattern,
-#     the 10.96.0.1 ClusterIP is identity-resolved in the BPF ipcache so a
-#     toCIDR form is inert) for pod-status tracking.
+#   - the Kubernetes API server (bare toEntities: [kube-apiserver], no toPorts:
+#     unport-restricted on purpose - on cluster0 kube-proxy-replacement DNATs
+#     the kubernetes service to the 6443 control-plane backend before L4
+#     classification, so a 443 port filter would be inert; the bare entity
+#     form matches the 4 infra precedent CNPs) for pod-status tracking.
 #
 # NOTE: a selecting endpointSelector ({} = all pods in this dedicated
 # namespace) puts every pod here under implicit egress default-deny; the
@@ -162,11 +164,18 @@ spec:
             - port: "8088"
               protocol: TCP
 ---
-# Kubernetes API server, matched by entity (toEntities: [kube-apiserver];
-# house pattern per the 4 infra policy files). The `kubernetes` service's
+# Kubernetes API server, matched by entity (bare toEntities: [kube-apiserver];
+# house pattern per the 4 infra policy files, which use the same bare entity
+# form without toPorts). The `kubernetes` service's
 # ClusterIP 10.96.0.1 is identity-resolved in the BPF ipcache (it maps to
 # identity 2 / reserved:world) and policy-cidr-match-mode is unset, so a
-# toCIDR rule does not match it and would be inert. AIPerf
+# toCIDR rule does not match it and would be inert. The rule is intentionally
+# unport-restricted: cluster0 runs Cilium kube-proxy-replacement, which
+# DNATs pod traffic to the `kubernetes` ClusterIP at the control-plane
+# backend (controlPlaneEndpoint 192.168.2.31:6443) before L4 egress
+# classification, so the L4 check sees dport 6443 and a toPorts 443 filter
+# would never match (inert) - see the allow-egress-to-dex comment in omni.yaml
+# for the same DNAT-before-classification behavior. AIPerf
 # controller/worker pods run with SA `default` (RBAC granted by the
 # aiperf-operator) and dial the in-cluster API during profiling to track
 # pod statuses; without this rule the connect times out, the controller
@@ -181,7 +190,3 @@ spec:
   egress:
     - toEntities:
         - kube-apiserver
-      toPorts:
-        - ports:
-            - port: "443"
-              protocol: TCP
