@@ -13,7 +13,9 @@
 #   - the intra-namespace ZMQ + probe mesh (the JobSet controller/worker pods,
 #     all in aiperf; the allow-intra-namespace policy below; port set per
 #     upstream aiperf v0.13.0 rbac-security docs).
-#   - the Kubernetes API server (10.96.0.1:443) for pod-status tracking.
+#   - the Kubernetes API server (toEntities: [kube-apiserver]; house pattern,
+#     the 10.96.0.1 ClusterIP is identity-resolved in the BPF ipcache so a
+#     toCIDR form is inert) for pod-status tracking.
 #
 # NOTE: a selecting endpointSelector ({} = all pods in this dedicated
 # namespace) puts every pod here under implicit egress default-deny; the
@@ -160,12 +162,15 @@ spec:
             - port: "8088"
               protocol: TCP
 ---
-# Kubernetes API server (the `kubernetes` service in the `default`
-# namespace, ClusterIP 10.96.0.1:443). AIPerf controller/worker pods run
-# with SA `default` (RBAC granted by the aiperf-operator) and dial the
-# in-cluster API during profiling to track pod statuses; without this
-# rule the connect times out, the controller exits and the JobSet fails
-# (issue #811).
+# Kubernetes API server, matched by entity (toEntities: [kube-apiserver];
+# house pattern per the 4 infra policy files). The `kubernetes` service's
+# ClusterIP 10.96.0.1 is identity-resolved in the BPF ipcache (it maps to
+# identity 2 / reserved:world) and policy-cidr-match-mode is unset, so a
+# toCIDR rule does not match it and would be inert. AIPerf
+# controller/worker pods run with SA `default` (RBAC granted by the
+# aiperf-operator) and dial the in-cluster API during profiling to track
+# pod statuses; without this rule the connect times out, the controller
+# exits and the JobSet fails (issue #811).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -174,8 +179,8 @@ metadata:
 spec:
   endpointSelector: {}
   egress:
-    - toCIDR:
-        - 10.96.0.1/32
+    - toEntities:
+        - kube-apiserver
       toPorts:
         - ports:
             - port: "443"
