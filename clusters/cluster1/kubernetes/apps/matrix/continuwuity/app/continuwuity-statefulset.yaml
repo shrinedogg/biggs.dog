@@ -52,6 +52,8 @@ spec:
               value: "4"
             - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
               value: "false"
+            - name: CONTINUWUITY_REQUEST_IP_SOURCE
+              value: "x_forwarded_for"
             # - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
             #   value: "false"
             # - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
