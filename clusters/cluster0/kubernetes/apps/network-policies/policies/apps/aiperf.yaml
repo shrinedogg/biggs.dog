@@ -163,6 +163,9 @@ spec:
               protocol: TCP
             - port: "8088"
               protocol: TCP
+            # Controller dataset API (worker dataset downloads):
+            - port: "9090"
+              protocol: TCP
 ---
 # Kubernetes API server, matched by entity (bare toEntities: [kube-apiserver];
 # house pattern per the 4 infra policy files, which use the same bare entity
