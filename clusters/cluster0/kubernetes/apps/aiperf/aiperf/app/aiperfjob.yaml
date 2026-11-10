@@ -85,3 +85,19 @@ spec:
   # probe makes admission deterministic. (Immutable after creation in the
   # v0.13.0 CRD.)
   skipEndpointCheck: true
+  # resourceMode: none (v0.13.0 CRD: burstable (default) / guaranteed / none).
+  # cluster0's single schedulable node (talos-z2j-iay) has ~2.8 CPU free, below
+  # the operator's default burstable sizing of ~3.8 CPU for this spec, so the
+  # first live run failed at SCHEDULING: the worker pod
+  # (aiperf-vllm-qwen38-bench-workers-0-0-*) sat Unschedulable
+  # ("1 Insufficient cpu") and the run's JobSet was GC'd. `none` omits
+  # CPU/memory requests AND limits on both controller and worker pods
+  # (BestEffort QoS), so the pods always schedule. Trade-off: no QoS
+  # guarantees; acceptable for an I/O-bound load-testing pod on this homelab
+  # node. NOTE: resourceMode is IMMUTABLE on an existing AIPerfJob (CEL rule:
+  # has(oldSelf.resourceMode) == has(self.resourceMode) &&
+  # oldSelf.resourceMode == self.resourceMode) -- the old CR
+  # vllm-qwen38-bench (phase Failed) must be DELETED post-merge so Flux
+  # re-creates it from this manifest (drift re-apply, works even with
+  # prune: false).
+  resourceMode: none
