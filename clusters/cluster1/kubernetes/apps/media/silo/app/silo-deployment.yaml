@@ -87,8 +87,9 @@ spec:
       containers:
         - name: silo
           # Pre-1.0: the `latest` tag moves, so pin the image index digest
-          # for deterministic rollouts. This is the omnibus image (upstream
-          # #3319, 2026-10-31, c3115d4): ENTRYPOINT is the s6-overlay /init,
+          # for deterministic rollouts. This is the omnibus image (first
+          # published upstream as #3319, 2026-10-31): ENTRYPOINT is the
+          # s6-overlay /init,
           # so pid 1 MUST start as root - do NOT add runAsUser/runAsNonRoot,
           # either one stops /init. s6 then drops the silo SERVICE process to
           # PUID/PGID 911. Keep allowPrivilegeEscalation:false + drop ALL,
