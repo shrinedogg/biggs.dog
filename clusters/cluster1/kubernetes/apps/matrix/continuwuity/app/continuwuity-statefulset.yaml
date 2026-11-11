@@ -52,27 +52,24 @@ spec:
               value: "4"
             - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
               value: "false"
-            # Unauthenticated rate-limit keying (30 req/min per client IP):
-            # rightmost X-Forwarded-For, written by agentgateway when it
-            # proxies client traffic; the socket source (direct) is the
-            # fallback for peers that carry no XFF header. Trust is enforced
-            # by Cilium, not assumed: allow-ingress-from-gateway
-            # (network-policies/policies/apps/matrix.yaml) restricts ingress
-            # to the matrix namespace to the agentgateway pods in networking
-            # (gateway-class agentgateway/agentgateway-canary) plus the
-            # observability (prometheus) pods, with the implicit default-deny
-            # dropping everything else, so no non-gateway peer can reach the
-            # client-server routes with a client-controlled XFF value.
-            # accepted_ip_sources carries the explicit [x_forwarded_for,
-            # direct] chain (the env value is parsed as a TOML-like array by
-            # the figment 0.10.19 config loader) and takes precedence where
-            # the build supports it; request_ip_source is the same chain's
-            # built-in fallback for older builds and is ignored when
-            # accepted_ip_sources is set.
-            - name: CONTINUWUITY_REQUEST_IP_SOURCE
-              value: "x_forwarded_for"
-            - name: CONTINUWUITY_ACCEPTED_IP_SOURCES
-              value: '["x_forwarded_for","direct"]'
+            # Unauthenticated rate limiting: one shared 300 req/min budget
+            # per gateway pod (upstream default is 30), keyed on the socket
+            # source (upstream default `direct`), not on X-Forwarded-For:
+            # the client's real address is not visible at this layer.
+            # Matrix ingress is restricted to the agentgateway pods
+            # (Cilium allow-ingress-from-gateway,
+            # network-policies/policies/apps/matrix.yaml), the client path is
+            # all-L4 (UDM BGP route -> Cilium BGP LB 192.168.6.7 ->
+            # agentgateway), and agentgateway does not write X-Forwarded-For
+            # (verified against its source), so any XFF value is client-
+            # chosen and XFF keying would let a client pick its own limiter
+            # key. Consequence: all unauthenticated traffic shares this
+            # budget, and a single abusive client can lock the site out by
+            # burning 300 req/min. Per-client keying needs an XFF-writing
+            # edge (agentgateway upstream) or an L7 LB path; revisit this
+            # block when one lands.
+            - name: CONTINUWUITY_UNAUTHENTICATED_REQUEST_RATELIMIT
+              value: "300"
             # - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
             #   value: "false"
             # - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
