@@ -144,8 +144,13 @@ spec:
                       first=0
                     done
                     json="$json}}"
-                    curl -fsS --cacert "$K8S_CA" -X PUT "$API/api/v1/namespaces/ai-system/secrets/pocketid-model-jwt" \
+                    # PUT cannot create a Secret (AllowCreateOnUpdate=false): POST
+                    # first; on 409 AlreadyExists re-issue as PUT to update.
+                    curl -fsS --cacert "$K8S_CA" -X POST "$API/api/v1/namespaces/ai-system/secrets" \
                       -H "Authorization: Bearer $(cat "$K8S_TOKEN")" \
-                      -H 'Content-Type: application/json' -d "$json"
+                      -H 'Content-Type: application/json' -d "$json" -o /dev/null \
+                    || curl -fsS --cacert "$K8S_CA" -X PUT "$API/api/v1/namespaces/ai-system/secrets/pocketid-model-jwt" \
+                      -H "Authorization: Bearer $(cat "$K8S_TOKEN")" \
+                      -H 'Content-Type: application/json' -d "$json" -o /dev/null
                   }
                   mint_and_write
