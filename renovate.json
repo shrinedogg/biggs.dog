@@ -170,9 +170,16 @@
         "ghcr.io/squat/generic-device-plugin",
         "quay.io/aminvakil/alpine-nfs-server",
         "szkud/biggslanding",
-        "michaelf34/infinity",
         "shrinedogg/nsyncd"
       ],
+      "pinDigests": true
+    },
+    {
+      "description": "Track versioned X.Y.Z-cpu release tags for michaelf34/infinity: the -cpu suffix is stripped for version comparison (extractVersion), so updates arrive as reviewable version steps with release notes; digests stay pinned per update.",
+      "matchDatasources": ["docker"],
+      "matchPackageNames": ["michaelf34/infinity"],
+      "versioning": "semver",
+      "extractVersion": "^v?(?<version>\\d+\\.\\d+\\.\\d+)-cpu$",
       "pinDigests": true
     },
     {
