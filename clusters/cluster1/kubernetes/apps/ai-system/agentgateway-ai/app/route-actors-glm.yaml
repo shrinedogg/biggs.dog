@@ -13,9 +13,12 @@
 # Clients: ModelConfig openAI.baseUrl =
 #   http://internal-biggs-dog.networking.svc.cluster.local:8444/v1
 # (the existing ClusterIP Service, resolvable in-cluster; plain HTTP on this
-# port, no TLS). Auth: model-api-key-actors-glm (Bearer token from the
-# model-api-keys Secret, created by issue #659). Backend:
-# AgentgatewayBackend/glm (issue #660).
+# port, no TLS). Auth: model-api-key-actors-glm (dual-accept since the
+# PocketID model-routes migration PR-1: a PocketID JWT for audience
+# https://glm.biggs.dog, or the legacy Bearer token from the model-api-keys
+# Secret created by issue #659; the refresher-written Secret
+# pocketid-model-jwt is the post-migration source for actor ModelConfigs).
+# Backend: AgentgatewayBackend/glm (issue #660).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:

@@ -1,0 +1,151 @@
+---
+# PocketID model-routes JWT refresher (CronJob + RBAC). Mints one
+# short-lived client_credentials JWT per hosted model-route audience
+# (https://minimax.biggs.dog, https://mistral.biggs.dog,
+# https://glm.biggs.dog) from the PocketID M2M client "model-routes" and
+# writes all three to the dedicated single-owner Secret
+# "pocketid-model-jwt" (ns ai-system, data keys minimax/mistral/glm).
+#
+# Why: kagent ModelConfigs read their apiKeySecret value once at startup
+# and cannot run an OAuth2 exchange, so a scheduled refresher is how
+# actors get PocketID JWTs for the hosted routes (plan, "Machine
+# callers"). When a hosted-route ModelConfig exists, it sets
+# apiKeySecretRef: pocketid-model-jwt / apiKeySecretKey: <route>.
+#
+# Ownership: this CronJob's ServiceAccount is the ONLY writer of
+# pocketid-model-jwt (Role resourceNames enforcement); no ExternalSecret
+# may ever target that Secret (an ESO 1h refresh would clobber
+# freshly-minted tokens). The ESO in this directory
+# (pocketid-model-routes) targets the CLIENT CREDENTIALS Secret only,
+# which the refresher reads via env (kubelet projection, not the API).
+#
+# Schedule */15 with the 24h access-token lifetime set on the client
+# (plan D2): one missed cycle is harmless; the Secret stays fresh well
+# before exp. If the refresher dies, actors' hosted-route calls 401 until
+# the next successful run (follow-up F4 adds an age alert).
+#
+# Image (plan D7): docker.io/curlimages/curl — already pulled in this
+# cluster (the onepassword-connect healthCheck image), amd64 digest
+# pinned: sha256:3b8fde20978e330b401837f24b871ebe2c8d14ff7f07b87990bcd832588a1a75.
+# The script uses only sh + curl + sed; the Secret is written via
+# stringData (the API server base64-encodes it), so no base64 tooling is
+# needed in the image. Operator first-run check: no ImagePullBackOff
+# (plan verification step 9).
+#
+# Egress: the refresher pod dials https://id.biggs.dog (public IdP host),
+# which resolves in-cluster to the wildcard-biggs-dog data-plane pods
+# (networking ns, split-horizon); the CiliumNetworkPolicy
+# allow-egress-model-jwt-refresher (network-policies/policies/infra/
+# ai-system.yaml) allows exactly that. The in-cluster kube-apiserver dial
+# is covered by allow-egress-kube-apiserver (toEntities: kube-apiserver).
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pocketid-model-jwt-refresher
+  namespace: ai-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: pocketid-model-jwt-refresher
+  namespace: ai-system
+rules:
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get, create, update]
+    # Write target: pocketid-model-jwt (this CronJob, single owner).
+    # Read target: pocketid-model-routes (client credentials; the normal
+    # path is the kubelet env projection, this is the API fallback).
+    resourceNames: [pocketid-model-jwt, pocketid-model-routes]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: pocketid-model-jwt-refresher
+  namespace: ai-system
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: pocketid-model-jwt-refresher
+subjects:
+  - kind: ServiceAccount
+    name: pocketid-model-jwt-refresher
+    namespace: ai-system
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pocketid-model-jwt-refresher
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: pocketid-model-jwt-refresher
+spec:
+  schedule: "*/15 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 2
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 3
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: pocketid-model-jwt-refresher
+        spec:
+          serviceAccountName: pocketid-model-jwt-refresher
+          restartPolicy: OnFailure
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: refresher
+              image: docker.io/curlimages/curl:latest@sha256:3b8fde20978e330b401837f24b871ebe2c8d14ff7f07b87990bcd832588a1a75
+              imagePullPolicy: Always
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+              env:
+                - name: POCKETID_TOKEN_URL
+                  value: "https://id.biggs.dog/api/oidc/token"
+                - name: POCKETID_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef:
+                      name: pocketid-model-routes
+                      key: client-id
+                - name: POCKETID_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: pocketid-model-routes
+                      key: client-secret
+              command:
+                - sh
+                - -c
+                - |
+                  set -e
+                  API="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                  K8S_CA=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                  K8S_TOKEN=/var/run/secrets/kubernetes.io/serviceaccount/token
+                  mint_and_write() {
+                    json='{"apiVersion":"v1","kind":"Secret","metadata":{"name":"pocketid-model-jwt","namespace":"ai-system"},"stringData":{'
+                    first=1
+                    for a in minimax mistral glm; do
+                      tok=$(curl -fsS -X POST "$POCKETID_TOKEN_URL" \
+                        -F grant_type=client_credentials \
+                        -F client_id="$POCKETID_CLIENT_ID" \
+                        -F client_secret="$POCKETID_CLIENT_SECRET" \
+                        -F resource="https://$a.biggs.dog" -F scope=model:inference \
+                        | sed -n 's/.*"access_token":"\([^"]*\)".*/\1/p')
+                      [ -n "$tok" ] || { echo "refresher: no access_token for $a"; exit 1; }
+                      [ $first -eq 1 ] || json="$json,"
+                      json="$json\"$a\":\"$tok\""
+                      first=0
+                    done
+                    json="$json}}"
+                    curl -fsS --cacert "$K8S_CA" -X PUT "$API/api/v1/namespaces/ai-system/secrets/pocketid-model-jwt" \
+                      -H "Authorization: Bearer $(cat "$K8S_TOKEN")" \
+                      -H 'Content-Type: application/json' -d "$json"
+                  }
+                  mint_and_write
