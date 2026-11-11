@@ -36,7 +36,7 @@ spec:
         # Rolling :main is deliberate (renovate.json "Track floating tags by digest"):
         # digest bumps carry upstream main commits without release notes, so evaluation
         # is by the digest delta, not release notes.
-        - image: ghcr.io/continuwuity/continuwuity:main@sha256:dba068e07db0b824fdab69e5524ebdd0ff5091c052899bf34654ab81687d7929
+        - image: ghcr.io/continuwuity/continuwuity:main@sha256:2fbdbe0b510bb37534068376f5d341c26272cd30a1468e96121de0b563152505
           imagePullPolicy: Always
           name: continuwuity
           env:
@@ -52,6 +52,24 @@ spec:
               value: "4"
             - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST
               value: "false"
+            # Unauthenticated rate limiting: one shared 300 req/min budget
+            # per gateway pod (upstream default is 30), keyed on the socket
+            # source (upstream default `direct`), not on X-Forwarded-For:
+            # the client's real address is not visible at this layer.
+            # Matrix ingress is restricted to the agentgateway pods
+            # (Cilium allow-ingress-from-gateway,
+            # network-policies/policies/apps/matrix.yaml), the client path is
+            # all-L4 (UDM BGP route -> Cilium BGP LB 192.168.6.7 ->
+            # agentgateway), and agentgateway does not write X-Forwarded-For
+            # (verified against its source), so any XFF value is client-
+            # chosen and XFF keying would let a client pick its own limiter
+            # key. Consequence: all unauthenticated traffic shares this
+            # budget, and a single abusive client can lock the site out by
+            # burning 300 req/min. Per-client keying needs an XFF-writing
+            # edge (agentgateway upstream) or an L7 LB path; revisit this
+            # block when one lands.
+            - name: CONTINUWUITY_UNAUTHENTICATED_REQUEST_RATELIMIT
+              value: "300"
             # - name: CONTINUWUITY_QUERY_TRUSTED_KEY_SERVERS_FIRST_ON_JOIN
             #   value: "false"
             # - name: CONTINUWUITY_FORBIDDEN_REMOTE_SERVER_NAMES
