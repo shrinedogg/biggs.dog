@@ -1,0 +1,31 @@
+---
+# Cross-namespace reference grant: the agentgateway data plane fetches
+# PocketID's JWKS from the pocket-id Service (auth ns, port 1411) for the
+# hosted model routes' jwtAuthentication (jwks.remote.backendRef in the
+# ai-system/agentgateway-ai/app/model-api-key-*.yaml policies). Without
+# this grant the cross-namespace backendRef is rejected.
+#
+# Part of the PocketID model-routes migration PR-1 (dual-accept). The
+# canary Gateway (gateway-class agentgateway-canary, networking ns) is
+# included so the JWKS fetch keeps working after the 1.x train cutover
+# (#748) when the canary plane carries the routes.
+apiVersion: gateway.networking.k8s.io/v1beta1
+kind: ReferenceGrant
+metadata:
+  name: pocket-id-jwks
+  namespace: auth
+spec:
+  from:
+    - group: agentgateway.dev
+      kind: AgentgatewayPolicy
+      namespace: ai-system
+    - group: agentgateway.dev
+      kind: AgentgatewayBackend
+      namespace: ai-system
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      namespace: networking
+  to:
+    - group: ""
+      kind: Service
+      name: pocket-id

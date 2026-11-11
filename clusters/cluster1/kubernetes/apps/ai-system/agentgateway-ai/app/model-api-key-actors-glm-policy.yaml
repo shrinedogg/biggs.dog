@@ -1,14 +1,40 @@
 ---
-# API-key auth + rate limit for the in-cluster GLM actor route
-# (model-actors-glm, issue #661).
+# Dual-accept client auth + rate limit for the in-cluster GLM actor route
+# (model-actors-glm, issue #661). Part of the PocketID model-routes
+# migration (PR-1, dual-accept window):
 #
-# Same client-token design as model-api-key (issue #659): the actors present
-# the model-api-keys token (kagent's credential binding for the ModelConfig
-# baseUrl hostname emits "Authorization: Bearer <token>"); the upstream Z.ai
-# key stays in the zai-api-key Secret and is never handed to an actor. On
-# agentgateway controller v2.2.1 / data plane 0.12.0 the policy is dropped
-# from xDS while the model-api-keys Secret is absent, so the route serves
-# UNAUTHENTICATED (fail-open, issue #704); 401 only once the Secret exists.
+#   - jwtAuthentication mode Permissive: a valid PocketID OIDC JWT (issuer
+#     https://id.biggs.dog, audience https://glm.biggs.dog) authenticates;
+#     an invalid/missing JWT is ignored while the static key path is still
+#     available. The gateway validates iss, JWKS signature, per-route
+#     audience, and exp in-process.
+#   - apiKeyAuthentication mode Permissive: the actors' legacy model-api-keys
+#     token (kagent's credential binding for the ModelConfig baseUrl) still
+#     authenticates during the window. The token refresher
+#     (pocketid-model-jwt-refresher) writes short-lived PocketID JWTs to the
+#     dedicated pocketid-model-jwt Secret, which a hosted-route ModelConfig
+#     repoints to (plan, "Machine callers").
+#   - authorization CEL rule (fail-closed): a request must have validated
+#     AT LEAST ONE credential (has(jwt.sub) || has(apiKey.key)) or it is
+#     rejected (403). Two Permissive modes without this rule would pass
+#     everything through.
+#   - PR-2 flips jwtAuthentication to Strict and removes the
+#     apiKeyAuthentication block + the authorization rule; after that only
+#     PocketID JWTs work on this route.
+#
+# The upstream Z.ai key stays in the zai-api-key Secret and is never handed
+# to an actor (preserveToken default false: the validated client token is
+# stripped before the backend's auth policy injects the provider key).
+#
+# JWKS wiring: jwks.remote.backendRef -> the pocket-id Service (auth ns,
+# port 1411), cross-namespace, allowed by the ReferenceGrant in
+# auth/pocket-id/app/referencegrant.yaml. backendRef (not url) is the
+# supported wiring on the pinned legacy train (plan decision D1).
+#
+# Carried from the pre-migration policy: on the pinned train (controller
+# v2.2.1 / data plane 0.12.0) a missing model-api-keys Secret drops the
+# apiKey block from xDS (fail-open, issue #704); during the dual-accept
+# window the CEL authorization rule bounds that path (403 unauthenticated).
 # Fixed upstream by agentgateway#1245 semantics (controller >= v1.0.1).
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayPolicy
@@ -21,11 +47,36 @@ spec:
       kind: HTTPRoute
       name: model-actors-glm
   traffic:
+    jwtAuthentication:
+      mode: Permissive
+      providers:
+        - issuer: https://id.biggs.dog
+          audiences:
+            - https://glm.biggs.dog
+          jwks:
+            remote:
+              backendRef:
+                # group "" = core API group; kind defaults to Service.
+                name: pocket-id
+                namespace: auth
+                port: 1411
+              jwksPath: .well-known/jwks.json
+              cacheDuration: 5m
     apiKeyAuthentication:
-      mode: Strict
+      mode: Permissive
       # location omitted — defaults to Authorization header with "Bearer " prefix
       secretRef:
         name: model-api-keys
+    authorization:
+      # Fail-closed dual-accept: Permissive auth modes alone would pass
+      # unauthenticated requests through. The CEL Allow rule matches only
+      # when at least one credential validated: a valid PocketID JWT
+      # (jwt.sub set) or the legacy static API key (apiKey.key set).
+      # Neither -> rejected (403).
+      action: Allow
+      policy:
+        matchExpressions:
+          - 'has(jwt.sub) || has(apiKey.key)'
     # Bound spend per proxy; a leaked token still cannot run away.
     rateLimit:
       local:

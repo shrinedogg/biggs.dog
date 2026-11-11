@@ -7,16 +7,22 @@
 # clients (the split-horizon answer is derived from this route's parent
 # Gateway).
 #
-# Client authentication is required (model-api-key AgentgatewayPolicy):
-# send the model-route token as `Authorization: Bearer <token>`. The token
-# comes from the model-api-keys Secret (ExternalSecret from the 1Password
-# item agentgateway-model-api-key); it is distinct from the MiniMax
-# provider key, which the backend uses upstream and never reaches clients.
+# Client authentication is required (model-api-key AgentgatewayPolicy,
+# dual-accept since the PocketID model-routes migration PR-1): send EITHER
+#   - a PocketID OIDC JWT for this route's audience (mint via
+#     client_credentials at https://id.biggs.dog/api/oidc/token with
+#     resource=https://minimax.biggs.dog; the gateway validates iss/JWKS/
+#     aud/exp in-process), or
+#   - the legacy static model-route token from the model-api-keys Secret
+#     (ExternalSecret from the 1Password item agentgateway-model-api-key;
+#     retired by migration PR-3 after PR-2).
+# Both are distinct from the MiniMax provider key, which the backend uses
+# upstream and never reaches clients.
 #
 # Usage:
 #   curl https://minimax.biggs.dog/v1/chat/completions \
 #     -H 'Content-Type: application/json' \
-#     -H 'Authorization: Bearer <model...ken>' \
+#     -H 'Authorization: Bearer <pocketid-jwt-or-static-token>' \
 #     -d '{"model":"MiniMax-M3","messages":[{"role":"user","content":"hi"}]}'
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute

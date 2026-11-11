@@ -531,3 +531,54 @@ spec:
         - ports:
             - port: "8083"
               protocol: TCP
+
+---
+# PocketID model-routes JWT refresher (CronJob, ai-system) mints
+# client_credentials tokens for the hosted model routes from the public
+# IdP host https://id.biggs.dog (PocketID, auth ns). The public hostname
+# resolves in-cluster to the wildcard-biggs-dog data-plane pods (networking
+# ns; split-horizon: the in-cluster answer for id.biggs.dog is the gateway
+# data plane, not the LAN VIP), so the egress allows exactly:
+#   - toFQDNs id.biggs.dog :443 (the L7 DNS proxy answers from the
+#     allow-egress-dns rule; DNS itself is allowed for all ai-system pods)
+#   - the wildcard-biggs-dog data-plane pods :443 (the production plane
+#     serving the public route)
+#   - the canary data plane (Gateway agentgateway1x-canary, 1.x train)
+#     :443, which carries the public route after the 1.x train cutover
+#     (#748; plan D8). Data-plane pods carry the standard
+#     gateway-name label, matched as the existing internal-biggs-dog
+#     CNI does (line ~316 of this file).
+# Pattern mirrors allow-egress-oidc in policies/apps/auth.yaml (the
+# oauth2-proxy dials the same IdP host).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-model-jwt-refresher
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: pocketid-model-jwt-refresher
+  egress:
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-name: agentgateway1x-canary
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
