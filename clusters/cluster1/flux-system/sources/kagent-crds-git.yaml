@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: https://github.com/kagent-dev/kagent
   ref:
-    tag: v1.0.0-rc3
+    tag: v1.0.1
