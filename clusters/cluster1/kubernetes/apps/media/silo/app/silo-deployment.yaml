@@ -41,7 +41,7 @@ spec:
       # would silently fail to chown.
       initContainers:
         - name: silo-data-migrate
-          image: ghcr.io/silo-server/silo-server:latest@sha256:590b908dfc5135775aa17212acd1cbc8d5d74de5dd58e9e6ae859a248549bf37
+          image: ghcr.io/silo-server/silo-server:latest@sha256:2a242495855cf002fda78ddbd308d34013595b333a6469cf07ab971f3b8ae309
           imagePullPolicy: Always
           command:
             - /bin/sh
@@ -106,7 +106,7 @@ spec:
           # /config/.silo-owner then persists on the PVC and the image's
           # ownership walk runs once instead of re-walking ~300k artwork
           # files on every pod recreation.
-          image: ghcr.io/silo-server/silo-server:latest@sha256:590b908dfc5135775aa17212acd1cbc8d5d74de5dd58e9e6ae859a248549bf37
+          image: ghcr.io/silo-server/silo-server:latest@sha256:2a242495855cf002fda78ddbd308d34013595b333a6469cf07ab971f3b8ae309
           imagePullPolicy: Always
           securityContext:
             allowPrivilegeEscalation: false
