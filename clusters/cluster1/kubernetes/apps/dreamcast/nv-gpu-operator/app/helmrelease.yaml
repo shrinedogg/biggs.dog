@@ -7,14 +7,10 @@ metadata:
   namespace: dreamcast
 spec:
   interval: 3m
-  chart:
-    spec:
-      chart: gpu-operator
-      version: v26.7.2
-      sourceRef:
-        kind: HelmRepository
-        name: nvidia
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: nvidia
+    namespace: flux-system
   values:
     nfd:
       enabled: true

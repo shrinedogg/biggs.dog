@@ -7,14 +7,10 @@ metadata:
 spec:
   interval: 3m
   timeout: 2m
-  chart:
-    spec:
-      chart: victoria-logs-single
-      version: 0.13.11 
-      sourceRef:
-        kind: HelmRepository
-        name: victoria-metrics
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: victoria-logs-single
+    namespace: flux-system
   install:
     remediation:
       retries: 3

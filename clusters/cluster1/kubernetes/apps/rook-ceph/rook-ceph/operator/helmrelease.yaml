@@ -8,14 +8,10 @@ metadata:
 spec:
   interval: 3m
   releaseName: rook-ceph-operator
-  chart:
-    spec:
-      chart: rook-ceph
-      version: v1.21.2
-      sourceRef:
-        kind: HelmRepository
-        name: rook-ceph
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: rook-ceph
+    namespace: flux-system
   values:
     operator:
       nodeSelector:

@@ -7,14 +7,10 @@ metadata:
   namespace: auth
 spec:
   interval: 3m
-  chart:
-    spec:
-      chart: oauth2-proxy
-      version: 10.7.2
-      sourceRef:
-        kind: HelmRepository
-        name: oauth2-proxy
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: oauth2-proxy
+    namespace: flux-system
   install:
     remediation:
       retries: 3
