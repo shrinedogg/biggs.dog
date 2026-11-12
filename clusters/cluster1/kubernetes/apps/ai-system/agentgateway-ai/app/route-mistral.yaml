@@ -33,7 +33,11 @@ spec:
   hostnames:
     - mistral.biggs.dog
   parentRefs:
-    - name: internal-biggs-dog
+    # Attached to the 1.7.0 canary Gateway (issues #821/#748) because the legacy
+    # 0.12.0 data plane on internal-biggs-dog cannot execute the dual-accept
+    # jwtAuthentication + apiKeyAuthentication CEL policy. Single parentRef so
+    # k8s-gateway answers mistral.biggs.dog exclusively with the 1.x VIP.
+    - name: agentgateway1x-canary
       namespace: networking
   rules:
     - backendRefs:
