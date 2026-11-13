@@ -1,11 +1,13 @@
 ---
 # External HTTPS route for the Mistral OpenAI-compatible API via agentgateway.
 # Endpoint: https://mistral.biggs.dog/v1 (internal LAN-only gateway, TLS at
-# the edge). Placed on internal-biggs-dog, NOT wildcard-biggs-dog: the WAN
-# VIP 192.168.6.7 is the only UDM-forwarded address, so the public path 404s
-# while k8s-gateway answers mistral.biggs.dog with 192.168.6.15 for LAN
+# the edge). Placed on agentgateway1x-canary (the 1.7.0 canary Gateway),
+# NOT wildcard-biggs-dog: the WAN VIP 192.168.6.7 is the only UDM-forwarded
+# address, so the public path 404s while k8s-gateway answers
+# mistral.biggs.dog with the canary Service's UDM-assigned VIP for LAN
 # clients (the split-horizon answer is derived from this route's parent
-# Gateway).
+# Gateway; the canary Gateway has no pinned spec.addresses, so read the VIP
+# from the canary Service EXTERNAL-IP after reconcile).
 #
 # Client authentication is required (model-api-key-mistral AgentgatewayPolicy,
 # dual-accept since the PocketID model-routes migration PR-1): send EITHER
@@ -33,7 +35,11 @@ spec:
   hostnames:
     - mistral.biggs.dog
   parentRefs:
-    - name: internal-biggs-dog
+    # Attached to the 1.7.0 canary Gateway (issues #821/#748) because the legacy
+    # 0.12.0 data plane on internal-biggs-dog cannot execute the dual-accept
+    # jwtAuthentication + apiKeyAuthentication CEL policy. Single parentRef so
+    # k8s-gateway answers mistral.biggs.dog exclusively with the 1.x VIP.
+    - name: agentgateway1x-canary
       namespace: networking
   rules:
     - backendRefs:
