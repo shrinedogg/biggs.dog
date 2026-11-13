@@ -3,11 +3,11 @@ kind: Kustomization
 resources:
   - flux-system-git.yaml
   - flux-operator-repo.yaml
-  # cert-manager HelmRepository moved to capi/sources/ (single definition).
-  - external-secrets-repo.yaml
-  - openebs-repo.yaml
-  - onepass-repo.yaml
-  - cilium-repo.yaml
+  # cert-manager OCIRepository moved to capi/sources/ (single definition).
+  - external-secrets-oci.yaml
+  - openebs-oci.yaml
+  - onepass-oci.yaml
+  - cilium-oci.yaml
   - gateway-api-crds-git.yaml
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
