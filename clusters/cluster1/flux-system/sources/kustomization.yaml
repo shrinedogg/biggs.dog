@@ -1,20 +1,23 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - cnpg-repo.yaml
-  - victoria-metrics-repo.yaml
-  - nfd-repo.yaml
+  - cnpg-oci.yaml
+  - victoria-metrics-k8s-stack-oci.yaml
+  - victoria-logs-collector-oci.yaml
+  - victoria-logs-single-oci.yaml
+  - nfd-oci.yaml
   - k8s-gateway-oci.yaml
-  - cert-manager-repo.yaml
-  - external-secrets-repo.yaml
-  - onepass-repo.yaml
-  - grafana-operator-repo.yaml
-  - rook-ceph-repo.yaml
-  - volsync-repo.yaml
-  - snapshot-controller-repo.yaml
-  - cilium-repo.yaml
-  - openebs-repo.yaml
-  - nfs-driver-repo.yaml
+  - cert-manager-oci.yaml
+  - external-secrets-oci.yaml
+  - onepass-oci.yaml
+  - grafana-operator-oci.yaml
+  - rook-ceph-oci.yaml
+  - rook-ceph-cluster-oci.yaml
+  - volsync-oci.yaml
+  - snapshot-controller-oci.yaml
+  - cilium-oci.yaml
+  - openebs-oci.yaml
+  - nfs-driver-oci.yaml
   - gateway-api-crds-git.yaml
   - gpu-arbiter-operator-git.yaml
   - agentgateway-crds-oci.yaml
@@ -23,7 +26,7 @@ resources:
   - continuwuity-oci.yaml
   - dragonfly-oci.yaml
   - barman-oci.yaml
-  - nvidia-repo.yaml
+  - nvidia-oci.yaml
   - fenrir-git.yaml
   - fenrir-oci.yaml
   - kagent-crds-git.yaml
@@ -38,8 +41,16 @@ resources:
   - substrate-podcert-oci.yaml
   - substrate-oci.yaml
   - agent-sandbox-git.yaml
-  - lightdash-repo.yaml
-  - oauth2-proxy-repo.yaml
+  # MIGRATION SAFETY: the generated root-sync Kustomization (flux-system, path
+  # clusters/cluster1) runs with prune: false (flux-instance.yaml patch, see
+  # docs/NOTES.md), so the 16 HelmRepository objects whose files this PR
+  # deletes are NOT garbage-collected after merge. Delete them by hand:
+  #   kubectl -n flux-system delete helmrepository \
+  #     cloudnative-pg cert-manager cilium external-secrets grafana-operator \
+  #     lightdash node-feature-discovery nfs-driver nvidia oauth2-proxy \
+  #     onepass openebs piraeus rook-ceph victoria-metrics volsync
+  # Re-enable prune on the root sync once the cluster0->cluster1 split is complete.
+  - oauth2-proxy-oci.yaml
   - flux-operator-repo.yaml
   - flux-operator-mcp-oci.yaml
   - cert-manager-csi-driver-oci.yaml

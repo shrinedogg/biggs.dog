@@ -7,14 +7,10 @@ metadata:
   namespace: kube-system
 spec:
   interval: 3m
-  chart:
-    spec:
-      chart: csi-driver-nfs
-      version: 4.13.6
-      sourceRef:
-        kind: HelmRepository
-        name: nfs-driver
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: nfs-driver
+    namespace: flux-system
   values:
     feature:
       enableFSGroupPolicy: false

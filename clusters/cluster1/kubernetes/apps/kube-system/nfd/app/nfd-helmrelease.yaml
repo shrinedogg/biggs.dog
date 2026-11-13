@@ -5,14 +5,10 @@ metadata:
   namespace: kube-system
 spec:
   interval: 3m
-  chart:
-    spec:
-      chart: node-feature-discovery
-      version: 0.20.1
-      sourceRef:
-        kind: HelmRepository
-        name: node-feature-discovery
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: node-feature-discovery
+    namespace: flux-system
   values:
     # master and worker ship a hardened container securityContext by default
     # (runAsNonRoot, drop ALL, readOnlyRootFilesystem, no privilege escalation);

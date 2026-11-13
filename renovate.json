@@ -62,57 +62,59 @@
   "packageRules": [
     {
       "description": "Flux HelmRelease dependencies",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
+      "matchFileNames": ["clusters/**/sources/*-oci.yaml", "clusters/**/*.yaml"],
       "commitMessageTopic": "chart {{depName}}"
     },
     {
       "description": "Auto-merge non-major Helm chart updates",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
+      "matchFileNames": ["clusters/**/sources/*-oci.yaml", "clusters/**/*.yaml"],
       "matchUpdateTypes": ["minor", "patch"],
       "automerge": true
     },
     {
       "description": "Group Rook Ceph charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
       "groupName": "rook-ceph",
-      "matchPackageNames": ["/^rook-ceph/"]
+      "matchPackageNames": ["/^rook-ceph/", "/(^|/)rook-ceph/"]
     },
     {
       "description": "Group VictoriaMetrics charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
       "groupName": "victoria-metrics",
-      "matchPackageNames": ["/^victoria/"]
+      "matchPackageNames": ["/^victoria/", "/(^|/)victoria/"]
     },
     {
       "description": "Group external-secrets charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
       "groupName": "external-secrets",
       "matchPackageNames": ["/external-secrets/", "/connect/"]
     },
     {
       "description": "Group observability charts",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
       "groupName": "observability",
       "matchPackageNames": ["/grafana/", "/prometheus/"]
     },
     {
       "description": "Semantic versioning for Cilium",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
-      "matchPackageNames": ["cilium"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
+      "matchPackageNames": ["cilium", "/(^|/)cilium$/"],
       "separateMajorMinor": true
     },
     {
       "description": "Semantic versioning for cert-manager",
-      "matchManagers": ["flux"],
-      "matchDatasources": ["helm"],
-      "matchPackageNames": ["cert-manager"],
+      "matchManagers": ["flux", "custom.regex"],
+      "matchDatasources": ["helm", "docker"],
+      "matchPackageNames": ["cert-manager", "/(^|/)cert-manager$/"],
       "separateMajorMinor": true
     },
     {
@@ -186,6 +188,7 @@
       "description": "Group CNPG operand + extension catalog images so the catalog updates as one set",
       "matchDatasources": ["docker"],
       "matchPackageNames": ["/^ghcr\\.io/cloudnative-pg//"],
+      "excludePackageNames": ["/^ghcr\\.io/cloudnative-pg/charts//"],
       "groupName": "cnpg-images"
     },
     {

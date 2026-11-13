@@ -7,14 +7,10 @@ metadata:
   namespace: rook-ceph
 spec:
   interval: 5m
-  chart:
-    spec:
-      chart: rook-ceph-cluster
-      version: v1.21.2
-      sourceRef:
-        kind: HelmRepository
-        name: rook-ceph
-        namespace: flux-system
+  chartRef:
+    kind: OCIRepository
+    name: rook-ceph-cluster
+    namespace: flux-system
   values:
     monitoring:
       enabled: true
