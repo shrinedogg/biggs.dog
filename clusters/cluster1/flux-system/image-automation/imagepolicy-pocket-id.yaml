@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: pocket-id
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: pocket-id
+  policy:
+    semver:
+      range: ">=2.19.2 <3.0.0"

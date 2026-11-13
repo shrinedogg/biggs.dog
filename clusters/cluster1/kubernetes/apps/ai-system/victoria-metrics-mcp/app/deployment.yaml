@@ -53,7 +53,7 @@ spec:
                       - linux
       containers:
         - name: server
-          image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.120.1
+          image: ghcr.io/victoriametrics/mcp-victoriametrics:v1.120.1 # {"$imagepolicy": "flux-system:mcp-victoriametrics"}
           imagePullPolicy: IfNotPresent
           env:
             # vmsingle-stack: the VM Operator creates a Service named

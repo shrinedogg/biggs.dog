@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: mindwtr-app
+  namespace: flux-system
+spec:
+  image: ghcr.io/dongdongbh/mindwtr-app
+  interval: 30m

@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: oauth2-proxy
+  namespace: flux-system
+spec:
+  image: quay.io/oauth2-proxy/oauth2-proxy
+  interval: 30m

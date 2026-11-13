@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: livekit-server
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: livekit-server
+  policy:
+    semver:
+      range: ">=1.13.11 <2.0.0"

@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: lk-jwt-service
+  namespace: flux-system
+spec:
+  image: ghcr.io/element-hq/lk-jwt-service
+  interval: 30m

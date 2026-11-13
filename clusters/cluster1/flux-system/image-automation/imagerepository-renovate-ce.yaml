@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: renovate-ce
+  namespace: flux-system
+spec:
+  image: ghcr.io/mend/renovate-ce
+  interval: 30m

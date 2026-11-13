@@ -4,3 +4,4 @@ resources:
   - namespace.yaml
   - sources
   - flux-operator/ks.yaml
+  - image-automation

@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: livekit-server
+  namespace: flux-system
+spec:
+  image: livekit/livekit-server
+  interval: 30m

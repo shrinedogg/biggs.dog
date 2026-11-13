@@ -27,7 +27,7 @@ spec:
       hostUsers: false
       containers:
         - name: pocket-id
-          image: ghcr.io/pocket-id/pocket-id:v2.19.2
+          image: ghcr.io/pocket-id/pocket-id:v2.19.2 # {"$imagepolicy": "flux-system:pocket-id"}
           env:
             # Public URL behind the agentgateway (TLS terminated at the gateway).
             - name: APP_URL

@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: oauth2-proxy
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: oauth2-proxy
+  policy:
+    semver:
+      range: ">=7.15.6 <8.0.0"
