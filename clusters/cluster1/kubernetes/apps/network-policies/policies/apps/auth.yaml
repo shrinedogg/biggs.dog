@@ -184,9 +184,17 @@ spec:
   endpointSelector: {}
   ingress:
     - fromEndpoints:
+        # Control-plane pods (legacy + 1.x canary) fetch remote JWKS from
+        # pocket-id.auth.svc.cluster.local:1411 when reconciling jwtAuthentication
+        # policies (model-api-key-*).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: networking
-            app.kubernetes.io/name: agentgateway
+          matchExpressions:
+            - key: app.kubernetes.io/name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
         # 1.x train data plane: gateway-class-name agentgateway-canary (canary
         # now; the production planes carry it after the #748 cutover).
         - matchLabels:
