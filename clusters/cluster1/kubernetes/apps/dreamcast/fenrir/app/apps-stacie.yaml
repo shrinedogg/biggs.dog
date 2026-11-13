@@ -545,9 +545,13 @@ spec:
               #   tiny logo top-left), and launcher dialogs such as the cloud
               #   save prompt were covered again within 2s. Once-per-window
               #   lets dialogs and popups that open later stay on top.
-              # - Steam Big Picture (class exactly "steam") is fullscreened
-              #   whenever nothing else is, so it fills the output again after
-              #   a game exits.
+              # - Whenever nothing is fullscreen, the newest surviving game
+              #   window is re-fullscreened, else Steam Big Picture (class
+              #   exactly "steam"). Games can drop their own fullscreen after
+              #   start (NieR:Automata in windowed mode does): without the
+              #   game-first fallback BPM took the screen and the game was
+              #   left tiled and hidden behind it. BPM also fills the output
+              #   again after a game exits.
               # - A Wayland game is re-focused if BPM takes focus: an occluded
               #   Wayland game pauses rendering (DXGI occlusion), which reads as
               #   a black/frozen stream. sway 1.11 has no color management, so
@@ -594,30 +598,33 @@ spec:
                           and not props.get("transient_for"))
 
 
-              handled = set()
+              games = []  # game con ids, first-seen order
               last_wayland_game = None
               while True:
                   try:
                       vs = list(views(json.loads(sway("-t", "get_tree").stdout)))
                       ids = {v["id"] for v in vs}
-                      handled &= ids
+                      games = [g for g in games if g in ids]
                       for v in vs:
-                          if v["id"] in handled or not is_game(v):
+                          if v["id"] in games or not is_game(v):
                               continue
                           sway(f"[con_id={v['id']}] fullscreen enable")
-                          handled.add(v["id"])
+                          games.append(v["id"])
                           if v.get("shell") == "xdg_shell":
                               sway(f"[con_id={v['id']}] focus")
                               last_wayland_game = v["id"]
                           if DEBUG:
                               print("fullscreen", v["id"], repr(v.get("name")), flush=True)
                       if not any(v.get("fullscreen_mode") for v in vs):
-                          for v in vs:
-                              if is_bpm(v):
-                                  sway(f"[con_id={v['id']}] fullscreen enable")
-                                  if DEBUG:
-                                      print("fullscreen bpm", v["id"], flush=True)
-                                  break
+                          # Nothing fullscreen: a game dropped its own fullscreen (NieR
+                          # does right after start), or the game exited. Prefer the
+                          # newest surviving game window, else Big Picture.
+                          target = games[-1] if games else next(
+                              (v["id"] for v in vs if is_bpm(v)), None)
+                          if target is not None:
+                              sway(f"[con_id={target}] fullscreen enable")
+                              if DEBUG:
+                                  print("refullscreen", target, flush=True)
                       if last_wayland_game in ids:
                           focused = next((v for v in vs if v.get("focused")), None)
                           if focused is not None and is_bpm(focused):
