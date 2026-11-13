@@ -13,7 +13,8 @@
 # apiKeySecretRef: pocketid-model-jwt / apiKeySecretKey: <route>.
 #
 # Ownership: this CronJob's ServiceAccount is the ONLY writer of
-# pocketid-model-jwt (Role resourceNames enforcement); no ExternalSecret
+# pocketid-model-jwt (Role resourceNames enforcement on get/update;
+# create is unscoped because RBAC cannot name-scope it); no ExternalSecret
 # may ever target that Secret (an ESO 1h refresh would clobber
 # freshly-minted tokens). The ESO in this directory
 # (pocketid-model-routes) targets the CLIENT CREDENTIALS Secret only,
@@ -52,11 +53,23 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: [secrets]
-    verbs: [get, create, update]
+    verbs: [get, update]
     # Write target: pocketid-model-jwt (this CronJob, single owner).
     # Read target: pocketid-model-routes (client credentials; the normal
     # path is the kubelet env projection, this is the API fallback).
     resourceNames: [pocketid-model-jwt, pocketid-model-routes]
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [create]
+    # create cannot be scoped by resourceNames: the object name is not
+    # part of the POST URL, so a named+create rule matches no create
+    # request and grants nothing (k8s docs: "You cannot restrict
+    # top-level create requests by resource name"). The original single
+    # named rule with [get, create, update] therefore 403'd every
+    # refresher POST (first-boot create path) while named get/update
+    # worked. Unscoped create lets the first run create the Secret;
+    # blast radius: this SA can create (but not get/update/delete) other
+    # Secrets in ai-system.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
