@@ -3,7 +3,7 @@
 # you keep (ghcr.io/asciimoo/hister, single-binary Go server + terminal client).
 #
 # Config is env-first per the docs: HISTER__<SECTION>__<KEY> overrides,
-# HISTER_DATA_DIR points at the data dir. The v0.12.0 image runs the server by
+# HISTER_DATA_DIR points at the data dir. The v0.5.0 image runs the server by
 # default (entrypoint /hister/hister, cmd "listen" — verified from the image
 # config), so no command is set.
 #
@@ -41,9 +41,11 @@ spec:
         fsGroup: 65532
       containers:
         - name: hister
-          image: ghcr.io/asciimoo/hister:v0.12.0
-          # Pin: v0.12.0 is the newest versioned release tag (tag scheme
-          # v<X>.<Y>.<Z> verified on GHCR; :latest tracks ahead of it).
+          image: ghcr.io/asciimoo/hister:v0.5.0
+          # Pin: v0.5.0 is the newest versioned release tag on GHCR (checked
+          # 2026-11-14: versioned tags are v0.4.0 and v0.5.0; :latest tracks
+          # ahead of v0.5.0, so pin the versioned tag). Re-check when a
+          # newer release is tagged.
           # ASSUMPTION: no upstream resource guidance; 100m/256Mi requests
           # cover the search API and crawl jobs, 500m/1Gi leaves headroom for
           # bulk indexing spikes.
