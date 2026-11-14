@@ -183,3 +183,63 @@ spec:
         - ports:
             - port: "5170"
               protocol: TCP
+---
+# Grafana (native generic_oauth "Pocket ID" SSO) exchanges the auth code with
+# the IdP token endpoint https://id.biggs.dog/api/oidc/token from inside the
+# cluster. k8s-gateway split-horizon DNS answers id.biggs.dog with the
+# wildcard-biggs-dog gateway VIP (192.168.6.7), which the implicit
+# default-deny drops without an explicit egress allow: the dial hangs ~20s and
+# Grafana's login shows "Failed to get token from provider" (the browser-side
+# authorize step reaches the IdP fine, only Grafana's server-side exchange
+# fails). Same path as allow-egress-oidc in auth.yaml (oauth2-proxy) and
+# allow-egress-model-jwt-refresher in ai-system.yaml.
+#
+# Belt and suspenders, mirroring allow-egress-lk-jwt-to-matrix in livekit.yaml:
+#  - toCIDR 192.168.6.7/32: the deterministic path (the FQDN->VIP mapping can
+#    be GC'd from the per-connection FQDN cache, which makes toFQDNs-only
+#    flaky).
+#  - toEndpoints wildcard-biggs-dog: the production data-plane pods, in case
+#    the VIP hairpin from the pod network is unreachable and Cilium DNATs to
+#    a pod.
+#  - toEndpoints agentgateway1x-canary: the 1.x train data plane, which
+#    carries the public route after the #748 cutover.
+#  - toFQDNs id.biggs.dog: fallback if the VIP ever changes.
+# DNS egress is already granted namespace-wide by allow-egress above.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-grafana-oidc
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: grafana
+  egress:
+    - toCIDR:
+        - 192.168.6.7/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-name: agentgateway1x-canary
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
