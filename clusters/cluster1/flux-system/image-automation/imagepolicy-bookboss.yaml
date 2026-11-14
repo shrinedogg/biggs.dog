@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: bookboss
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: bookboss
+  policy:
+    semver:
+      range: ">=0.8.40 <1.0.0"

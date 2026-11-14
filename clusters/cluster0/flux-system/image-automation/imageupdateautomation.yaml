@@ -1,0 +1,33 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageUpdateAutomation
+metadata:
+  name: flux-system
+  namespace: flux-system
+spec:
+  interval: 30m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  git:
+    checkout:
+      ref:
+        branch: main
+    commit:
+      author:
+        name: fluxcdbot
+        email: fluxcdbot@users.noreply.github.com
+      messageTemplate: |-
+        Update container images
+        {{- range $file, $objects := .Changed.FileChanges }}
+        {{ $file }}:
+        {{- range $id, $changes := $objects }}
+        {{- range $c := $changes }}
+        - {{ $id.Kind }}/{{ $id.Name }}: {{ $c.OldValue }} -> {{ $c.NewValue }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
+    push:
+      branch: main
+  update:
+    path: ./clusters/cluster0
+    strategy: Setters

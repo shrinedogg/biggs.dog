@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: mcp-proxy
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: mcp-proxy
+  policy:
+    semver:
+      range: ">=0.15.0 <1.0.0"

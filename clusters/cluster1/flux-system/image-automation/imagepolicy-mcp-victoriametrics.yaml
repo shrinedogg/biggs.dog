@@ -1,0 +1,11 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: mcp-victoriametrics
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: mcp-victoriametrics
+  policy:
+    semver:
+      range: ">=1.120.1 <2.0.0"

@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: mcp-proxy
+  namespace: flux-system
+spec:
+  image: ghcr.io/sparfenyuk/mcp-proxy
+  interval: 30m

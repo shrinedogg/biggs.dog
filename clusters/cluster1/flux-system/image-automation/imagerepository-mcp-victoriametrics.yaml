@@ -1,0 +1,8 @@
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: mcp-victoriametrics
+  namespace: flux-system
+spec:
+  image: ghcr.io/victoriametrics/mcp-victoriametrics
+  interval: 30m

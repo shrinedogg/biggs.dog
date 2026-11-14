@@ -47,7 +47,7 @@ spec:
             claimName: zot-data
       containers:
         - name: zot
-          image: ghcr.io/project-zot/zot:v2.1.23
+          image: ghcr.io/project-zot/zot:v2.1.23 # {"$imagepolicy": "flux-system:zot"}
           imagePullPolicy: IfNotPresent
           args:
             - serve
