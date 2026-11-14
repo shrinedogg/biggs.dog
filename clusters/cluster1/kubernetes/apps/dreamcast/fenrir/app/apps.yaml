@@ -513,7 +513,7 @@ spec:
                               print("game", hex(game), repr(wm_name(d, game)),
                                     "focus", hex(f), flush=True)
                           # 0 = None, 1 = PointerRoot: nothing to steal back from.
-                          if f not in (0, 1, game) and not wm_class(d, f) and not wm_name(d, f):
+                          if f not in (0, 1, game.value) and not wm_class(d, f) and not wm_name(d, f):
                               x.XSetInputFocus(d, game, REVERT_TO_PARENT, 0)
                               x.XSync(d, 0)
                               if DEBUG:
