@@ -582,3 +582,28 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# Hister (hister ns) semantic search dials the Infinity embeddings service
+# (BAAI/bge-m3) on :7997. Cross-namespace ClusterIP: like the kritika path
+# above, the embeddings Service VIP reverse-NATs SYN,ACK, so the return path
+# must be allowed as ingress here too, or the dial is dropped
+# (fetch failed / i-o timeout from the hister pod). Egress side:
+# allow-egress-to-embeddings in policies/apps/hister.yaml.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hister
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: embeddings
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
+            app.kubernetes.io/name: hister
+      toPorts:
+        - ports:
+            - port: "7997"
+              protocol: TCP

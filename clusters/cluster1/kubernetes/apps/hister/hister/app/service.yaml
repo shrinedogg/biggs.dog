@@ -1,0 +1,20 @@
+---
+# ClusterIP for Hister. The internal-biggs-dog gateway routes
+# hister.biggs.dog here (see http-route.yaml); kagent's hister-mcp
+# RemoteMCPServer (ai-system) reaches it in-cluster on the same port.
+apiVersion: v1
+kind: Service
+metadata:
+  name: hister
+  namespace: hister
+  labels:
+    app.kubernetes.io/name: hister
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: hister
+  ports:
+    - name: http
+      port: 4433
+      targetPort: 4433
+      protocol: TCP

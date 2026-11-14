@@ -1,0 +1,30 @@
+---
+# Registers Hister's /mcp endpoint (Streamable HTTP, Bearer token) as a
+# kagent tool source. Mirrors the pattern established by exa-mcp and
+# codebase-memory-mcp.
+#
+# The Authorization header is injected from the hister-mcp-auth Secret
+# (ExternalSecret in external-secret.yaml; mirrors the 1Password item the
+# hister namespace uses). The CRD (kagent v1.0.1) allows Secret-backed
+# Authorization headers; the egress-gateway forbidden list is
+# proxy-authorization/cookie etc., not Authorization.
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata:
+  name: hister-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Hister personal search engine — search indexed pages, facets, stored
+    previews, and history.
+  protocol: STREAMABLE_HTTP
+  url: http://hister.hister.svc.cluster.local:4433/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s
+  headersFrom:
+    - name: Authorization
+      valueFrom:
+        type: Secret
+        name: hister-mcp-auth
+        key: authorization

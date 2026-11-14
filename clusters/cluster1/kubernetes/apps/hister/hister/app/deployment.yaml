@@ -1,0 +1,127 @@
+---
+# Hister: private, self-hosted search engine over pages you visit and files
+# you keep (github.com/asciimoo/hister).
+#
+# Image pin: ghcr.io/asciimoo/hister is public; anonymous pull verified
+# 2026-11-14. Repo convention pins tags (no latest), so this pins v0.5.0,
+# the newest versioned tag at probe time (the registry also carries latest,
+# latest-root, and sha-* CI tags).
+#
+# No command override: the image entrypoint IS the server (the Docker docs'
+# Compose examples run the server by default; the CLI form is
+# `hister listen`).
+#
+# Env-first configuration per the docs (env vars are the recommended
+# containerization mechanism; K8s named explicitly). Hister is HTTP only;
+# TLS terminates at the internal-biggs-dog gateway.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hister
+  namespace: hister
+  labels:
+    app.kubernetes.io/name: hister
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hister
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hister
+    spec:
+      # The image runs as nonroot UID/GID 65532; fsGroup makes the PVC
+      # writable by that user.
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 65532
+      containers:
+        - name: hister
+          image: ghcr.io/asciimoo/hister:v0.5.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 4433
+              protocol: TCP
+          env:
+            # Listen on all interfaces; TLS terminates at the gateway.
+            # base_url is required when not listening on loopback and is
+            # used by the MCP origin checks.
+            - name: HISTER__SERVER__ADDRESS
+              value: "0.0.0.0:4433"
+            - name: HISTER__SERVER__BASE_URL
+              value: https://hister.biggs.dog
+            # Token-gate search + MCP (access-token from 1Password item
+            # hister-access-token). app.public stays unset: no anonymous
+            # access; the user can flip it later via env/config.
+            - name: HISTER__APP__ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hister-access-token
+                  key: access-token
+            # Hister's only LLM touchpoint: opt-in semantic search via an
+            # OpenAI-compatible embeddings endpoint. The local vLLM on nv-01
+            # serves the Qwen chat model and does not serve embeddings, so
+            # this points at the cluster's Infinity embeddings service
+            # (BAAI/bge-m3) in ai-system; both share the vllm-api-key
+            # credential.
+            - name: HISTER__SEMANTIC_SEARCH__ENABLE
+              value: "true"
+            # Infinity serves its OpenAI endpoint at /embeddings, NOT
+            # /v1/embeddings (the /v1 paths 404).
+            - name: HISTER__SEMANTIC_SEARCH__EMBEDDING_ENDPOINT
+              value: http://embeddings.ai-system.svc.cluster.local:7997/embeddings
+            - name: HISTER__SEMANTIC_SEARCH__EMBEDDING_MODEL
+              value: BAAI/bge-m3
+            # ASSUMPTION: bge-m3 dense dimension count is 1024 (Hister caps
+            # dimensions at 2000). Re-verify live after merge.
+            - name: HISTER__SEMANTIC_SEARCH__DIMENSIONS
+              value: "1024"
+            - name: HISTER__SEMANTIC_SEARCH__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hister-access-token
+                  key: embedding-api-key
+          readinessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          resources:
+            # ASSUMPTION: no upstream CPU/RAM guidance; generous starting
+            # values for a single-user search engine.
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          # The image's runtime user is nonroot UID/GID 65532.
+          # readOnlyRootFilesystem with a /tmp scratch; all data lives on
+          # the hister-data PVC at /hister/data (the image's default data
+          # dir).
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: hister-data
+              mountPath: /hister/data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: hister-data
+          persistentVolumeClaim:
+            claimName: hister-data
+        - name: tmp
+          emptyDir: {}
