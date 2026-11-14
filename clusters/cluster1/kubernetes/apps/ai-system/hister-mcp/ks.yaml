@@ -1,0 +1,27 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app hister-mcp
+  namespace: flux-system
+spec:
+  dependsOn:
+    # kagent provides the RemoteMCPServer/Agent CRDs and the
+    # default-model-config ModelConfig (the local vLLM provider).
+    - name: kagent
+    # The Hister service must be reachable for the MCP endpoint to accept
+    # initialize + tools/list (the RemoteMCPServer Accepted gate).
+    - name: hister
+  # All resources live in ai-system.
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/hister-mcp/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  timeout: 5m

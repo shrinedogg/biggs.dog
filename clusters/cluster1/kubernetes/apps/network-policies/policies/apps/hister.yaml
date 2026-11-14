@@ -1,0 +1,123 @@
+# Namespace: hister  (Hister personal search engine)
+#
+# hister: single Go server on :4433 (HTTP only; TLS terminates at the
+# internal-biggs-dog gateway), data on an RWO ceph-block PVC.
+# It dials exactly one in-cluster destination: the Infinity embeddings
+# service (ai-system, :7997) for opt-in semantic search.
+---
+# NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
+# (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
+# is implicit: the allow policies below all select endpointSelector: {} for
+# ingress and/or egress, so any traffic not explicitly allowed is dropped.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-dns
+  namespace: hister
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: kube-system
+            k8s:k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          # L7 DNS proxy — Cilium injects replies directly to the pod, avoiding
+          # the conntrack reply-drop that breaks Go resolvers behind default-deny
+          # ingress, and enables toFQDNs.
+          rules:
+            dns:
+              - matchPattern: "*"
+---
+# Hister semantic search dials the Infinity embedding service (ClusterIP in
+# ai-system, :7997). Forward direction: egress to the embeddings pods.
+# (The return path is allowed by allow-ingress-from-embeddings below; the
+# ingress grant on the ai-system side is in policies/infra/ai-system.yaml.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-embeddings
+  namespace: hister
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: embeddings
+      toPorts:
+        - ports:
+            - port: "7997"
+              protocol: TCP
+---
+# hister serves at hister.biggs.dog via the internal-biggs-dog gateway
+# (agentgateway data plane in networking).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-gateway
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: agentgateway
+        # 1.x train data plane: gateway-class-name agentgateway-canary (canary
+        # now; the production planes carry it after the #748 cutover).
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
+      toPorts:
+        - ports:
+            - port: "4433"
+              protocol: TCP
+---
+# kubelet health/readiness probes.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-host
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEntities:
+        - host
+        - remote-node
+      toPorts:
+        - ports:
+            - port: "4433"
+              protocol: TCP
+---
+# Return path for the embeddings dial. Like the flux-mcp and mindwtr-cloud
+# precedents in policies/infra/ai-system.yaml, the embeddings ClusterIP
+# reverse-NATs SYN,ACK, so the reply arrives at the hister pod attributed to
+# the embeddings pod identity and would be dropped by the implicit
+# default-deny here after the first round-trip. No toPorts: the reply lands
+# on the client's ephemeral port (see allow-ingress-from-flux /
+# allow-ingress-from-mindwtr-cloud, which are port-unrestricted).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-embeddings
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: embeddings

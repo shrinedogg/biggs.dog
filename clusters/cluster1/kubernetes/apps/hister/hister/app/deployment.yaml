@@ -1,0 +1,130 @@
+---
+# Hister — self-hosted personal search engine over pages you visit and files
+# you keep (ghcr.io/asciimoo/hister, single-binary Go server + terminal client).
+#
+# Config is env-first per the docs: HISTER__<SECTION>__<KEY> overrides,
+# HISTER_DATA_DIR points at the data dir. The v0.5.0 image runs the server by
+# default (entrypoint /hister/hister, cmd "listen" — verified from the image
+# config), so no command is set.
+#
+# Semantic search (Hister's only LLM touchpoint) points at the cluster's
+# OpenAI-compatible embeddings endpoint (Infinity, BAAI/bge-m3) in ai-system:
+# the local vLLM on nv-01 serves the chat model only, not embeddings. The
+# Infinity server enforces the same credential as the vLLM chat model
+# (the shared vllm-api-key 1Password item).
+#
+# Auth: single-user access token (HISTER__APP__ACCESS_TOKEN) gates both the
+# HTTP API and the MCP endpoint. app.public is intentionally NOT set, so
+# search and MCP stay token-gated.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hister
+  namespace: hister
+  labels:
+    app.kubernetes.io/name: hister
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hister
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hister
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        # The image user is 65532 (nonroot, UID/GID 65532). fsGroup matches
+        # so the freshly-formatted ceph-block volume (root-owned) stays
+        # group-writable for the hister user.
+        fsGroup: 65532
+      containers:
+        - name: hister
+          image: ghcr.io/asciimoo/hister:v0.5.0
+          # Pin: v0.5.0 is the newest versioned release tag on GHCR (checked
+          # 2026-11-14: versioned tags are v0.4.0 and v0.5.0; :latest tracks
+          # ahead of v0.5.0, so pin the versioned tag). Re-check when a
+          # newer release is tagged.
+          # ASSUMPTION: no upstream resource guidance; 100m/256Mi requests
+          # cover the search API and crawl jobs, 500m/1Gi leaves headroom for
+          # bulk indexing spikes.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop:
+                - ALL
+            seccomp:
+              type: RuntimeDefault
+          ports:
+            - name: http
+              containerPort: 4433
+          env:
+            # Listen on all interfaces (the image default); HTTP only — TLS
+            # terminates at the internal-biggs-dog gateway.
+            - name: HISTER__SERVER__ADDRESS
+              value: 0.0.0.0:4433
+            # Required when listening on all interfaces (overrides the
+            # image's http://localhost:4433 default); used by the MCP
+            # origin checks.
+            - name: HISTER__SERVER__BASE_URL
+              value: https://hister.biggs.dog
+            # Long random token from the hister-access-token 1Password item;
+            # gates the HTTP API and the MCP endpoint (Bearer or
+            # X-Access-Token).
+            - name: HISTER__APP__ACCESS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: hister-access-token
+                  key: access-token
+            # Opt-in semantic search against the local LLM stack.
+            - name: HISTER__SEMANTIC_SEARCH__ENABLE
+              value: "true"
+            # Infinity (ai-system) serves its OpenAI-compatible endpoint at
+            # /embeddings (NOT /v1/embeddings — the /v1 paths 404; repo-
+            # verified in the embedding-model ModelConfig), model BAAI/bge-m3.
+            - name: HISTER__SEMANTIC_SEARCH__EMBEDDING_ENDPOINT
+              value: http://embeddings.ai-system.svc.cluster.local:7997/embeddings
+            - name: HISTER__SEMANTIC_SEARCH__EMBEDDING_MODEL
+              value: BAAI/bge-m3
+            # ASSUMPTION: bge-m3 dense dimension count is 1024 (Hister caps
+            # at 2000). Re-verify live; lower it if the server rejects it.
+            - name: HISTER__SEMANTIC_SEARCH__DIMENSIONS
+              value: "1024"
+            # The Infinity server enforces the shared kagent-vllm key
+            # (same credential family as the vLLM chat model).
+            - name: HISTER__SEMANTIC_SEARCH__API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: hister-access-token
+                  key: embedding-api-key
+          readinessProbe:
+            tcpSocket:
+              port: 4433
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: 4433
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: hister-data
+              mountPath: /hister/data
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: hister-data
+          persistentVolumeClaim:
+            claimName: hister-data

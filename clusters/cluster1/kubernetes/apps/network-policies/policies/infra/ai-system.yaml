@@ -582,3 +582,29 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# Hister (hister ns) dials the Infinity embedding service for opt-in
+# semantic search (the local vLLM serves chat only, not embeddings).
+# Cross-namespace ClusterIP precedent (allow-ingress-from-kritika,
+# allow-ingress-from-mindwtr-cloud): forward request into the embeddings
+# pod is granted here; the client side is the hister CNP set
+# (policies/apps/hister.yaml: allow-egress-to-embeddings + the
+# allow-ingress-from-embeddings return-path grant).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hister
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: embeddings
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
+            app.kubernetes.io/name: hister
+      toPorts:
+        - ports:
+            - port: "7997"
+              protocol: TCP
