@@ -6,11 +6,11 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
-    # kagent provides the RemoteMCPServer/Agent CRDs, the default-model-config
-    # ModelConfig (the local vLLM), and the kagent-builtin-prompts ConfigMap.
+    # kagent provides the RemoteMCPServer/Agent CRDs and the
+    # default-model-config ModelConfig (the local vLLM provider).
     - name: kagent
-    # The hister app (Deployment + Service in the hister namespace) must be
-    # up for the RemoteMCPServer's URL to resolve.
+    # The Hister service must be reachable for the MCP endpoint to accept
+    # initialize + tools/list (the RemoteMCPServer Accepted gate).
     - name: hister
   # All resources live in ai-system.
   commonMetadata:

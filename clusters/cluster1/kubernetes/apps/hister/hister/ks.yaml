@@ -8,7 +8,7 @@ spec:
   dependsOn:
     # ClusterSecretStore (onepassword-connect) must exist for the ExternalSecret.
     - name: secretstore
-    # Internal LAN gateway for the HTTPRoute (hister.biggs.dog).
+    # Internal gateway for the HTTPRoute.
     - name: agentgateway
   commonMetadata:
     labels:

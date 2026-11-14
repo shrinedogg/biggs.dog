@@ -1,11 +1,7 @@
 ---
-# Persistent store for the Hister index (Bleve index.db files, HTML
-# previews, favicons, sqlite databases, embedding vectors, rules).
-# ~100 KB per page.
-#
-# ASSUMPTION: 5Gi is a generous starting size for a single-user engine;
-# grow the PVC when the index outgrows it. ceph-block is the dominant RWO
-# storage class in this cluster.
+# ASSUMPTION: 5Gi is a generous starting size — Hister stores roughly
+# 100 KB/page (Bleve index + HTML preview + favicon + metadata). Expand if
+# the library outgrows it.
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -14,9 +10,9 @@ metadata:
   labels:
     app.kubernetes.io/name: hister
 spec:
-  storageClassName: ceph-block
   accessModes:
     - ReadWriteOnce
+  storageClassName: ceph-block
   resources:
     requests:
       storage: 5Gi

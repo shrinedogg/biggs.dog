@@ -1,10 +1,10 @@
 ---
-# HTTPS route for hister.biggs.dog, LAN-only via the internal-biggs-dog
-# gateway (TLS terminates there with the *.biggs.dog wildcard cert):
-#   /  -> hister (search UI, terminal client, and the /mcp endpoint)
-# k8s-gateway picks up this hostname and answers hister.biggs.dog for
-# LAN/VPN clients (split-horizon). The Hister server itself is HTTP-only;
-# TLS terminates at the gateway.
+# LAN-only route for hister.biggs.dog via the internal-biggs-dog gateway
+# (TLS terminates there with the *.biggs.dog wildcard cert). Hister has no
+# built-in TLS. k8s-gateway answers hister.biggs.dog with the LAN VIP for
+# LAN/VPN clients (split-horizon), like mindwtr.biggs.dog.
+# The browser extension and MCP clients use this host; the MCP origin checks
+# accept it (it matches HISTER__SERVER__BASE_URL).
 apiVersion: gateway.networking.k8s.io/v1
 kind: HTTPRoute
 metadata:
