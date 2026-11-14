@@ -16,10 +16,16 @@ spec:
       author:
         name: fluxcdbot
         email: fluxcdbot@users.noreply.github.com
-      messageTemplate: |
+      messageTemplate: |-
         Update container images
-
-        {{ .Changed.Summary }}
+        {{- range $file, $objects := .Changed.FileChanges }}
+        {{ $file }}:
+        {{- range $id, $changes := $objects }}
+        {{- range $c := $changes }}
+        - {{ $id.Kind }}/{{ $id.Name }}: {{ $c.OldValue }} -> {{ $c.NewValue }}
+        {{- end }}
+        {{- end }}
+        {{- end }}
     push:
       branch: main
   update:
