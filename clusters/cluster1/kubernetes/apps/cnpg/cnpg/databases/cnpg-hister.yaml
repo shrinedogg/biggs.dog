@@ -1,0 +1,43 @@
+# Hister's Postgres (the cnpg-databases Kustomization auto-discovers this
+# dir — no kustomization.yaml there). Mirrors cnpg-kagent.yaml: 3 instances
+# on the host-path class, minimal trixie operand + pg18 from the official
+# CNPG 1.29 catalog. Hister's semantic search stores embeddings in pgvector
+# (vector(N) + HNSW, capped at 2000 dims; bge-m3 is 1024) and runs
+# CREATE EXTENSION IF NOT EXISTS vector itself at startup, so the extension
+# must be available in the operand image (same as cnpg-kagent).
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: cnpg-hister
+  namespace: cnpg-system
+spec:
+  instances: 3
+  bootstrap:
+    initdb:
+      database: hister
+      owner: hister
+      dataChecksums: true
+      secret:
+        name: hister-user-password
+  # Minimal trixie operand + extension images from the official CNPG 1.29
+  # catalog (../app/postgresql-minimal-trixie-catalog.yaml). Enables
+  # pgvector by name only.
+  imageCatalogRef:
+    apiGroup: postgresql.cnpg.io
+    kind: ClusterImageCatalog
+    name: postgresql-minimal-trixie
+    major: 18
+  resources:
+    requests:
+      memory: 300Mi
+      cpu: 150m
+    limits:
+      memory: 300Mi
+  storage:
+    storageClass: host-path
+    size: 5Gi
+  postgresql:
+    extensions:
+      - name: pgvector
+    parameters:
+      archive_mode: "off"

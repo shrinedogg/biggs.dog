@@ -2,10 +2,29 @@
 # Hister — self-hosted personal search engine over pages you visit and files
 # you keep (ghcr.io/asciimoo/hister, single-binary Go server + terminal client).
 #
+# Image pin: the v0.21.0 image, pinned by digest. Upstream publishes versioned
+# GHCR tags only through v0.5.0 (no versioned tag exists for v0.6.0-v0.21.0),
+# and :latest is the v0.21.0 release image — verified 2026-11-15 from the
+# image config labels (org.opencontainers.image.version=v0.21.0 and
+# org.opencontainers.image.revision=161bd84e..., the v0.21.0 git-tag commit).
+# The digest below is that image's multi-arch index, so the pin is immutable.
+# v0.5.0 (the previous pin) predates semantic search, the /mcp endpoint and
+# the access-token auth entirely — it could never serve this release's MCP
+# acceptance gate. Re-pin when a versioned tag >= v0.21.0 appears.
+#
 # Config is env-first per the docs: HISTER__<SECTION>__<KEY> overrides,
-# HISTER_DATA_DIR points at the data dir. The v0.5.0 image runs the server by
+# HISTER_DATA_DIR points at the data dir. The image runs the server by
 # default (entrypoint /hister/hister, cmd "listen" — verified from the image
 # config), so no command is set.
+#
+# Storage: the index + stored previews live in the cluster's CNPG postgres
+# (cnpg-hister, clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/
+# cnpg-hister.yaml; Hister selects Postgres from the key=value DSN in
+# HISTER__SERVER__DATABASE and creates the pgvector extension + HNSW index
+# itself at startup). /hister/data is an emptyDir holding only runtime
+# scratch (the config.yml the web UI writes); nothing durable lives in the
+# pod, so the deployment is reschedulable anywhere and 2 replicas make the
+# search service HA in-cluster (no RWO ceph-block PVC).
 #
 # Semantic search (Hister's only LLM touchpoint) points at the cluster's
 # OpenAI-compatible embeddings endpoint (Infinity, BAAI/bge-m3) in ai-system:
@@ -24,7 +43,10 @@ metadata:
   labels:
     app.kubernetes.io/name: hister
 spec:
-  replicas: 1
+  # Stateless (data in cnpg-hister, /hister/data is emptyDir scratch): any
+  # node can run a replica; 2 replicas keep the service up across a node or
+  # pod loss.
+  replicas: 2
   selector:
     matchLabels:
       app.kubernetes.io/name: hister
@@ -36,16 +58,17 @@ spec:
       securityContext:
         runAsNonRoot: true
         # The image user is 65532 (nonroot, UID/GID 65532). fsGroup matches
-        # so the freshly-formatted ceph-block volume (root-owned) stays
-        # group-writable for the hister user.
+        # so the emptyDir volumes stay group-writable for the hister user.
         fsGroup: 65532
       containers:
         - name: hister
-          image: ghcr.io/asciimoo/hister:v0.5.0
-          # Pin: v0.5.0 is the newest versioned release tag on GHCR (checked
-          # 2026-11-14: versioned tags are v0.4.0 and v0.5.0; :latest tracks
-          # ahead of v0.5.0, so pin the versioned tag). Re-check when a
-          # newer release is tagged.
+          # v0.21.0 image pinned by digest (see header): the multi-arch index
+          # that :latest points at is the v0.21.0 release build — verified
+          # 2026-11-15 via the image config's OCI revision/version labels.
+          # Upstream has not published a versioned tag since v0.5.0, so a
+          # digest pin is the only immutable way to pin v0.21.0. Anonymous
+          # pull verified.
+          image: ghcr.io/asciimoo/hister@sha256:4dab1cbd7aabe8ade8e696e4085ecd3254e1170467c4502debec792a904abdbc
           # ASSUMPTION: no upstream resource guidance; 100m/256Mi requests
           # cover the search API and crawl jobs, 500m/1Gi leaves headroom for
           # bulk indexing spikes.
@@ -86,6 +109,17 @@ spec:
                 secretKeyRef:
                   name: hister-access-token
                   key: access-token
+            # External Postgres: the cnpg-hister cluster (cnpg-system). The
+            # value is a libpq key=value DSN — Hister selects Postgres only
+            # when the database value contains "=" (a bare postgres:// URL
+            # would be treated as a SQLite filename). The password is
+            # alphanumeric (see the hister-user-password operator gate), so
+            # no key=value quoting is needed.
+            - name: HISTER__SERVER__DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: hister-database-url
+                  key: dsn
             # Opt-in semantic search against the local LLM stack.
             - name: HISTER__SEMANTIC_SEARCH__ENABLE
               value: "true"
@@ -97,7 +131,8 @@ spec:
             - name: HISTER__SEMANTIC_SEARCH__EMBEDDING_MODEL
               value: BAAI/bge-m3
             # ASSUMPTION: bge-m3 dense dimension count is 1024 (Hister caps
-            # at 2000). Re-verify live; lower it if the server rejects it.
+            # PostgreSQL at 2000). Re-verify live; lower it if the server
+            # rejects it.
             - name: HISTER__SEMANTIC_SEARCH__DIMENSIONS
               value: "1024"
             # The Infinity server enforces the shared kagent-vllm key
@@ -125,6 +160,8 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        # Runtime scratch only (config.yml written by the web UI at
+        # /hister/data/config.yml). Durable data lives in cnpg-hister; this
+        # volume is lost on pod restart by design.
         - name: hister-data
-          persistentVolumeClaim:
-            claimName: hister-data
+          emptyDir: {}

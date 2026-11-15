@@ -1,9 +1,13 @@
 # Namespace: hister  (Hister personal search engine)
 #
-# hister: single Go server on :4433 (HTTP only; TLS terminates at the
-# internal-biggs-dog gateway), data on an RWO ceph-block PVC.
-# It dials exactly one in-cluster destination: the Infinity embeddings
-# service (ai-system, :7997) for opt-in semantic search.
+# hister: Go server on :4433 (HTTP only; TLS terminates at the
+# internal-biggs-dog gateway), 2 stateless replicas: index + previews in
+# the CNPG postgres (cnpg-hister, cnpg-system), /hister/data an emptyDir
+# scratch. Dials exactly two in-cluster destinations: the Infinity
+# embeddings service (ai-system, :7997) for opt-in semantic search and the
+# cnpg-hister Postgres (cnpg-system, :5432) for storage. The kagent
+# controller (ai-system) dials Hister's /mcp endpoint (RemoteMCPServer
+# hister-mcp).
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
@@ -121,3 +125,73 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: ai-system
             app.kubernetes.io/name: embeddings
+---
+# The kagent controller (ai-system) reconciles the hister-mcp
+# RemoteMCPServer and dials Hister's MCP endpoint (initialize + tools/list,
+# the Accepted gate) at http://hister.hister.svc.cluster.local:4433/mcp.
+# Cross-namespace ClusterIP precedent (allow-ingress-from-kritika,
+# allow-ingress-from-mindwtr-cloud in policies/infra/ai-system.yaml): the
+# forward request into the hister pods is granted here, scoped to the kagent
+# controller pods; the reverse-NAT'd reply lands at the kagent controller
+# pods attributed to the hister pods and is allowed by
+# allow-ingress-from-hister-mcp in policies/infra/ai-system.yaml.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-kagent
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: ai-system
+            app.kubernetes.io/name: kagent
+            app.kubernetes.io/component: controller
+      toPorts:
+        - ports:
+            - port: "4433"
+              protocol: TCP
+---
+# Hister stores its index in the cnpg-hister Postgres cluster (cnpg-system,
+# the cnpg-hister-rw Service, :5432). Forward direction: egress to the
+# instance pods (they carry the cnpg.io/cluster label, matched here like
+# the ai-system precedent).
+# (The return path is allowed by allow-ingress-from-postgres below; the
+# cnpg-system-side ingress grant is the hister entry in
+# allow-ingress-from-apps in policies/infra/cnpg-system.yaml.)
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-postgres
+  namespace: hister
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hister
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+# Return path for the postgres dial. Like the CNPG precedent in
+# policies/infra/ai-system.yaml, the cnpg-hister-rw Service VIP
+# reverse-NATs SYN,ACK, so the reply arrives at the hister pods attributed
+# to the cnpg pod identity and would be dropped by the implicit default-deny
+# here after the first round-trip. No toPorts: the reply lands on the
+# client's ephemeral port.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-postgres
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hister
