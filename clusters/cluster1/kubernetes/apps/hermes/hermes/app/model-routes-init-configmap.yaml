@@ -49,7 +49,18 @@ data:
         yaml = YAML()
         yaml.preserve_quotes = True
         with config_path.open("r", encoding="utf-8") as fh:
-            doc = yaml.load(fh)
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        # Never fail the boot contract over the file this hook is meant to heal:
+        # hermes tolerates config states ruamel rejects (e.g. duplicate keys),
+        # so an unparseable config.yaml must degrade to "skip" (stale provider
+        # wiring), not a failed cont-init (s6 never starts user services).
+        try:
+            with config_path.open("r", encoding="utf-8") as fh:
+                doc = yaml.load(fh)
+        except Exception as exc:
+            print(f"[reconcile-model-routes] skipped: config.yaml not parseable: {exc}")
+            return
         if not isinstance(doc, dict):
             return
 
