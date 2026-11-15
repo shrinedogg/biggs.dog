@@ -15,7 +15,7 @@ data:
   vllm-inference.json: |
     {
       "annotations": { "list": [] },
-      "description": "vLLM inference server — Qwen/Qwen3.8-27B-FP8 on nv-01 2x RTX 5090 (FP8, tensor-parallel 2, MTP speculative decoding)",
+      "description": "vLLM inference server — minima-ai/mnma_qwen3.8_27b_nvfp4 on nv-01 2x RTX 5090 (NVFP4, tensor-parallel 2)",
       "editable": true,
       "graphTooltip": 1,
       "links": [],
