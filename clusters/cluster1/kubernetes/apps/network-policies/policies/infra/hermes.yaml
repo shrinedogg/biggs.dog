@@ -305,3 +305,52 @@ spec:
         - ports:
             - port: "6443"
               protocol: TCP
+---
+# PocketID model-routes JWT refresher CronJob (app.kubernetes.io/name=
+# pocketid-model-jwt-refresher): mints 24h client_credentials tokens from
+# https://id.biggs.dog/api/oidc/token and writes Secret/pocketid-model-jwt via
+# the in-cluster kube-apiserver. Scoped strictly to the refresher pod label so
+# Deployment/hermes continues to have zero kube-apiserver egress.
+# Belt-and-suspenders IdP egress matches observability.yaml (PR #848, 9853af0c)
+# and ai-system.yaml: split-horizon VIP 192.168.6.7/32 + wildcard-biggs-dog +
+# agentgateway1x-canary data planes + toFQDNs fallback on :443/TCP.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-model-jwt-refresher
+  namespace: hermes
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: pocketid-model-jwt-refresher
+  egress:
+    - toEntities:
+        - kube-apiserver
+    - toCIDR:
+        - 192.168.6.7/32
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            gateway.networking.k8s.io/gateway-name: agentgateway1x-canary
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP

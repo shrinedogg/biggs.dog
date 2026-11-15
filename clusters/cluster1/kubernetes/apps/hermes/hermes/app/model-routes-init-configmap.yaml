@@ -1,0 +1,88 @@
+---
+# Declarative boot-time reconciliation of hosted model-route provider wiring in
+# /opt/data/config.yaml (PocketID model-routes migration follow-up F2).
+#
+# Mounted at /etc/cont-init.d/018-reconcile-model-routes + /etc/hermes-init/ so
+# s6-overlay executes it:
+#   - AFTER 01-hermes-setup (stage2-hook.sh chowns /opt/data and seeds the full
+#     cli-config.yaml.example on an empty PVC — an initContainer writing
+#     config.yaml before container start would suppress that seed), and
+#   - BEFORE 02-reconcile-profiles and s6-rc user services (dashboard, gateway).
+#
+# Idempotently converges providers.mistral onto key_cmd reading the kubelet-
+# synced Secret volume (/var/run/secrets/pocketid-model-jwt/mistral, refreshed
+# every 15m by CronJob/pocketid-model-jwt-refresher; Hermes CommandTokenSource
+# re-reads bare key_cmd output every 900s without restarting the pod) and drops
+# the retired HERMES_MISTRAL_PROXY_KEY key_env reference while preserving all
+# comments and unrelated user settings.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: hermes-model-routes-init
+  namespace: hermes
+data:
+  018-reconcile-model-routes: |
+    #!/command/with-contenv sh
+    set -eu
+    if [ "$(id -u)" = "0" ]; then
+      exec s6-setuidgid hermes /opt/hermes/.venv/bin/python /etc/hermes-init/reconcile_model_routes.py
+    fi
+    exec /opt/hermes/.venv/bin/python /etc/hermes-init/reconcile_model_routes.py
+  reconcile_model_routes.py: |
+    import os
+    from pathlib import Path
+    from ruamel.yaml import YAML
+
+    DESIRED = {
+        "name": "mistral",
+        "base_url": "https://mistral.biggs.dog/v1",
+        "key_cmd": "/bin/cat /var/run/secrets/pocketid-model-jwt/mistral",
+        "discover_models": True,
+    }
+
+
+    def main() -> None:
+        config_path = Path(os.environ.get("HERMES_HOME", "/opt/data")) / "config.yaml"
+        if not config_path.is_file() or config_path.is_symlink():
+            return
+
+        yaml = YAML()
+        yaml.preserve_quotes = True
+        with config_path.open("r", encoding="utf-8") as fh:
+            doc = yaml.load(fh)
+        if not isinstance(doc, dict):
+            return
+
+        changed = False
+        providers = doc.get("providers")
+        if not isinstance(providers, dict):
+            doc["providers"] = {}
+            providers = doc["providers"]
+            changed = True
+
+        mistral = providers.get("mistral")
+        if not isinstance(mistral, dict):
+            providers["mistral"] = {}
+            mistral = providers["mistral"]
+            changed = True
+
+        for key, val in DESIRED.items():
+            if mistral.get(key) != val:
+                mistral[key] = val
+                changed = True
+
+        if mistral.get("key_env") == "HERMES_MISTRAL_PROXY_KEY":
+            del mistral["key_env"]
+            changed = True
+
+        if changed:
+            tmp_path = config_path.with_name(config_path.name + ".reconcile-tmp")
+            fd = os.open(str(tmp_path), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o640)
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                yaml.dump(doc, fh)
+            os.replace(tmp_path, config_path)
+        print(f"[reconcile-model-routes] providers.mistral converged (updated={changed})")
+
+
+    if __name__ == "__main__":
+        main()
