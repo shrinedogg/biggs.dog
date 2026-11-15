@@ -34,7 +34,17 @@
 #
 # Auth: single-user access token (HISTER__APP__ACCESS_TOKEN) gates both the
 # HTTP API and the MCP endpoint. app.public is intentionally NOT set, so
-# search and MCP stay token-gated.
+# search and MCP stay token-gated. Human browser sign-in goes through
+# PocketID OIDC (the hister generic "oidc" OAuth provider, id.biggs.dog);
+# oauth_only stays unset so the token-gated API/MCP paths keep working
+# alongside the OAuth sessions.
+#
+# Session cookies are signed with the data-dir .secret_key file (hister
+# mints a random one on first start if absent). With 2 replicas on emptyDir
+# each replica would mint its own key and cookies signed on one replica
+# would fail on the other (the OAuth callback hop), so a shared session-key
+# (1Password item hister-oidc, ExternalSecret hister-oidc) is mounted over
+# the file.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -123,6 +133,31 @@ spec:
                 secretKeyRef:
                   name: hister-access-token
                   key: access-token
+            # PocketID OIDC sign-in (hister's generic "oidc" provider). The
+            # app dials the public FQDN for discovery + token + userinfo
+            # (https://id.biggs.dog), which in-cluster resolves via
+            # split-horizon DNS to the wildcard-biggs-dog gateway VIP — the
+            # allow-egress-oidc / allow-ingress-from-oidc-gateway grants in
+            # network-policies (policies/apps/hister.yaml) cover that dial
+            # and its reverse-NAT return path. The confidential client
+            # (redirect URI https://hister.biggs.dog/api/oauth/callback
+            # ?provider=oidc, the exact redirect_uri hister sends) and the
+            # shared session-signing key come from the hister-oidc
+            # ExternalSecret (1Password item hister-oidc). PKCE stays on;
+            # if the PocketID release ever rejects the code_verifier, set
+            # HISTER__SERVER__OAUTH__OIDC__DISABLE_PKCE=true.
+            - name: HISTER__SERVER__OAUTH__OIDC__CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: hister-oidc
+                  key: client-id
+            - name: HISTER__SERVER__OAUTH__OIDC__CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: hister-oidc
+                  key: client-secret
+            - name: HISTER__SERVER__OAUTH__OIDC__CONFIGURATION_URL
+              value: https://id.biggs.dog/.well-known/openid-configuration
             # External Postgres: the cnpg-hister cluster (cnpg-system). The
             # value is a libpq key=value DSN — Hister selects Postgres only
             # when the database value contains "=" (a bare postgres:// URL
@@ -171,11 +206,27 @@ spec:
               mountPath: /tmp
             - name: hister-data
               mountPath: /hister/data
+            # Shared session-signing key: hister signs its OAuth session
+            # cookies with the data-dir .secret_key file (a per-pod random
+            # key if the file is absent). Mounting the same bytes on both
+            # replicas keeps cookies valid across the OAuth callback hop.
+            - name: hister-oidc-secret
+              mountPath: /hister/data/.secret_key
+              subPath: session-key
+              readOnly: true
       volumes:
         - name: tmp
           emptyDir: {}
-        # Runtime scratch only (config.yml written by the web UI at
+        # Runtime scratch only (the config.yml written by the web UI at
         # /hister/data/config.yml). Durable data lives in cnpg-hister; this
         # volume is lost on pod restart by design.
         - name: hister-data
           emptyDir: {}
+        # hister-oidc ExternalSecret (1Password item hister-oidc): only the
+        # session-key key is mounted here; client-id/client-secret feed the
+        # OAuth env above.
+        - name: hister-oidc-secret
+          secret:
+            secretName: hister-oidc
+            items:
+              - key: session-key
