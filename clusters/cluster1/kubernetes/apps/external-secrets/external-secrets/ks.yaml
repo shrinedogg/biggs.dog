@@ -17,6 +17,8 @@ spec:
   interval: 3m
   retryInterval: 1m
   timeout: 2m
+  dependsOn:
+    - name: onepassword-connect
 ---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization

@@ -1,0 +1,17 @@
+# ConfigMap/kritika-runner-image (IAC-only, local-config): the tools image the
+# kritika runner execs. Consumed by the app kustomization's replacement; never
+# applied to the cluster (Wave 1 de-Helm).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kritika-runner-image
+  namespace: kritika
+  annotations:
+    config.kubernetes.io/local-config: "true"
+data:
+  # local-config: consumed by the app kustomization's replacement and never
+  # applied to the cluster. The $imagepolicy marker enrolls this line in the
+  # cluster1 IAC (kritika-tools policy; extract "$version" from <ver>-tools
+  # tags, range >=0.0.119 <1.0.0, shared ImageRepository/kritika with a
+  # sha256-digest exclusionList).
+  image: ghcr.io/home-operations/kritika:0.0.120-tools # {"$imagepolicy": "flux-system:kritika-tools"}

@@ -1,0 +1,21 @@
+# oauth2-proxy app (Wave 1 de-Helm: replaces the HelmRelease).
+#
+# The configMapGenerator creates ConfigMap/oauth2-proxy (data key
+# oauth2_proxy.cfg) so an edit to oauth2_proxy.cfg hash-rolls the pod:
+# kustomize names the generated CM oauth2-proxy-<hash> and rewrites the
+# Deployment's volume reference to it on every build.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: auth
+configMapGenerator:
+  - name: oauth2-proxy
+    files:
+      - oauth2_proxy.cfg
+resources:
+  - serviceaccount.yaml
+  - service.yaml
+  - deployment.yaml
+  - external-secret.yaml
+  - reference-grant.yaml
+  - route.yaml
+  - vmservicescrape.yaml

@@ -1,0 +1,38 @@
+# Service/direwolf: the shared moonlight-proxy LoadBalancer VIP
+# (lbipam.cilium.io/sharing-key: direwolf; per-session RTP Services share the
+# same IP). Converted from the HelmRelease (Wave 1 de-Helm).
+#
+# service.cilium.io/forwarding-mode: dsr (also injected at admission by
+# MutatingAdmissionPolicy/direwolf-dsr) keeps the high-bitrate UDP video
+# return path on the backend node (nv-01) without SNAT.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: direwolf
+  labels:
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/service: direwolf
+    app.kubernetes.io/version: 0.0.1
+  annotations:
+    io.cilium/lb-ipam-ips: 192.168.6.12
+    lbipam.cilium.io/sharing-key: direwolf
+    metallb.universe.tf/allow-shared-ip: direwolf
+    service.cilium.io/forwarding-mode: dsr
+  namespace: dreamcast
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 47984
+      targetPort: 47984
+      protocol: TCP
+      name: http
+    - port: 47989
+      targetPort: 47989
+      protocol: TCP
+      name: https
+  selector:
+    app.kubernetes.io/controller: moonlight_proxy
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir

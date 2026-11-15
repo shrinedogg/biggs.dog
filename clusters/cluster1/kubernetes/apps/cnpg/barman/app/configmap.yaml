@@ -1,0 +1,13 @@
+# plugin-barman-cloud sidecar image ConfigMap (Wave 1 de-Helm: the chart's
+# self-managed CM replaced by a plain one with an IAC marker).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: plugin-barman-cloud-config
+  namespace: cnpg-system
+data:
+  # Consumed by the plugin Deployment (env SIDECAR_IMAGE): the CNPG operator
+  # spawns this sidecar image inside instance pods for object-store backups.
+  # The $imagepolicy marker enrolls it in the cluster1 IAC (patch-only
+  # ~0.16.0, kept in lockstep with the plugin image).
+  SIDECAR_IMAGE: ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.16.0 # {"$imagepolicy": "flux-system:plugin-barman-cloud-sidecar"}

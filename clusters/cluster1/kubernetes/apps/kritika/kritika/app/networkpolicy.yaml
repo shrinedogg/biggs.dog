@@ -1,0 +1,144 @@
+# kritika network policies (converted from the HelmRelease, Wave 1 de-Helm):
+# NP/kritika-runner (cilium L3/L4 ingress/egress) + CNPs (runner egress to
+# vLLM + postgres, and the runner-ingress pair for the runner Service +
+# port 8082).
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: kritika-runner
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: runner
+spec:
+  podSelector:
+    matchLabels:
+      kritika.home-operations.com/role: runner
+  policyTypes:
+    - Ingress
+    - Egress
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: kritika
+              app.kubernetes.io/instance: kritika
+      ports:
+        - port: 8082
+          protocol: TCP
+
+---
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: kritika
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: kritika
+      app.kubernetes.io/instance: kritika
+  ingress:
+    - fromEntities:
+        - all
+      toPorts:
+        - ports:
+            - port: "8080"
+              protocol: TCP
+            - port: "8081"
+              protocol: TCP
+    - fromEndpoints:
+        - matchLabels:
+            kritika.home-operations.com/role: runner
+      toPorts:
+        - ports:
+            - port: "8082"
+              protocol: TCP
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: "kube-system"
+            "k8s-app": "kube-dns"
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+    - toEntities:
+        - cluster
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "8000"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: "cnpg-system"
+            "cnpg.io/cluster": "cnpg-kritika"
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+    - toEntities:
+        - kube-apiserver
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+            - port: "6443"
+              protocol: TCP
+
+---
+
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: kritika-runner
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: runner
+spec:
+  endpointSelector:
+    matchLabels:
+      kritika.home-operations.com/role: runner
+  # An ingress section with one empty rule puts the pods into default deny
+  # for ingress without allowing any peer.
+  ingress:
+    - {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: "kube-system"
+            "k8s-app": "kube-dns"
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*.*.svc.cluster.local"
+    - toEndpoints:
+        - matchLabels:
+            app.kubernetes.io/name: kritika
+            app.kubernetes.io/instance: kritika
+      toPorts:
+        - ports:
+            - port: "8082"
+              protocol: TCP
+

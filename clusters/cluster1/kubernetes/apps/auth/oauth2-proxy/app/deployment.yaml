@@ -1,0 +1,119 @@
+# oauth2-proxy Deployment (OIDC forward-auth for *.biggs.dog via Pocket ID),
+# converted from the HelmRelease (Wave 1 de-Helm).
+#
+# client-id / client-secret / cookie-secret come from
+# ExternalSecret/oauth2-proxy (Secret/oauth2-proxy, keys client-id /
+# client-secret / cookie-secret). Redis sessions run on Dragonfly
+# (OAUTH2_PROXY_REDIS_CONNECTION_URL). The $imagepolicy marker enrolls the
+# image in the cluster1 IAC (oauth2-proxy policy, >=7.15.6 <8.0.0).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: oauth2-proxy
+    app.kubernetes.io/component: authentication-proxy
+    app.kubernetes.io/part-of: oauth2-proxy
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/instance: oauth2-proxy
+    app.kubernetes.io/version: "7.15.6"
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: oauth2-proxy
+      app.kubernetes.io/instance: oauth2-proxy
+  template:
+    metadata:
+      labels:
+        app: oauth2-proxy
+        app.kubernetes.io/component: authentication-proxy
+        app.kubernetes.io/part-of: oauth2-proxy
+        app.kubernetes.io/name: oauth2-proxy
+        app.kubernetes.io/instance: oauth2-proxy
+        app.kubernetes.io/version: "7.15.6"
+    spec:
+      serviceAccountName: oauth2-proxy
+      enableServiceLinks: true
+      automountServiceAccountToken: true
+      containers:
+      - name: oauth2-proxy
+        image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.6 # {"$imagepolicy": "flux-system:oauth2-proxy"}
+        imagePullPolicy: IfNotPresent
+        args:
+          - --http-address=0.0.0.0:4180
+          - --https-address=0.0.0.0:4443
+          - --metrics-address=0.0.0.0:44180
+          - --config=/etc/oauth2_proxy/oauth2_proxy.cfg
+        env:
+        - name: OAUTH2_PROXY_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy
+              key: client-id
+        - name: OAUTH2_PROXY_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy
+              key: client-secret
+        - name: OAUTH2_PROXY_COOKIE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: oauth2-proxy
+              key: cookie-secret
+        - name: OAUTH2_PROXY_SESSION_STORE_TYPE
+          value: "redis"
+        - name: OAUTH2_PROXY_REDIS_CONNECTION_URL
+          value: redis://dragonfly-db.dragonfly.svc.cluster.local:6379
+        ports:
+          - containerPort: 4180
+            name: http
+            protocol: TCP
+          - containerPort: 44180
+            protocol: TCP
+            name: metrics
+        livenessProbe:
+          httpGet:
+            path: /ping
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 0
+          timeoutSeconds: 1
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+            scheme: HTTP
+          initialDelaySeconds: 0
+          timeoutSeconds: 5
+          successThreshold: 1
+          periodSeconds: 10
+        resources:
+          limits:
+            memory: 128Mi
+          requests:
+            cpu: 25m
+            memory: 64Mi
+        volumeMounts:
+        - mountPath: /etc/oauth2_proxy/oauth2_proxy.cfg
+          name: configmain
+          subPath: oauth2_proxy.cfg
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 2000
+          runAsNonRoot: true
+          runAsUser: 2000
+          seccompProfile:
+            type: RuntimeDefault
+      volumes:
+      - configMap:
+          defaultMode: 420
+          name: oauth2-proxy
+        name: configmain

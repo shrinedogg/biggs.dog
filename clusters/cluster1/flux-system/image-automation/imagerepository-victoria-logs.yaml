@@ -1,0 +1,9 @@
+# Wave 1 de-Helm: IAC enrollment of docker.io/victoriametrics/victoria-logs (see the per-app
+# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: victoria-logs
+  namespace: flux-system
+spec:
+  image: docker.io/victoriametrics/victoria-logs
+  interval: 30m

@@ -1,0 +1,90 @@
+# direwolf-operator Deployment (fenrir game-session operator), converted from
+# the HelmRelease (Wave 1 de-Helm).
+#
+# AGENT_IMAGE / WOLF_IMAGE are env-set so the operator can be pointed at new
+# wolf builds without a code change; all three images are IAC-enrolled via
+# $imagepolicy markers (operator-coupled, patch-only ranges).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: direwolf-operator
+  labels:
+    app.kubernetes.io/controller: direwolf_operator
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+  namespace: dreamcast
+spec:
+  revisionHistoryLimit: 3
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/controller: direwolf_operator
+      app.kubernetes.io/name: fenrir
+      app.kubernetes.io/instance: fenrir
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/controller: direwolf_operator
+        app.kubernetes.io/instance: fenrir
+        app.kubernetes.io/name: fenrir
+    spec:
+      enableServiceLinks: false
+      serviceAccountName: direwolf-operator
+      automountServiceAccountToken: true
+      securityContext:
+        fsGroup: 100
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 100
+        runAsNonRoot: true
+        runAsUser: 1000
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - 'fenrir'
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      containers:
+        - args:
+          - --lb-sharing-key=direwolf
+          - --proxy-service-name=direwolf
+          env:
+          - name: AGENT_IMAGE
+            value: docker.io/shrinedogg/wolf-agent:v0.1.3 # {"$imagepolicy": "flux-system:fenrir-wolf-agent"}
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            value: dreamcast
+          - name: WOLF_IMAGE
+            value: docker.io/shrinedogg/wolf:v0.2.9 # {"$imagepolicy": "flux-system:fenrir-wolf"}
+          image: docker.io/shrinedogg/operator:v0.1.7 # {"$imagepolicy": "flux-system:fenrir-operator"}
+          imagePullPolicy: Always
+          name: operator
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true

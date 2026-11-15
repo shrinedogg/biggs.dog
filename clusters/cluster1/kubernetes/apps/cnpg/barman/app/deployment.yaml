@@ -1,0 +1,91 @@
+# plugin-barman-cloud operator Deployment (CNPG object-store backup plugin),
+# converted from the HelmRelease (Wave 1 de-Helm).
+#
+# mTLS: barman-cloud-{server,client}-tls secrets are self-signed CA leaves
+# owned by the cnpg-barman-certs Kustomization (../certificates/).
+# strategy must stay Recreate (the CNPG operator only supports it).
+# The $imagepolicy marker enrolls the image in the cluster1 IAC (patch-only
+# ~0.15.1); bump the barman-crds git tag in the same commit as a minor bump.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/name: plugin-barman-cloud
+    app.kubernetes.io/instance: plugin-barman-cloud
+    app.kubernetes.io/version: "v0.16.0"
+  name: plugin-barman-cloud
+  namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: plugin-barman-cloud
+      app.kubernetes.io/instance: plugin-barman-cloud
+  # RollingUpdate strategy is not supported by the operator yet, so it can only use the Recreate strategy.
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: plugin-barman-cloud
+        app.kubernetes.io/instance: plugin-barman-cloud
+    spec:
+      containers:
+      - args:
+        - operator
+        - --server-cert=/server/tls.crt
+        - --server-key=/server/tls.key
+        - --client-cert=/client/tls.crt
+        - --server-address=:9090
+        - --leader-elect
+        - --log-level=info
+        env:
+        - name: SIDECAR_IMAGE
+          valueFrom:
+            configMapKeyRef:
+              key: SIDECAR_IMAGE
+              name: plugin-barman-cloud-config
+        image: ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.16.0 # {"$imagepolicy": "flux-system:plugin-barman-cloud"}
+        imagePullPolicy: IfNotPresent
+        name: barman-cloud
+        ports:
+        - containerPort: 9090
+          protocol: TCP
+        readinessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          tcpSocket:
+            port: 8081
+        livenessProbe:
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          tcpSocket:
+            port: 8081
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+          runAsGroup: 10001
+          runAsUser: 10001
+          seccompProfile:
+            type: RuntimeDefault
+        volumeMounts:
+        - mountPath: /server
+          name: server
+        - mountPath: /client
+          name: client
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: plugin-barman-cloud
+      volumes:
+      - name: server
+        secret:
+          secretName: barman-cloud-server-tls
+      - name: client
+        secret:
+          secretName: barman-cloud-client-tls

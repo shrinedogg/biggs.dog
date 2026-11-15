@@ -1,0 +1,14 @@
+# Wave 1 de-Helm: IAC policy for kritika (shared ImageRepository/kritika).
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: kritika
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: kritika
+  filterTags:
+    pattern: '^[0-9]+\.[0-9]+\.[0-9]+$'
+  policy:
+    semver:
+      range: ">=0.0.119 <1.0.0"

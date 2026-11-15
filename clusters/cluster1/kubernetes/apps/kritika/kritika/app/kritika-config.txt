@@ -1,0 +1,84 @@
+# kritika config.yaml (Helm values -> runner config), converted from the
+# HelmRelease (Wave 1 de-Helm).
+#
+# The runner-image line below is a kustomize replacement target: the app
+# kustomization copies CM/kritika-runner-image data.image over this (only)
+# single-quoted token (options.delimiter is the apostrophe char, index 1),
+# so the IAC-setters bump of the kritika-tools policy flows into the
+# generated ConfigMap on every build. The file must stay free of any
+# other apostrophe chars: the replacement splits on them.
+addr: :8080
+agent:
+  timeout: 90m
+  tokens: 8000000
+apps:
+  github:
+    accounts:
+    - shrinedogg
+    clientId: Iv23lipwA6RQKaoILlNW
+    privateKey:
+      env: GITHUB_APP_PRIVATE_KEY
+    webhookSecret:
+      env: GITHUB_APP_WEBHOOK_SECRET
+auth:
+  admin:
+    password:
+      env: ADMIN_PASSWORD
+databaseAppRole: kritika_app
+executor: kubernetes
+gatewayAddr: :8082
+gatewayUrl: http://kritika-gateway.default.svc.cluster.local:8082
+metricsAddr: :8081
+providers:
+  local:
+    apiKey:
+      env: LOCAL_LLM_KEY
+    baseUrl: http://vllm.ai-system.svc.cluster.local:8000/v1
+    pricing:
+      qwen 3.8 - local:
+        input: 0
+        output: 0
+    type: openai
+  openrouter:
+    apiKey:
+      env: OPENROUTER_API_KEY
+    type: openrouter
+  zai:
+    apiKey:
+      env: ZAI_API_KEY
+    baseUrl: https://api.z.ai/api/coding/paas/v4
+    pricing:
+      glm-5.3-flash:
+        input: 0
+        output: 0
+    type: openai
+review:
+  model: zai/glm-5.3-flash
+runner:
+  jobTemplate:
+    metadata:
+      annotations: {}
+      labels: {}
+    spec:
+      activeDeadlineSeconds: 900
+      ttlSecondsAfterFinished: 600
+  podTemplate:
+    metadata:
+      annotations: {}
+      labels: {}
+    spec:
+      affinity: {}
+      containers:
+      - env: []
+        image: 'ghcr.io/home-operations/kritika:0.0.120-tools'
+        imagePullPolicy: IfNotPresent
+        name: runner
+      hostUsers: true
+      nodeSelector: {}
+      priorityClassName: ""
+      resources: {}
+      runtimeClassName: ""
+      tolerations: []
+      topologySpreadConstraints: []
+  serviceAccount: kritika-runner
+webUrl: https://kritika.biggs.dog

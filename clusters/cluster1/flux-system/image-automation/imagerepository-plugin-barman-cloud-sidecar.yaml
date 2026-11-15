@@ -1,0 +1,9 @@
+# Wave 1 de-Helm: IAC enrollment of ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar (see the per-app
+# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: plugin-barman-cloud-sidecar
+  namespace: flux-system
+spec:
+  image: ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar
+  interval: 30m

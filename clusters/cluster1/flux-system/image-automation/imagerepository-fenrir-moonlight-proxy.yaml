@@ -1,0 +1,9 @@
+# Wave 1 de-Helm: IAC enrollment of docker.io/shrinedogg/moonlight-proxy (see the per-app
+# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: fenrir-moonlight-proxy
+  namespace: flux-system
+spec:
+  image: docker.io/shrinedogg/moonlight-proxy
+  interval: 30m

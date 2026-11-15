@@ -1,0 +1,9 @@
+# Wave 1 de-Helm: IAC enrollment of docker.io/shrinedogg/wolf-agent (see the per-app
+# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: fenrir-wolf-agent
+  namespace: flux-system
+spec:
+  image: docker.io/shrinedogg/wolf-agent
+  interval: 30m

@@ -1,0 +1,97 @@
+# kritika RBAC (converted from the HelmRelease, Wave 1 de-Helm).
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kritika"
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+automountServiceAccountToken: true
+
+---
+
+# Runner pods run as this account. It grants nothing and mounts no token.
+# The executor builds runner Jobs without pull secrets, so the account
+# carries the chart's: the kubelet adds a ServiceAccount's to every pod
+# that runs as it, whether or not a token is mounted.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: "kritika-runner"
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: runner
+automountServiceAccountToken: false
+
+---
+
+# kritika serve creates runner Jobs in its own namespace and watches them and
+# their pods. It keeps one watch of each by the runner role label, however many
+# runs are in flight. It lists a Job's pods and reads their logs. It records
+# Events on those Jobs and on its own pods, and reads why a Job created no pod.
+# It does nothing cluster-wide, and nothing else.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: kritika-worker
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "list", "watch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get"]
+  # Why kritika ended a run, on its Job, and what the leader did with the
+  # configuration, on its pod. Each is created whole, never updated. Listed
+  # for a Job's FailedCreate, why its pod was never created.
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create", "list"]
+  # One Secret per runner Job carries that run's credentials, created with
+  # the Job as its owner, so garbage collection deletes it with the Job.
+  # Create alone: the worker writes them and never reads, changes or
+  # deletes any.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["create"]
+  # A run Secret's owner reference holds its Job's foreground deletion until
+  # the Secret is gone. Where owner references' permissions are enforced,
+  # that takes update on the Job's finalizers: a check, not an endpoint.
+  - apiGroups: ["batch"]
+    resources: ["jobs/finalizers"]
+    verbs: ["update"]
+
+---
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: kritika-worker
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: kritika-worker
+subjects:
+  - kind: ServiceAccount
+    name: "kritika"
+    namespace: default
+

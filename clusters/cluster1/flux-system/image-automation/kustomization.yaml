@@ -21,4 +21,31 @@ resources:
   - imagepolicy-mcp-victoriametrics.yaml
   - imagerepository-mcp-proxy.yaml
   - imagepolicy-mcp-proxy.yaml
+  - imagerepository-agent-sandbox-controller.yaml
+  - imagepolicy-agent-sandbox-controller.yaml
+  - imagerepository-fenrir-moonlight-proxy.yaml
+  - imagepolicy-fenrir-moonlight-proxy.yaml
+  - imagerepository-fenrir-operator.yaml
+  - imagepolicy-fenrir-operator.yaml
+  - imagerepository-fenrir-wolf-agent.yaml
+  - imagepolicy-fenrir-wolf-agent.yaml
+  - imagerepository-fenrir-wolf.yaml
+  - imagepolicy-fenrir-wolf.yaml
+  - imagerepository-kritika.yaml
+  - imagepolicy-kritika.yaml
+  - imagepolicy-kritika-tools.yaml
+  - imagerepository-oauth2-proxy.yaml
+  - imagepolicy-oauth2-proxy.yaml
+  - imagerepository-onepassword-connect-api.yaml
+  - imagepolicy-onepassword-connect-api.yaml
+  - imagerepository-onepassword-connect-sync.yaml
+  - imagepolicy-onepassword-connect-sync.yaml
+  - imagerepository-plugin-barman-cloud.yaml
+  - imagepolicy-plugin-barman-cloud.yaml
+  - imagerepository-plugin-barman-cloud-sidecar.yaml
+  - imagepolicy-plugin-barman-cloud-sidecar.yaml
+  - imagerepository-victoria-logs.yaml
+  - imagepolicy-victoria-logs.yaml
+  - imagerepository-vlagent.yaml
+  - imagepolicy-vlagent.yaml
   - imageupdateautomation.yaml

@@ -6,8 +6,12 @@
 # `kind: Agent` CRs (which still use executeCodeBlocks + this controller for
 # sandboxed code execution). The controller is retained to support
 # executeCodeBlocks in the declarative agents.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
 resources:
-  - helmrelease.yaml
+  - rbac.yaml
+  - service.yaml
+  - deployment.yaml
   # Webhook cert secret namespace + RBAC (controller looks for
   # agent-sandbox-webhook-certs in agent-sandbox-system regardless of the
   # release namespace).

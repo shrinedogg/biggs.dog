@@ -1,0 +1,73 @@
+# kritika Services (converted from the HelmRelease, Wave 1 de-Helm):
+# 8080 gateway (HTTPRoute), 8082 runner, 8081 metrics.
+
+# The public listener: the webhooks and the dashboard.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kritika
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+
+---
+
+# The gateway: the forward proxy runner Jobs reach the outside through, and
+# their model and similar-code endpoints.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kritika-gateway
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: gateway
+spec:
+  type: ClusterIP
+  ports:
+    - name: gateway
+      port: 8082
+      targetPort: gateway
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+
+---
+
+# Metrics.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kritika-metrics
+  namespace: default
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: metrics
+spec:
+  type: ClusterIP
+  ports:
+    - name: metrics
+      port: 8081
+      targetPort: metrics
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+

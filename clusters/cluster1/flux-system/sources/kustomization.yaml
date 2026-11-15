@@ -3,13 +3,10 @@ kind: Kustomization
 resources:
   - cnpg-oci.yaml
   - victoria-metrics-k8s-stack-oci.yaml
-  - victoria-logs-collector-oci.yaml
-  - victoria-logs-single-oci.yaml
   - nfd-oci.yaml
   - k8s-gateway-oci.yaml
   - cert-manager-oci.yaml
   - external-secrets-oci.yaml
-  - onepass-oci.yaml
   - grafana-operator-oci.yaml
   - rook-ceph-oci.yaml
   - rook-ceph-cluster-oci.yaml
@@ -23,15 +20,12 @@ resources:
   - agentgateway-crds-oci.yaml
   - agentgateway-oci.yaml
   - agentgateway-canary-oci.yaml
-  - continuwuity-oci.yaml
   - dragonfly-oci.yaml
-  - barman-oci.yaml
+  - barman-crds-git.yaml
   - nvidia-oci.yaml
   - fenrir-git.yaml
-  - fenrir-oci.yaml
   - kagent-crds-git.yaml
   - kagent-oci.yaml
-  - kritika-oci.yaml
   # The substrate-stack migration (2026-10-10) re-added substrate-crds and
   # the substrate-podcert signer source alongside substrate-oci.yaml.
   # 2026-11-09: the substrate-crds source migrated from the OCI chart to the
@@ -50,7 +44,6 @@ resources:
   #     lightdash node-feature-discovery nfs-driver nvidia oauth2-proxy \
   #     onepass openebs piraeus rook-ceph victoria-metrics volsync
   # Re-enable prune on the root sync once the cluster0->cluster1 split is complete.
-  - oauth2-proxy-oci.yaml
   - flux-operator-repo.yaml
   - flux-operator-mcp-oci.yaml
   - cert-manager-csi-driver-oci.yaml
