@@ -275,7 +275,7 @@ spec:
         - ports:
             - port: "8083"
               protocol: TCP
-
+---
 # Direct egress to the cluster0 management node (192.168.2.31, LAN segment
 # 192.168.2.0/24): Talos system API 50000 (+ SSH 22 fallback) for talosctl,
 # and k8s API 6443 for the container's cluster0 kubeconfig. Single node /32
