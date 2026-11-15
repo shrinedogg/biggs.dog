@@ -1,0 +1,34 @@
+---
+# Registers Hister's MCP endpoint (POST /mcp, Streamable HTTP transport) as a
+# kagent tool source, so the local-vLLM-powered kagent agents (default-model-
+# config) can call Hister's personal-search tools: search indexed pages,
+# get_facets, get_preview (stored article text), get_history (recent pages).
+#
+# Auth: Hister requires its app access token (Authorization: Bearer <token>
+# or X-Access-Token). The CRD allows a Secret-backed Authorization header via
+# headersFrom; the referenced secret must live in the SAME namespace as this
+# RemoteMCPServer (ai-system), hence the hister-mcp-auth ExternalSecret that
+# mirrors the hister-access-token 1Password item (next to this file).
+#
+# Acceptance gate: `kubectl -n ai-system get remotemcpserver hister-mcp` —
+# Accepted=True means kagent completed initialize + tools/list.
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata:
+  name: hister-mcp
+  namespace: ai-system
+spec:
+  description: >-
+    Hister personal search engine — search indexed pages, facets, stored
+    previews, and history.
+  protocol: STREAMABLE_HTTP
+  url: http://hister.hister.svc.cluster.local:4433/mcp
+  sseReadTimeout: 5m0s
+  terminateOnClose: true
+  timeout: 30s
+  headersFrom:
+    - name: Authorization
+      valueFrom:
+        type: Secret
+        name: hister-mcp-auth
+        key: authorization
