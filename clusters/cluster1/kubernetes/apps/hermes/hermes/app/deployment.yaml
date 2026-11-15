@@ -177,8 +177,7 @@ spec:
               subPath: 018-reconcile-model-routes
               readOnly: true
             - name: model-routes-init
-              mountPath: /etc/hermes-init/reconcile_model_routes.py
-              subPath: reconcile_model_routes.py
+              mountPath: /etc/hermes-init
               readOnly: true
       volumes:
         - name: data
