@@ -8,7 +8,7 @@ metadata:
     fluxcd.controlplane.io/reconcileTimeout: "10m"
 spec:
   distribution:
-    version: "2.9.0"
+    version: "2.10.0"
     registry: "ghcr.io/fluxcd"
     artifact: "oci://ghcr.io/controlplaneio-fluxcd/flux-operator-manifests"
   components:
