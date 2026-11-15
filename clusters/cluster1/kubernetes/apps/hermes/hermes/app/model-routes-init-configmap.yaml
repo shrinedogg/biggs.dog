@@ -48,9 +48,7 @@ data:
 
         yaml = YAML()
         yaml.preserve_quotes = True
-        with config_path.open("r", encoding="utf-8") as fh:
-        yaml = YAML()
-        yaml.preserve_quotes = True
+        yaml.allow_duplicate_keys = True
         # Never fail the boot contract over the file this hook is meant to heal:
         # hermes tolerates config states ruamel rejects (e.g. duplicate keys),
         # so an unparseable config.yaml must degrade to "skip" (stale provider

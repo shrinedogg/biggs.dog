@@ -72,7 +72,7 @@ rules:
     # refresher POST (first-boot create path) while named get/update
     # worked. Unscoped create lets the first run create the Secret;
     # blast radius: this SA can create (but not get/update/delete) other
-    # Secrets in ai-system.
+    # Secrets in hermes.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
