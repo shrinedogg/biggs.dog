@@ -6,7 +6,14 @@ metadata:
   name: substrate
   namespace: ai-system
 spec:
-  interval: 3m
+  # 4m (was 3m): generation bump. After the contaminated helm release
+  # secrets were deleted (their v1alpha1-era manifests can no longer be
+  # built against the v1-only CRD, which wedged every upgrade/rollback
+  # cycle), the HR's remediation went quiescent (RetriesExceeded does
+  # not self-clear). This spec delta re-arms the release: the next
+  # reconcile does a clean 0.7.0 install with no release history to
+  # read.
+  interval: 4m
   chartRef:
     kind: OCIRepository
     name: substrate
