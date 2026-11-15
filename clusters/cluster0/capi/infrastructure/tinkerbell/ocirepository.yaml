@@ -7,4 +7,4 @@ spec:
   interval: 12h
   url: oci://ghcr.io/tinkerbell/charts/tinkerbell
   ref:
-    tag: v0.25.0
+    tag: v0.26.0
