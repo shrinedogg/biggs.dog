@@ -85,26 +85,30 @@ spec:
           # The chart renders the cluster-scoped gvisor-default SandboxConfig
           # with an unreachable gs://gvisor asset URL (no GCS identity on
           # these nodes; the node plugin's S3 backend does not serve gs://).
-          # Retarget the amd64 asset at the durable B2 store (issue #598)
-          # under the substrate/ prefix; the node's objectstore-plugin
-          # downloads it (env from values.objectStorePlugin.extraEnv).
-          # Since the 0.7.0-alpha2 chart (substrate 1.0 line) the asset
-          # lives under spec.versions[].assets (versions[0] = v5, gVisor
-          # release 20261019.0) and pauseImage no longer exists in the chart
-          # or the ate.dev/v1 SandboxConfig CRD, so the pre-0.7 ops
+          # Retarget the DEFAULT version's amd64 asset at the durable B2
+          # store (issue #598) under the substrate/ prefix; the node's
+          # objectstore-plugin downloads it (env from
+          # values.objectStorePlugin.extraEnv). Since the 0.7.0-alpha2
+          # chart (substrate 1.0 line) the asset lives under
+          # spec.versions[].assets and pauseImage no longer exists in the
+          # chart or the ate.dev/v1 SandboxConfig CRD, so the pre-0.7 ops
           # (/spec/assets/amd64/gvisor/url, /spec/pauseImage) stopped
           # applying: "replace operation does not apply: doc is missing
-          # path". The sha256 stays the chart's own pin, so the B2 object
-          # must hold the 20261019.0 x86_64 tarball (the pre-0.7 seed was
-          # the 2026-09-02 nightly and no longer matches). Reseed BEFORE
-          # the merge (cutover runbook in the PR body): if the reseed is
-          # missed the upgrade still lands and ate-api-server stays Ready,
-          # but the v5 asset prewarm fails on the sha256 mismatch and no
-          # gVisor sandbox can start until the reseed.
+          # path".
+          # 1.0.0 chart: defaultVersion = v7 (gVisor 20261102.0), which is
+          # versions[1]; v6 (20261026.0) stays on gs:// and is never
+          # fetched (not the default). The sha256 stays the chart's own
+          # pin, so the B2 object must hold the 20261102.0 x86_64 tarball
+          # (the pre-1.0 seed was the 20261019.0 build and no longer
+          # matches). Reseed BEFORE the merge (cutover runbook in the PR
+          # body): if the reseed is missed the upgrade still lands and
+          # ate-api-server stays Ready, but the v7 asset prewarm fails on
+          # the sha256 mismatch and no gVisor sandbox can start until the
+          # reseed.
           #   curl -fsL -o /tmp/gvisor.tar.zstd \
-          #     "https://storage.googleapis.com/gvisor/releases/release/20261019.0/x86_64/gvisor.tar.zstd"
+          #     "https://storage.googleapis.com/gvisor/releases/release/20261102.0/x86_64/gvisor.tar.zstd"
           #   sha256sum /tmp/gvisor.tar.zstd
-          #   # -> 8637abfb50f81552af25ca08f7172589c09292a7c881efe8d9e09a9f3b6bec7b
+          #   # -> a1439ffbba7d212e0fde32ea79fa9bb51cbc4c5f6c16af1f047260290b861d42
           #   aws s3 cp /tmp/gvisor.tar.zstd s3://biggs-dog/substrate/gvisor.tar.zstd \
           #     --endpoint-url https://s3.eu-central-003.backblazeb2.com
           - target:
@@ -112,7 +116,7 @@ spec:
               name: gvisor-default
             patch: |-
               - op: replace
-                path: /spec/versions/0/assets/amd64/gvisor/url
+                path: /spec/versions/1/assets/amd64/gvisor/url
                 value: "s3://biggs-dog/substrate/gvisor.tar.zstd"
   install:
     remediation:

@@ -147,17 +147,18 @@ spec:
         atenetRouterURL: "http://atenet-router.ai-system.svc:80"
       sandbox:
         guestImage:
-          # kagent-dev/kagent/sandbox-guest:1.0.0-alpha11 (verified digest).
+          # kagent-dev/kagent/sandbox-guest:1.0.1 (verified digest).
           # Without it KAGENT_SANDBOX_GUEST_IMAGE renders "" and standalone
           # sandbox prep is silently broken.
-          digest: "sha256:fb1218d5bdc397ecb514c5aa81d7958843635ca090c1419b191051f7bb01a3e2"
+          digest: "sha256:16e84a2285119ce02cc6ba45ea7f68181eb1527335de85477614fb9a6b5ecf03"
     # ------------------------------------------------------------------
     # The kagent-default WorkerPool: substrate workers (gVisor actors)
     # that run the Harness workloads. The chart FAILS render if
     # workerImage is empty when create=true.
     #
-    # PINNED to the substrate control-plane version (0.5.0-alpha2). The
-    # ateom worker image MUST move in lockstep with
+    # PINNED to the substrate control-plane version (1.0.0). The 1.0 line
+    # renamed the worker image ateom-gvisor -> ateworker-gvisor (v-prefix
+    # tags). The worker MUST move in lockstep with
     # ate-controller/atelet/atenet-router (renovate.json groups the whole
     # substrate stack, automerge:false). Workers get their mTLS
     # credentials (atunnel credential bundle) projected automatically by
@@ -167,7 +168,7 @@ spec:
       create: true
       name: kagent-default
       replicas: 1
-      workerImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.5.0-alpha2
+      workerImage: ghcr.io/kagent-dev/substrate/ateworker-gvisor:v1.0.0
       sandboxClass: gvisor
       template:
         # Flat pod-template fragment (the chart pipes this verbatim into

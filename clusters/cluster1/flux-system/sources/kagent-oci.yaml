@@ -10,10 +10,13 @@ spec:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy
   ref:
-    # Paired lockstep with substrate 0.5.0-alpha2: go/go.mod at this tag
-    # replaces agent-substrate/substrate with kagent-dev/substrate
-    # v0.5.0-alpha2. 1.0.0 drops ALL legacy kagent.dev/v1alpha2 APIs — the
-    # ai-system agent fleet is rewritten to api.kagent.dev/v1alpha3 in the
-    # same PR.
-    tag: "1.0.0-alpha11"
+    # Paired lockstep with substrate 1.0.0: go/go.mod at this tag
+    # replaces go.ate.dev/substrate with kagent-dev/substrate v1.0.0.
+    # 1.0 drops ALL legacy kagent.dev/v1alpha2 APIs and the
+    # ate.dev/v1alpha1 substrate client APIs; the ai-system agent fleet
+    # is on api.kagent.dev/v1alpha3 and the substrate CRDs are v1-only
+    # (substrate-crds git repo at kagent-dev/substrate v1.0.1). The 1.0
+    # line renames the gVisor worker image ateom-gvisor ->
+    # ateworker-gvisor (see the kagent HelmRelease values).
+    tag: "1.0.1"
   url: oci://ghcr.io/kagent-dev/kagent/helm/kagent
