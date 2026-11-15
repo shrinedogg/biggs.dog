@@ -184,6 +184,13 @@ spec:
     # both go away.
     rustfs:
       enabled: false
+    # substrate 0.7.0-alpha2 chart: when rustfs is disabled, the api server
+    # requires an explicit snapshot location (previously implicit via the
+    # bundled rustfs store). Every kagent harness already points its
+    # snapshotPolicy at this durable B2 prefix (kagent/app/harnesses.yaml),
+    # so the api-level default is the same store.
+    ateApi:
+      snapshotLocation: s3://biggs-dog/substrate/kagent/
     # The atelet binary defaults --ateapi-address/--ateapi-server-name to
     # api.ate-system.svc (the substrate canonical namespace). Substrate is
     # installed in ai-system here, so the node-local atelet (which brokers the
