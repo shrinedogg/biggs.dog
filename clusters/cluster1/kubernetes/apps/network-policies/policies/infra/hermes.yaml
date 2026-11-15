@@ -275,3 +275,33 @@ spec:
         - ports:
             - port: "8083"
               protocol: TCP
+
+# Direct egress to the cluster0 management node (192.168.2.31, LAN segment
+# 192.168.2.0/24): Talos system API 50000 (+ SSH 22 fallback) for talosctl,
+# and k8s API 6443 for the container's cluster0 kubeconfig. Single node /32
+# -- extend to the segment only if more cluster0 nodes appear. 443 to this
+# IP is already served by the cluster0 edge agentgateway LB (shared
+# lbipam), so this rule does not change 443 behavior.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-cluster0-lan
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toCIDR:
+        - 192.168.2.31/32
+      toPorts:
+        - ports:
+            - port: "22"
+              protocol: TCP
+        - ports:
+            - port: "443"
+              protocol: TCP
+        - ports:
+            - port: "50000"
+              protocol: TCP
+        - ports:
+            - port: "6443"
+              protocol: TCP
