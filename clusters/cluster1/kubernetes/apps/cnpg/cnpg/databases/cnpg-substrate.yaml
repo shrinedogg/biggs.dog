@@ -1,10 +1,18 @@
 ---
-# cnpg-substrate: BYO postgres for the v0.5.0 substrate control plane (issue #594).
+# cnpg-substrate: BYO postgres for the substrate control plane (issue #594).
 #
-# The 0.5.0 substrate chart no longer bundles postgres. It takes BYO postgres
+# The substrate chart no longer bundles postgres. It takes BYO postgres
 # as two connection-string Secrets (substrate-postgres-readwrite /
 # substrate-postgres-owner; see ai-system/substrate/app/external-secrets.yaml)
 # and FAILS to render without them. This cluster provisions that database.
+#
+# 0.7.0 cutover: upstream squashed the substrate postgres migrations
+# through v0.6.0 into 000001_initial.sql (kagent-dev/substrate chart
+# README, "PostgreSQL setup"); a database created before the squash
+# cannot be upgraded in place and must be recreated. The live cluster
+# predates the squash, so the 0.7.0 cutover (PR #865) recreates it:
+# delete the CNPG Cluster + its PVCs before the chart merge, Flux
+# re-applies this manifest, and initdb builds the fresh squashed schema.
 #
 # Mirrors cnpg-kagent (three instances). The `substrate` login (from the
 # substrate-user-password ClusterExternalSecret) is created by CNPG as a

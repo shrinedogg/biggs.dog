@@ -50,51 +50,19 @@ spec:
                   - key: nvidia.com/gpu
                     operator: Exists
                     effect: NoSchedule
-          # B2 object store for substrate snapshots + the gVisor asset
-          # (issue #598). With rustfs disabled the chart renders NO AWS env
-          # for either S3 reader, and the ate-api-server Deployment has no
-          # extraEnv value hook (only atelet does), so pin the endpoint here.
-          # Path style is required (B2's S3 API wants bucket-in-path). The
-          # key pair comes from the substrate-b2-object-store Secret
-          # (app/external-secrets.yaml, same 1Password item as Barman's
-          # object-store-secret in cnpg-system). The atelet DaemonSet gets
-          # the identical five vars via values.atelet.extraEnv below -- the
-          # two components must agree, or snapshot reads fail at restore.
-          - target:
-              kind: Deployment
-              name: ate-api-server
-            patch: |-
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: AWS_REGION
-                  value: us-east-1
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: AWS_ENDPOINT_URL
-                  value: "https://s3.eu-central-003.backblazeb2.com"
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: AWS_S3_USE_PATH_STYLE
-                  value: "true"
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: AWS_ACCESS_KEY_ID
-                  valueFrom:
-                    secretKeyRef:
-                      name: substrate-b2-object-store
-                      key: AWS_ACCESS_KEY_ID
-              - op: add
-                path: /spec/template/spec/containers/0/env/-
-                value:
-                  name: AWS_SECRET_ACCESS_KEY
-                  valueFrom:
-                    secretKeyRef:
-                      name: substrate-b2-object-store
-                      key: AWS_SECRET_ACCESS_KEY
+          # 0.7.0 wiring: the S3 I/O (gVisor asset fetch on the node,
+          # snapshot transfers) happens in the objectstore-plugin init
+          # containers (node mode in the atelet DaemonSet, control mode in
+          # the ate-api-server pod), not in the atelet or ate-api-server
+          # containers. The chart renders those containers' env from the
+          # objectStorePlugin.extraEnv value (the storage.env helper) plus
+          # the rustfs branch (disabled), so with rustfs off the B2 AWS_*
+          # vars go in values.objectStorePlugin.extraEnv below (issue
+          # #598). The pre-0.7 wiring -- env pinned on the atelet container
+          # (atelet.extraEnv) and on the ate-api-server container (an old
+          # postRenderer env patch) -- no longer reaches the 0.7 S3 reader;
+          # with rustfs disabled the chart rendered no AWS env anywhere, so
+          # the s3:// gVisor asset URL was unservable.
           # Tolerate the nv-01 GPU taint for the atelet DaemonSet. The chart
           # already sets one toleration (ate.dev/sandboxClass Exists), so
           # APPEND instead of replacing the whole list.
@@ -108,18 +76,24 @@ spec:
                   operator: Exists
                   effect: NoSchedule
           # The chart renders the cluster-scoped gvisor-default SandboxConfig
-          # with an unreachable gs://gvisor asset URL. Retarget the amd64
-          # asset at the durable B2 store (issue #598) under the substrate/
-          # prefix. Since the 0.7.0-alpha2 chart (substrate 1.0 line) the
-          # asset lives under spec.versions[].assets (versions[0] = v5,
-          # gVisor release 20261019.0) and pauseImage no longer exists in
-          # the chart or the ate.dev/v1 SandboxConfig CRD, so the pre-0.7
-          # ops (/spec/assets/amd64/gvisor/url, /spec/pauseImage) stopped
+          # with an unreachable gs://gvisor asset URL (no GCS identity on
+          # these nodes; the node plugin's S3 backend does not serve gs://).
+          # Retarget the amd64 asset at the durable B2 store (issue #598)
+          # under the substrate/ prefix; the node's objectstore-plugin
+          # downloads it (env from values.objectStorePlugin.extraEnv).
+          # Since the 0.7.0-alpha2 chart (substrate 1.0 line) the asset
+          # lives under spec.versions[].assets (versions[0] = v5, gVisor
+          # release 20261019.0) and pauseImage no longer exists in the chart
+          # or the ate.dev/v1 SandboxConfig CRD, so the pre-0.7 ops
+          # (/spec/assets/amd64/gvisor/url, /spec/pauseImage) stopped
           # applying: "replace operation does not apply: doc is missing
           # path". The sha256 stays the chart's own pin, so the B2 object
           # must hold the 20261019.0 x86_64 tarball (the pre-0.7 seed was
-          # the 2026-09-02 nightly and no longer matches). Reseed before the
-          # upgrade lands:
+          # the 2026-09-02 nightly and no longer matches). Reseed BEFORE
+          # the merge (cutover runbook in the PR body): if the reseed is
+          # missed the upgrade still lands and ate-api-server stays Ready,
+          # but the v5 asset prewarm fails on the sha256 mismatch and no
+          # gVisor sandbox can start until the reseed.
           #   curl -fsL -o /tmp/gvisor.tar.zstd \
           #     "https://storage.googleapis.com/gvisor/releases/release/20261019.0/x86_64/gvisor.tar.zstd"
           #   sha256sum /tmp/gvisor.tar.zstd
@@ -141,11 +115,20 @@ spec:
     remediation:
       retries: 3
   values:
-    # BYO postgres (the 0.5.0 chart has no bundled postgres and FAILS render
-    # without these refs). The two Secrets are ExternalSecrets over 1Password
-    # (app/external-secrets.yaml); the database itself is cnpg-substrate
-    # (clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/cnpg-substrate.yaml).
-    # Names match the chart defaults; set explicitly for readability.
+    # BYO postgres (the substrate chart has no bundled postgres and FAILS
+    # render without these refs). The two Secrets are ExternalSecrets over
+    # 1Password (app/external-secrets.yaml); the database itself is
+    # cnpg-substrate (clusters/cluster1/kubernetes/apps/cnpg/cnpg/databases/
+    # cnpg-substrate.yaml). Names match the chart defaults; set explicitly
+    # for readability.
+    #
+    # 0.7.0 cutover: upstream squashed the postgres migrations through
+    # v0.6.0 into 000001_initial.sql, and a database created before that
+    # squash cannot be upgraded in place (chart README, PostgreSQL setup).
+    # The live cnpg-substrate predates the squash, so recreate it BEFORE
+    # this cutover (delete the CNPG Cluster + its PVCs; Flux re-applies the
+    # manifest and initdb builds the fresh squashed schema). Cutover
+    # runbook in the PR body.
     postgres:
       readWriteConnectionStringSecretRef:
         name: substrate-postgres-readwrite
@@ -180,13 +163,15 @@ spec:
           allowedNamespaces:
             - ai-system
     # Disable the in-cluster rustfs object store (issue #598). Substrate's
-    # S3 backend (ATE_STORAGE_BACKEND=s3, already the chart default) is
-    # pointed at the durable Backblaze B2 endpoint via the AWS_* env below
-    # (atelet.extraEnv) and the postRenderer patch on the ate-api-server
-    # Deployment. Disabling rustfs removes its Deployment, ephemeral
-    # host-path PVC, Service, and bucket-init Job -- the 1Gi PVC on the
-    # shared OpenEBS local store and the manual asset upload it implied
-    # both go away.
+    # S3 backend (ATE_STORAGE_BACKEND=s3, the chart default) is pointed at
+    # the durable Backblaze B2 endpoint via the AWS_* env in
+    # values.objectStorePlugin.extraEnv below. The 0.7.0 chart does the
+    # S3 I/O in the objectstore-plugin init containers, which take their
+    # env from that value; with rustfs disabled the chart's rustfs env
+    # branch renders nothing. Disabling rustfs removes its Deployment,
+    # ephemeral host-path PVC, Service, and bucket-init Job -- the 1Gi PVC
+    # on the shared OpenEBS local store and the manual asset upload it
+    # implied both go away.
     rustfs:
       enabled: false
     # substrate 0.7.0-alpha2 chart: when rustfs is disabled, the api server
@@ -210,11 +195,19 @@ spec:
       extraArgs:
         - --ateapi-address=dns:///api.ai-system.svc:443
         - --ateapi-server-name=api.ai-system.svc
-      # B2 object store (issue #598): the node daemon reads/writes sandbox
-      # assets + snapshots, so it needs the same five AWS_* vars the
-      # postRenderer pins on ate-api-server (the chart's rustfs.enabled
-      # branch is the only other place these are set, and it is disabled).
-      # extraEnv is appended verbatim to the DaemonSet container env.
+    # B2 object store (issue #598): the five AWS_* vars for the S3
+    # endpoint, shared by BOTH objectstore-plugin containers through the
+    # chart's storage.env helper (node init container in the atelet
+    # DaemonSet: gVisor asset download + node-side snapshot transfers;
+    # control init container in the ate-api-server pod: control-side
+    # snapshot transfers). The 0.5.0-era wiring (atelet.extraEnv on the
+    # atelet container + a postRenderer env patch on the ate-api-server
+    # container) reached neither of the 0.7.0 S3 readers and is retired.
+    # Path style is required (B2's S3 API wants bucket-in-path). The key
+    # pair comes from the substrate-b2-object-store Secret
+    # (app/external-secrets.yaml, same 1Password item as Barman's
+    # object-store-secret in cnpg-system).
+    objectStorePlugin:
       extraEnv:
         - name: AWS_REGION
           value: us-east-1
