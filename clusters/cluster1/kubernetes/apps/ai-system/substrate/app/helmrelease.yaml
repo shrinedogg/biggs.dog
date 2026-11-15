@@ -107,27 +107,32 @@ spec:
                   key: nvidia.com/gpu
                   operator: Exists
                   effect: NoSchedule
-          # The chart always renders the cluster-scoped gvisor-default
-          # SandboxConfig with an unreachable gs://gvisor asset URL and a
-          # registry.k8s.io pause image. Retarget the asset at the durable
-          # B2 store (issue #598) under the substrate/ prefix; the
-          # sha256 is the chart's own pin, so the bytes must be the
-          # upstream nightly 2026-09-02 tarball (seeded once into B2). The
-          # pause digest stays at the proven gcr.io pin (renovate.json
-          # excludes gcr.io/gke-release/pause from updates): all old actor
-          # snapshots were deleted in the 2026-10-09 teardown, so there is
-          # no snapshot-compatibility constraint, and gcr.io is the
-          # pullable registry on these nodes.
+          # The chart renders the cluster-scoped gvisor-default SandboxConfig
+          # with an unreachable gs://gvisor asset URL. Retarget the amd64
+          # asset at the durable B2 store (issue #598) under the substrate/
+          # prefix. Since the 0.7.0-alpha2 chart (substrate 1.0 line) the
+          # asset lives under spec.versions[].assets (versions[0] = v5,
+          # gVisor release 20261019.0) and pauseImage no longer exists in
+          # the chart or the ate.dev/v1 SandboxConfig CRD, so the pre-0.7
+          # ops (/spec/assets/amd64/gvisor/url, /spec/pauseImage) stopped
+          # applying: "replace operation does not apply: doc is missing
+          # path". The sha256 stays the chart's own pin, so the B2 object
+          # must hold the 20261019.0 x86_64 tarball (the pre-0.7 seed was
+          # the 2026-09-02 nightly and no longer matches). Reseed before the
+          # upgrade lands:
+          #   curl -fsL -o /tmp/gvisor.tar.zstd \
+          #     "https://storage.googleapis.com/gvisor/releases/release/20261019.0/x86_64/gvisor.tar.zstd"
+          #   sha256sum /tmp/gvisor.tar.zstd
+          #   # -> 8637abfb50f81552af25ca08f7172589c09292a7c881efe8d9e09a9f3b6bec7b
+          #   aws s3 cp /tmp/gvisor.tar.zstd s3://biggs-dog/substrate/gvisor.tar.zstd \
+          #     --endpoint-url https://s3.eu-central-003.backblazeb2.com
           - target:
               kind: SandboxConfig
               name: gvisor-default
             patch: |-
               - op: replace
-                path: /spec/assets/amd64/gvisor/url
+                path: /spec/versions/0/assets/amd64/gvisor/url
                 value: "s3://biggs-dog/substrate/gvisor.tar.zstd"
-              - op: replace
-                path: /spec/pauseImage
-                value: "gcr.io/gke-release/pause@sha256:bcbd57ba5653580ec647b16d8163cdd1112df3609129b01f912a8032e48265da"
   install:
     remediation:
       retries: 3
