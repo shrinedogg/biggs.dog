@@ -18,11 +18,6 @@ resources:
   # the substrate document), so that ordering still holds.
   - ./substrate-podcert/ks.yaml
   - ./substrate/ks.yaml
-  # One-shot ate.dev CRD storage-version migration (v1alpha1 -> v1): applied
-  # its dual-version CRDs once (PR #806) and is now suspended (its KZ
-  # object persists in-cluster — the root KZ is prune:false; see the
-  # storage-migration/ks.yaml header for the optional housekeeping delete).
-  - ./substrate/substrate-crds/storage-migration/ks.yaml
   - ./csi-driver/ks.yaml
   - ./agent-sandbox/ks.yaml
   - ./kagent/ks.yaml
