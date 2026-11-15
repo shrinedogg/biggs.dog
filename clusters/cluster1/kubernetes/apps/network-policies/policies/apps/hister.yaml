@@ -3,11 +3,12 @@
 # hister: Go server on :4433 (HTTP only; TLS terminates at the
 # internal-biggs-dog gateway), 2 stateless replicas: index + previews in
 # the CNPG postgres (cnpg-hister, cnpg-system), /hister/data an emptyDir
-# scratch. Dials exactly two in-cluster destinations: the Infinity
-# embeddings service (ai-system, :7997) for opt-in semantic search and the
-# cnpg-hister Postgres (cnpg-system, :5432) for storage. The kagent
-# controller (ai-system) dials Hister's /mcp endpoint (RemoteMCPServer
-# hister-mcp).
+# scratch. Dials three in-cluster destinations: the Infinity embeddings
+# service (ai-system, :7997) for opt-in semantic search, the cnpg-hister
+# Postgres (cnpg-system, :5432) for storage, and PocketID (auth, via the
+# wildcard-biggs-dog gateway VIP) for OIDC sign-in discovery/token/userinfo.
+# The kagent controller (ai-system) dials Hister's /mcp endpoint
+# (RemoteMCPServer hister-mcp).
 ---
 # NOTE: No standalone default-deny policy — Cilium rejects an empty deny-all
 # (VALID: False, "rule must have at least one of Ingress/Egress"). Default-deny
@@ -180,9 +181,9 @@ spec:
 # Return path for the postgres dial. Like the CNPG precedent in
 # policies/infra/ai-system.yaml, the cnpg-hister-rw Service VIP
 # reverse-NATs SYN,ACK, so the reply arrives at the hister pods attributed
-# to the cnpg pod identity and would be dropped by the implicit default-deny
-# here after the first round-trip. No toPorts: the reply lands on the
-# client's ephemeral port.
+# to the cnpg pod identity and would be dropped by the implicit
+# default-deny here after the first round-trip. No toPorts: the reply lands
+# on the client's ephemeral port.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -195,3 +196,72 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: cnpg-system
             cnpg.io/cluster: cnpg-hister
+---
+# PocketID OIDC sign-in: hister's generic "oidc" OAuth provider dials the
+# public IdP FQDN https://id.biggs.dog for discovery
+# (/.well-known/openid-configuration) and the token + userinfo endpoints.
+# In-cluster the FQDN resolves via split-horizon DNS to the
+# wildcard-biggs-dog gateway VIP, which forwards to pocket-id (auth, :1411).
+# The egress triad copies the proven selectors from allow-egress-oidc in
+# policies/apps/auth.yaml (the oauth2-proxy PocketID dial); the direct-svc
+# leg also covers a future in-cluster configuration_url.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-oidc
+  namespace: hister
+spec:
+  endpointSelector: {}
+  egress:
+    - toFQDNs:
+        - matchName: id.biggs.dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: auth
+            app: pocket-id
+      toPorts:
+        - ports:
+            - port: "1411"
+              protocol: TCP
+---
+# Return path for the OIDC dial: the wildcard-biggs-dog VIP reverse-NATs
+# SYN,ACK, so replies arrive at the hister pods attributed to the gateway
+# data-plane pod identity and would be dropped by the implicit default-deny
+# here after the first round-trip. No toPorts: the reply lands on the
+# hister pod's ephemeral port (same shape as allow-ingress-from-embeddings).
+# Leg 1 is the legacy data plane (the app.kubernetes.io/name:
+# wildcard-biggs-dog selector proven in policies/apps/auth.yaml egress);
+# leg 2 is the 1.x train (gateway-class-name, mirrored from
+# allow-ingress-from-gateway in policies/apps/auth.yaml).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-oidc-gateway
+  namespace: hister
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+            app.kubernetes.io/name: wildcard-biggs-dog
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: networking
+          matchExpressions:
+            - key: gateway.networking.k8s.io/gateway-class-name
+              operator: In
+              values:
+                - agentgateway
+                - agentgateway-canary
