@@ -6,11 +6,9 @@ metadata:
   name: substrate-crds
   namespace: ai-system
 spec:
-  # 1m (was 3m): this spec change doubles as the generation bump that
-  # un-stalls the release — RetriesExceeded does not self-clear, and the
-  # API-server storage gate is cleared (v1 is now the storage version), so
-  # the 0.1.0 upgrade proceeds on the next reconcile. 1m also keeps future
-  # Renovate CRD tag bumps picking up faster.
+  # 1m: generation polling. Under reconcileStrategy: Revision this interval is
+  # what picks up Renovate CRD tag bumps: a new tag is a new git artifact
+  # revision, the chart re-resolves, and the CRDs re-apply on the next poll.
   interval: 1m
   chart:
     spec:
@@ -19,7 +17,15 @@ spec:
       # agent-sandbox HelmRelease). spec.chartRef does not accept kind GitRepository
       # (HelmRelease v2 CRD enum: OCIRepository, HelmChart, ExternalArtifact), so no
       # chartRef is set.
-      reconcileStrategy: ChartVersion
+      # Revision (was ChartVersion): every upstream CRD chart tag pins the same
+      # chart version (0.1.0), so ChartVersion never re-resolves on a tag bump
+      # and the live CRDs silently stay stale (v1alpha1 still served while the
+      # 0.7.0 control-plane chart needs the v1.0.1 v1-only schema). Revision
+      # re-resolves whenever the git artifact revision changes. This spec
+      # change also doubles as the generation bump that forces the v1.0.1
+      # CRD re-apply now (the live CRD was last replaced before the 0.7.0
+      # cutover and still serves the retired v1alpha1 version).
+      reconcileStrategy: Revision
       sourceRef:
         kind: GitRepository
         name: substrate-crds
@@ -34,6 +40,8 @@ spec:
     remediation:
       retries: 3
   # Sourced from the upstream git tree (was the OCI ghcr.io/kagent-dev/substrate/helm/substrate-crds
-  # chart). v1.0.1 CRDs serve ate.dev/v1 only; the substrate control-plane chart stays pinned at
-  # 0.5.0-alpha2 (v1alpha1) until the stack moves to the 1.x line — accepted, see issue #798.
+  # chart). v1.0.1 CRDs serve ate.dev/v1 only (storage v1; spec.versions present),
+  # which is what the 0.7.0-alpha2 control-plane chart (substrate 1.0 line) applies
+  # against. The pre-0.7 pairing (control plane 0.5.0-alpha2 at v1alpha1, issue #798)
+  # is retired by the 0.7.0 cutover.
   values: {}
