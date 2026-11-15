@@ -1,0 +1,43 @@
+# Declarative pgvector management for the hister database (CNPG Database CRD,
+# available in the CNPG 1.29 API: DatabaseSpec.extensions, 1.29 API ref).
+#
+# The CNPG 1.29 release notes (2026-11-15 check) confirm the Database CRD's
+# declarative extension management: the operator runs CREATE EXTENSION /
+# DROP EXTENSION / ALTER EXTENSION as the postgres superuser on the primary
+# (docs: declarative_database_management.md "Managing Extensions in a
+# Database"), so a non-superuser app role can no longer be the reason an
+# extension is missing - the operator ensures it and tracks it in
+# status.extensions. This covers both this EXISTING cluster (the initdb of
+# the live cnpg-hister predates the extension) and any future fresh cluster.
+#
+# It supersedes the imperative one-shot:
+#   kubectl -n cnpg-system exec cnpg-hister-1 -- psql -U superuser \
+#     -d hister -c 'CREATE EXTENSION IF NOT EXISTS vector;'
+# which is still needed only if this CR has not been applied yet.
+#
+# The extension binary is already present in the operand via the
+# postgresql-minimal-trixie ClusterImageCatalog (cnpg-hister.yaml
+# imageCatalogRef + postgresql.extensions), so no image change is required.
+apiVersion: postgresql.cnpg.io/v1
+kind: Database
+metadata:
+  name: hister-database
+  namespace: cnpg-system
+  labels:
+    app.kubernetes.io/name: hister
+spec:
+  # Existing bootstrap database (cnpg-hister.yaml initdb: database/owner
+  # 'hister'). The operator no-ops the CREATE DATABASE (it already exists
+  # with the same owner) and manages only the extensions listed below;
+  # everything else in the database is left untouched.
+  name: hister
+  owner: hister
+  cluster:
+    name: cnpg-hister
+  extensions:
+    # HNSW-indexed 1024-dim embeddings (bge-m3) for Hister semantic search.
+    # Hister's app startup falls back (with a WARN, not a fatal) if the
+    # extension is missing because its own CREATE EXTENSION runs as the
+    # non-superuser 'hister' role (42501); this CR removes that failure.
+    - name: vector
+      ensure: present

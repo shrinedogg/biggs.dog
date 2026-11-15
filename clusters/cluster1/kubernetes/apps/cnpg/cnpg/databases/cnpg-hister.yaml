@@ -19,14 +19,6 @@ spec:
       dataChecksums: true
       secret:
         name: hister-user-password
-      # Hister runs CREATE EXTENSION IF NOT EXISTS vector at startup, but
-      # the 'hister' DB role is not a superuser (CNPG bootstrap owner), so
-      # on an existing cluster the app's own CREATE fails with 42501 and
-      # semantic search silently disables. Creating the extension at initdb
-      # (as the operator superuser) covers fresh clusters; the live
-      # cluster needs a one-shot psql CREATE EXTENSION (see PR body).
-      extensions:
-        - vector
   # Minimal trixie operand + extension images from the official CNPG 1.29
   # catalog (../app/postgresql-minimal-trixie-catalog.yaml). Enables
   # pgvector by name only.
