@@ -231,7 +231,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 - **`--gpu-memory-utilization 0.92`** - ~3 GB free per card; deliberately below the old single-card 0.96 ceiling (0.97 contributed to a node lockup when embeddings also ran on GPU).
 - **`--max-num-batched-tokens 8192`** - reduces prefill scheduling rounds for medium tool prompts.
 - **`--kv-cache-dtype fp8`**.
-- **MTP speculative decoding** - `--speculative-config {"method":"mtp","num_speculative_tokens":2}` using the draft head shipped in the checkpoint.
+- **MTP speculative decoding** - removed 2026-11-15 (measured 0.009% acceptance on the NVFP4 checkpoint; see the REMOVED note in `deployment.yaml`). The draft head still ships in the checkpoint; re-enable `--speculative-config` only with a checkpoint whose MTP head is healthy.
 - **Quantization**: auto-detected NVFP4 (compressed-tensors, nvfp4-pack-quantized) from the checkpoint's `quantization_config`; no `--quantization` flag is passed.
 - **Tool-call parser**: `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3` (with `--enable-auto-tool-choice`), paired with the model's built-in chat template.
 - **`--language-model-only`** - skips the vision encoder on this checkpoint, preserving VRAM for KV cache.

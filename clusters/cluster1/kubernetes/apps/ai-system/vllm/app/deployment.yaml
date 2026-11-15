@@ -58,8 +58,9 @@ spec:
             # BF16 parity within seed noise; fastest prefill of the recipes
             # the paper compares (+14-19% vs partial quants). Single
             # model.safetensors = 18,788,354,104 bytes (~17.5GiB) incl. the
-            # MTP draft head; global scales are harmonized for vLLM's fused
-            # in_proj GEMMs, so it serves correctly out of the box. Built
+            # MTP draft head (inert without --speculative-config); global
+            # scales are harmonized for vLLM's fused in_proj GEMMs, so it
+            # serves correctly out of the box. Built
             # with llm-compressor (compressed-tensors, nvfp4-pack-quantized);
             # the card requires vLLM >= 0.27 on SM120/Blackwell -- this image
             # is v0.33.0 (CUDA 13.0), so no image bump is needed.
@@ -105,7 +106,8 @@ spec:
             - --served-model-name=qwen 3.8 - local
             # Split the model across both 5090s. PCIe-only (PHB topology, no
             # NVLink, no GeForce P2P), so the per-layer allreduce rides host
-            # memory via NCCL; the MTP speed-up below is what pays for it.
+            # memory via NCCL; the doubled fp8 KV pool (~31GiB total
+            # across both cards, ~3.5 full 262K sessions) is what pays for it.
             # If NCCL hangs at startup on this consumer board, the first thing
             # to try is env NCCL_P2P_DISABLE=1 (forces the host-memory path
             # explicitly instead of letting NCCL probe P2P).
