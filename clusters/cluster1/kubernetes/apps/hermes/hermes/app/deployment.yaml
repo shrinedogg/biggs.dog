@@ -169,6 +169,17 @@ spec:
               mountPath: /tmp
             - name: run
               mountPath: /run
+            - name: pocketid-model-jwt
+              mountPath: /var/run/secrets/pocketid-model-jwt
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/cont-init.d/018-reconcile-model-routes
+              subPath: 018-reconcile-model-routes
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/hermes-init/reconcile_model_routes.py
+              subPath: reconcile_model_routes.py
+              readOnly: true
       volumes:
         - name: data
           persistentVolumeClaim:
@@ -177,3 +188,18 @@ spec:
           emptyDir: {}
         - name: run
           emptyDir: {}
+        # Refreshed every 15m by CronJob/pocketid-model-jwt-refresher. Directory
+        # mount (no subPath) so kubelet updates rotated tokens in place without
+        # restarting the pod; optional: true so Recreate rollouts never block on
+        # ContainerCreating before the CronJob's first */15 tick; 0444 (292) so
+        # UID 10000 (hermes) can read the root-owned Secret projection without
+        # setting fsGroup on the 30Gi RBD PVC.
+        - name: pocketid-model-jwt
+          secret:
+            secretName: pocketid-model-jwt
+            defaultMode: 292
+            optional: true
+        - name: model-routes-init
+          configMap:
+            name: hermes-model-routes-init
+            defaultMode: 365
