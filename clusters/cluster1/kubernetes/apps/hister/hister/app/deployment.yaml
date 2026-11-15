@@ -32,12 +32,17 @@
 # Infinity server enforces the same credential as the vLLM chat model
 # (the shared vllm-api-key 1Password item).
 #
-# Auth: single-user access token (HISTER__APP__ACCESS_TOKEN) gates both the
+# Auth: single-user access token (HISTER__APP__ACCESS_TOKEN) gates the
 # HTTP API and the MCP endpoint. app.public is intentionally NOT set, so
 # search and MCP stay token-gated. Human browser sign-in goes through
-# PocketID OIDC (the hister generic "oidc" OAuth provider, id.biggs.dog);
-# oauth_only stays unset so the token-gated API/MCP paths keep working
-# alongside the OAuth sessions.
+# PocketID OIDC (the hister generic "oidc" OAuth provider, id.biggs.dog).
+# app.user_handling=true is required for the OAuth layer: without it the
+# OAuth handlers 403 "user handling is disabled" and the auth page
+# (authMode=token) renders the token field only, so the SSO button is
+# never shown. With user handling on, authMode becomes "user" (the SSO
+# button appears alongside the password form) while the access token
+# above keeps gating the API/MCP paths. oauth_only stays unset so both
+# forms remain available.
 #
 # Session cookies are signed with the data-dir .secret_key file (hister
 # mints a random one on first start if absent). With 2 replicas on emptyDir
@@ -133,6 +138,14 @@ spec:
                 secretKeyRef:
                   name: hister-access-token
                   key: access-token
+            # Enables the session/OAuth layer (PocketID SSO sign-in).
+            # Upstream gates every OAuth handler on app.user_handling
+            # (403 "user handling is disabled" without it) and the auth
+            # page renders the SSO button only in user mode. This is
+            # independent of the access token above, which keeps gating
+            # the API and /mcp.
+            - name: HISTER__APP__USER_HANDLING
+              value: "true"
             # PocketID OIDC sign-in (hister's generic "oidc" provider). The
             # app dials the public FQDN for discovery + token + userinfo
             # (https://id.biggs.dog), which in-cluster resolves via
