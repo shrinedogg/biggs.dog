@@ -1,5 +1,6 @@
 # Wave 1 de-Helm: IAC enrollment of ghcr.io/home-operations/kritika (see the per-app
-# $imagepolicy markers). Digest tags excluded (exclusionList).apiVersion: image.toolkit.fluxcd.io/v1
+# $imagepolicy markers). Digest tags excluded (exclusionList).
+apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
   name: kritika

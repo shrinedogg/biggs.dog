@@ -3,7 +3,7 @@
 # rendered the CRDs from the registry tarball).
 #
 # Bump this tag in the same commit as a plugin minor bump (the
-# ImagePolicy plugin-barman-cloud range is patch-only ~0.15.1).
+# ImagePolicy plugin-barman-cloud range is patch-only ~0.16.0).
 ---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: GitRepository
@@ -14,4 +14,4 @@ spec:
   interval: 1h
   url: https://github.com/cloudnative-pg/plugin-barman-cloud
   ref:
-    tag: v0.15.1 # commit: 6216b7dd552f389952d3de77712d9522a79d9548
+    tag: v0.16.0 # commit: cd3b9faeb18466bc1195688589dc20db2b247f15

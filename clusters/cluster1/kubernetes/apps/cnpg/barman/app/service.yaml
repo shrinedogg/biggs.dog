@@ -15,7 +15,7 @@ metadata:
     cnpg.io/pluginPort: "9090"
     cnpg.io/pluginServerSecret: barman-cloud-server-tls
   name: barman-cloud
-  namespace: default
+  namespace: cnpg-system
 spec:
   ports:
   - port: 9090

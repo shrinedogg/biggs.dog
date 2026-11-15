@@ -6,7 +6,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kritika
-  namespace: default
+  namespace: kritika
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
@@ -30,7 +30,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kritika-gateway
-  namespace: default
+  namespace: kritika
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
@@ -54,7 +54,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: kritika-metrics
-  namespace: default
+  namespace: kritika
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika

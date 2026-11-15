@@ -4,7 +4,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  namespace: default
+  namespace: observability
   name: victoria-logs-single-vls-victorialogs-single-node
   labels:
     app.kubernetes.io/component: server

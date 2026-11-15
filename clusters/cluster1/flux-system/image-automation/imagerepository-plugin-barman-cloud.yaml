@@ -1,5 +1,6 @@
 # Wave 1 de-Helm: IAC enrollment of ghcr.io/cloudnative-pg/plugin-barman-cloud (see the per-app
-# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+# $imagepolicy markers).
+apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
   name: plugin-barman-cloud

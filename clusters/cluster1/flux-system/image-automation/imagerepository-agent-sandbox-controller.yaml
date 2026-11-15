@@ -1,5 +1,6 @@
 # Wave 1 de-Helm: IAC enrollment of registry.k8s.io/agent-sandbox/agent-sandbox-controller (see the per-app
-# $imagepolicy markers). apiVersion: image.toolkit.fluxcd.io/v1
+# $imagepolicy markers).
+apiVersion: image.toolkit.fluxcd.io/v1
 kind: ImageRepository
 metadata:
   name: agent-sandbox-controller

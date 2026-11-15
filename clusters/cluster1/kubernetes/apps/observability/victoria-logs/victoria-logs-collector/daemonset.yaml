@@ -8,7 +8,7 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   name: victoria-logs-collector-vlc
-  namespace: default
+  namespace: observability
   labels:
     app.kubernetes.io/instance: victoria-logs-collector
     app.kubernetes.io/name: vlc

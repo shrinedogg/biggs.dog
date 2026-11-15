@@ -12,7 +12,7 @@
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
-  name: default.kritika-runner-jobs
+  name: kritika.kritika-runner-jobs
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
@@ -27,7 +27,7 @@ spec:
         resources: ["jobs"]
   matchConditions:
     - name: kritika
-      expression: "request.userInfo.username == 'system:serviceaccount:default:kritika'"
+      expression: "request.userInfo.username == 'system:serviceaccount:kritika:kritika'"
   variables:
     - name: pod
       expression: object.spec.template.spec
@@ -121,7 +121,7 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
-  name: default.kritika-runner-job-deletes
+  name: kritika.kritika-runner-job-deletes
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
@@ -136,7 +136,7 @@ spec:
         resources: ["jobs"]
   matchConditions:
     - name: kritika
-      expression: "request.userInfo.username == 'system:serviceaccount:default:kritika'"
+      expression: "request.userInfo.username == 'system:serviceaccount:kritika:kritika'"
   validations:
     - expression: "has(request.options.propagationPolicy) && request.options.propagationPolicy == 'Foreground'"
       message: kritika deletes a runner Job in the foreground, its run's Secret with it
@@ -146,7 +146,7 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
-  name: default.kritika-runner-secrets
+  name: kritika.kritika-runner-secrets
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
@@ -161,7 +161,7 @@ spec:
         resources: ["secrets"]
   matchConditions:
     - name: kritika
-      expression: "request.userInfo.username == 'system:serviceaccount:default:kritika'"
+      expression: "request.userInfo.username == 'system:serviceaccount:kritika:kritika'"
   validations:
     - expression: "object.metadata.name.matches('^kritika-run-[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$')"
       message: a run Secret is named kritika-run- and its run's ID
@@ -179,52 +179,52 @@ spec:
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
-  name: default.kritika-runner-jobs
+  name: kritika.kritika-runner-jobs
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
     app.kubernetes.io/version: "0.0.120"
 spec:
-  policyName: default.kritika-runner-jobs
+  policyName: kritika.kritika-runner-jobs
   validationActions: [Deny]
   matchResources:
     namespaceSelector:
       matchLabels:
-        kubernetes.io/metadata.name: default
+        kubernetes.io/metadata.name: kritika
 
 ---
 
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
-  name: default.kritika-runner-job-deletes
+  name: kritika.kritika-runner-job-deletes
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
     app.kubernetes.io/version: "0.0.120"
 spec:
-  policyName: default.kritika-runner-job-deletes
+  policyName: kritika.kritika-runner-job-deletes
   validationActions: [Deny]
   matchResources:
     namespaceSelector:
       matchLabels:
-        kubernetes.io/metadata.name: default
+        kubernetes.io/metadata.name: kritika
 
 ---
 
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
-  name: default.kritika-runner-secrets
+  name: kritika.kritika-runner-secrets
   labels:
     app.kubernetes.io/name: kritika
     app.kubernetes.io/instance: kritika
     app.kubernetes.io/version: "0.0.120"
 spec:
-  policyName: default.kritika-runner-secrets
+  policyName: kritika.kritika-runner-secrets
   validationActions: [Deny]
   matchResources:
     namespaceSelector:
       matchLabels:
-        kubernetes.io/metadata.name: default
+        kubernetes.io/metadata.name: kritika
 

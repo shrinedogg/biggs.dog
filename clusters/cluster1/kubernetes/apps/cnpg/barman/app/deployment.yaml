@@ -5,7 +5,7 @@
 # owned by the cnpg-barman-certs Kustomization (../certificates/).
 # strategy must stay Recreate (the CNPG operator only supports it).
 # The $imagepolicy marker enrolls the image in the cluster1 IAC (patch-only
-# ~0.15.1); bump the barman-crds git tag in the same commit as a minor bump.
+# ~0.16.0); bump the barman-crds git tag in the same commit as a minor bump.
 
 apiVersion: apps/v1
 kind: Deployment
@@ -15,7 +15,7 @@ metadata:
     app.kubernetes.io/instance: plugin-barman-cloud
     app.kubernetes.io/version: "v0.16.0"
   name: plugin-barman-cloud
-  namespace: default
+  namespace: cnpg-system
 spec:
   replicas: 1
   selector:

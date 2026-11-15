@@ -8,7 +8,7 @@ metadata:
     app.kubernetes.io/instance: plugin-barman-cloud
     app.kubernetes.io/version: "v0.16.0"
   name: plugin-barman-cloud
-  namespace: default
+  namespace: cnpg-system
 
 ---
 
@@ -97,7 +97,7 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: plugin-barman-cloud
-  namespace: default
+  namespace: cnpg-system
 
 ---
 
@@ -109,7 +109,7 @@ metadata:
     app.kubernetes.io/instance: plugin-barman-cloud
     app.kubernetes.io/version: "v0.16.0"
   name: plugin-barman-cloud-leader-election-role
-  namespace: default
+  namespace: cnpg-system
 rules:
 - apiGroups:
   - ""
@@ -153,7 +153,7 @@ metadata:
     app.kubernetes.io/instance: plugin-barman-cloud
     app.kubernetes.io/version: "v0.16.0"
   name: plugin-barman-cloud-leader-election-rolebinding
-  namespace: default
+  namespace: cnpg-system
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -161,4 +161,4 @@ roleRef:
 subjects:
 - kind: ServiceAccount
   name: plugin-barman-cloud
-  namespace: default
+  namespace: cnpg-system
