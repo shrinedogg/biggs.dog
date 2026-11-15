@@ -229,4 +229,8 @@ spec:
           secret:
             secretName: hister-oidc
             items:
+              # key+path are both required by the corev1 schema (the Flux
+              # server-side dry-run rejects the Deployment without path).
+              # subPath on the mount must match the item's path, not key.
               - key: session-key
+                path: session-key
