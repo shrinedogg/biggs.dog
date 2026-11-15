@@ -96,6 +96,20 @@ spec:
             # terminates at the internal-biggs-dog gateway.
             - name: HISTER__SERVER__ADDRESS
               value: 0.0.0.0:4433
+            # The app reads HISTER_PORT as a plain port number (config.go
+            # normalize: server.address = JoinHostPort(host, HISTER_PORT)).
+            # But the kubelet ALSO auto-injects the legacy k8s Service env
+            # var HISTER_PORT into every pod in this namespace for the
+            # 'hister' Service, valued "tcp://<clusterIP>:4433" (Service
+            # env-var discovery). With that address-shaped value the app
+            # builds listen address "0.0.0.0:tcp://10.106.13.208:4433" and
+            # net.Listen fails with "too many colons in address" — the pod
+            # crash-loops. Defining HISTER_PORT explicitly suppresses the
+            # generated var (the spec value wins) and hands the app the
+            # plain number it expects. Same bug class as centrifugo's
+            # CENTRIFUGO_PORT and morphos' MORPHOS_PORT collisions.
+            - name: HISTER_PORT
+              value: "4433"
             # Required when listening on all interfaces (overrides the
             # image's http://localhost:4433 default); used by the MCP
             # origin checks.
