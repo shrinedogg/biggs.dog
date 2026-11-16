@@ -102,26 +102,40 @@ spec:
         config:
           baseUrl: "http://internal-biggs-dog.networking.svc.cluster.local:8445/v1"
     # ------------------------------------------------------------------
-    # Use the cluster's CNPG operator (cnpg-kagent) instead of a bundled
-    # dev Postgres. The full connection URL (incl. password) comes from the
-    # existing ExternalSecret kagent-database-url (key: url) — no
-    # credentials live in git.
+    # BYO postgres via the cluster's CNPG operator (cnpg-kagent): the
+    # 1.0.0-line chart takes two pre-created connection-string Secrets
+    # (no credentials live in git; both are rendered by the ESOs in
+    # kagent-postgres-secrets.yaml from the kagent-user-password
+    # 1Password item — the same login the CNPG cluster bootstraps with).
     #
-    # role: "" — cnpg-kagent has no kagent_owner role; an empty role skips
-    # SET ROLE after connecting (kagent connect.go).
-    # schema: kagent — the controller runs CREATE SCHEMA IF NOT EXISTS at
-    # migration. Clean 1.0 schema: 0.10.3's tables stay orphaned in the
-    # public schema, untouched but unread by 1.0.
+    # Single-login role design: the `kagent` login is a member of BOTH
+    # the kagent_owner and kagent_readwrite NOLOGIN roles (created by the
+    # cnpg-kagent-init ConfigMap's init.sql at cluster creation). The
+    # owner connection runs the controller's startup migrations (SET ROLE
+    # kagent_owner); the readwrite connection is the runtime pool (SET
+    # ROLE kagent_readwrite, chart config.database defaults).
+    #
+    # schema: kagent — the controller creates/owns its 1.0 tables here;
+    # the pre-1.0 tables (0.10.3 era) stay orphaned in the public schema
+    # of the recreated database, untouched but unread by 1.0.
     # vectorEnabled=true + vectorSchema=public — long-term vector memory.
-    # The Database CR cnpg-kagent-db installs pgvector in `public` (it has
-    # no schema key), so the extensions schema must not be used.
+    # The Database CR cnpg-kagent-database.yaml installs the vector
+    # extension with no schema key, so it lands in `public`; the chart
+    # default (vectorSchema: extensions) would look in the wrong place.
+    # If vector memory is ever dropped, leave vectorEnabled at its
+    # default (false) and the Database CR's extension ensure becomes a
+    # no-op.
     # ------------------------------------------------------------------
     database:
       postgres:
-        connectionStringSecretRef:
-          name: kagent-database-url
-          key: url
-        role: ""
+        readWriteConnectionStringSecretRef:
+          name: kagent-postgres-readwrite
+          key: readWriteConnectionString
+        ownerConnectionStringSecretRef:
+          name: kagent-postgres-owner
+          key: ownerConnectionString
+    config:
+      database:
         schema: kagent
         vectorEnabled: true
         vectorSchema: public

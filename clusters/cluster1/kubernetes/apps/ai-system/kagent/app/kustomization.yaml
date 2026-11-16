@@ -10,7 +10,6 @@ resources:
   - ./harnesses.yaml
   # Standalone resources (not Helm-managed)
   - ./grafana-mcp-token-secret.yaml
-  - ./kagent-database-url.yaml
   # 1.0.0-line BYO-postgres connection-string Secrets (controller mounts both)
   - ./kagent-postgres-secrets.yaml
   - ./kagent-mcp-route.yaml
