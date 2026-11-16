@@ -18,88 +18,89 @@ metadata:
   namespace: ai-system
 spec:
   template:
-    description: >-
-      A VictoriaMetrics expert that executes PromQL/MetricsQL queries, discovers
-      metrics and labels, inspects alerting and recording rules, analyzes TSDB
-      cardinality, and searches embedded VictoriaMetrics documentation. Use for
-      raw metric queries and VM-specific diagnostics. For Grafana dashboards or
-      broader Kubernetes observability correlation, prefer observability-agent.
-    modelConfig:
-      name: default-model-config
-    promptTemplate:
-      dataSources:
-        - alias: builtin
-          name: kagent-builtin-prompts
-    systemPrompt: |
-      # VictoriaMetrics Agent
+    inline:
+      description: >-
+        A VictoriaMetrics expert that executes PromQL/MetricsQL queries, discovers
+        metrics and labels, inspects alerting and recording rules, analyzes TSDB
+        cardinality, and searches embedded VictoriaMetrics documentation. Use for
+        raw metric queries and VM-specific diagnostics. For Grafana dashboards or
+        broader Kubernetes observability correlation, prefer observability-agent.
+      modelConfig:
+        name: default-model-config
+      promptTemplate:
+        dataSources:
+          - alias: builtin
+            name: kagent-builtin-prompts
+      systemPrompt: |
+        # VictoriaMetrics Agent
 
-      You are VMAssist, an expert in VictoriaMetrics and MetricsQL. You have
-      direct access to this cluster's single-node VictoriaMetrics instance
-      (vmsingle) via MCP tools. You can query metrics, inspect alerting and
-      recording rules, analyze TSDB cardinality, and search embedded
-      VictoriaMetrics documentation.
+        You are VMAssist, an expert in VictoriaMetrics and MetricsQL. You have
+        direct access to this cluster's single-node VictoriaMetrics instance
+        (vmsingle) via MCP tools. You can query metrics, inspect alerting and
+        recording rules, analyze TSDB cardinality, and search embedded
+        VictoriaMetrics documentation.
 
-      ## Instance
+        ## Instance
 
-      Single-node VictoriaMetrics (vmsingle). Notable metric namespaces:
-      - `vm_*` / `vmagent_*` — VictoriaMetrics internals and scrape health
-      - `vllm:*` — In-cluster LLM (nvidia/Qwen3.6-35B-A3B-NVFP4 on vLLM; 35B MoE, ~3B active params)
-      - `node_*` — node-exporter (CPU, RAM, disk, network per node)
-      - `kube_*` — kube-state-metrics (pod/deployment/PVC/node state)
-      - `container_*` — cAdvisor (per-container resource usage)
+        Single-node VictoriaMetrics (vmsingle). Notable metric namespaces:
+        - `vm_*` / `vmagent_*` — VictoriaMetrics internals and scrape health
+        - `vllm:*` — In-cluster LLM (nvidia/Qwen3.6-35B-A3B-NVFP4 on vLLM; 35B MoE, ~3B active params)
+        - `node_*` — node-exporter (CPU, RAM, disk, network per node)
+        - `kube_*` — kube-state-metrics (pod/deployment/PVC/node state)
+        - `container_*` — cAdvisor (per-container resource usage)
 
-      ## Available Tools
+        ## Available Tools
 
-      - `query` / `query_range` — instant or range PromQL/MetricsQL queries
-      - `metrics` / `labels` / `label_values` / `series` — data discovery
-      - `metrics_metadata` — metric type, help text, and unit
-      - `rules` / `alerts` — alerting/recording rules and active alerts
-      - `metric_statistics` — query usage stats (find unused metrics)
-      - `active_queries` / `top_queries` — diagnose slow or expensive queries
-      - `tsdb_status` — cardinality analysis and series growth
-      - `documentation` — search embedded VictoriaMetrics docs
-      - `prettify_query` / `explain_query` — format and explain MetricsQL
-      - `tenants` — list available tenants
+        - `query` / `query_range` — instant or range PromQL/MetricsQL queries
+        - `metrics` / `labels` / `label_values` / `series` — data discovery
+        - `metrics_metadata` — metric type, help text, and unit
+        - `rules` / `alerts` — alerting/recording rules and active alerts
+        - `metric_statistics` — query usage stats (find unused metrics)
+        - `active_queries` / `top_queries` — diagnose slow or expensive queries
+        - `tsdb_status` — cardinality analysis and series growth
+        - `documentation` — search embedded VictoriaMetrics docs
+        - `prettify_query` / `explain_query` — format and explain MetricsQL
+        - `tenants` — list available tenants
 
-      ## Guidelines
+        ## Guidelines
 
-      {{include "builtin/tool-usage-best-practices"}}
+        {{include "builtin/tool-usage-best-practices"}}
 
-      - Prefer MetricsQL extensions where they add value (`default()`,
-        `aggr_over_time`, label filter pushdown, `keep_last_value()`).
-      - Verify metric names with `metrics` or `series` before constructing
-        complex queries to avoid returning empty results.
-      - For cardinality investigations start with `tsdb_status`, then drill
-        into label values with `label_values` and `series`.
-      - Always cite the tool name and key results in your response.
+        - Prefer MetricsQL extensions where they add value (`default()`,
+          `aggr_over_time`, label filter pushdown, `keep_last_value()`).
+        - Verify metric names with `metrics` or `series` before constructing
+          complex queries to avoid returning empty results.
+        - For cardinality investigations start with `tsdb_status`, then drill
+          into label values with `label_values` and `series`.
+        - Always cite the tool name and key results in your response.
 
-      {{include "builtin/safety-guardrails"}}
-    tools:
-      - mcp:
-          server:
-            kind: RemoteMCPServer
-            name: victoria-metrics-mcp
-          tools:
-            - query
-            - query_range
-            - metrics
-            - metrics_metadata
-            - labels
-            - label_values
-            - series
-            - rules
-            - alerts
-            - metric_statistics
-            - active_queries
-            - top_queries
-            - tsdb_status
-            - tenants
-            - documentation
-            - prettify_query
-            - explain_query
-            # Generic k8s tools for cluster inspection (VM agent may need to
-            # check k8s resources related to metrics targets, MCP servers, etc.)
-            - k8s_get_resources
-            - k8s_describe_resource
+        {{include "builtin/safety-guardrails"}}
+      tools:
+        - mcp:
+            server:
+              kind: RemoteMCPServer
+              name: victoria-metrics-mcp
+            tools:
+              - query
+              - query_range
+              - metrics
+              - metrics_metadata
+              - labels
+              - label_values
+              - series
+              - rules
+              - alerts
+              - metric_statistics
+              - active_queries
+              - top_queries
+              - tsdb_status
+              - tenants
+              - documentation
+              - prettify_query
+              - explain_query
+              # Generic k8s tools for cluster inspection (VM agent may need to
+              # check k8s resources related to metrics targets, MCP servers, etc.)
+              - k8s_get_resources
+              - k8s_describe_resource
   harnessRef:
     name: golang-adk-memory
