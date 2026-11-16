@@ -63,3 +63,4 @@ spec:
         - name: node-ate
           hostPath:
             path: /var/lib/ate
+            type: DirectoryOrCreate
