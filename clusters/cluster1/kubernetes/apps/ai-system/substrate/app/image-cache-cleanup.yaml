@@ -59,6 +59,9 @@ spec:
       # chart's atelet DaemonSet).
       tolerations:
         - key: nvidia.com/gpu
+        - key: ate.dev/sandboxClass
+          operator: Exists
+          effect: NoSchedule
           operator: Exists
           effect: NoSchedule
       volumes:
