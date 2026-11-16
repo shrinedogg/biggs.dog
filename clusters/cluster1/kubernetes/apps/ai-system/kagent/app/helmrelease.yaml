@@ -139,32 +139,47 @@ spec:
         schema: kagent
         vectorEnabled: true
         vectorSchema: public
+      # ------------------------------------------------------------------
+      # Substrate control plane wiring (1.0.0-line key paths; the
+      # alpha11-era controller.substrate.* keys are unknown to this chart
+      # and were silently ignored). The control plane lives in ai-system,
+      # not the chart-default ate-system namespace.
+      # apiEndpoint: the ate-api-server gRPC endpoint (mTLS, port 443).
+      # routerUrl: the atenet-router Service in ai-system, port 80.
+      # actorJwtIssuer: must match the substrate chart's actor-jwt-issuer
+      # (verified in the ate-api-server boot log: https://idp.ai-system.svc).
+      # ------------------------------------------------------------------
+      substrate:
+        apiEndpoint: "dns:///api.ai-system.svc:443"
+        routerUrl: "http://atenet-router.ai-system.svc:80"
+        actorJwtIssuer: "https://idp.ai-system.svc"
+      # Standalone sandbox guest image (BYO; the chart default is "" which
+      # disables sandbox prep). Digest-pinned: kagent-dev/kagent/
+      # sandbox-guest:1.0.1 (verified in the 1.0.1 pairing; the registry
+      # override mirrors the host to ghcr.io, the digest survives).
+      # 1.0.0-line key: config.sandboxes (the alpha11-era
+      # controller.sandbox.* keys are unknown to this chart and were
+      # silently ignored).
+      sandboxes:
+        guestImage: "ghcr.io/kagent-dev/kagent/sandbox-guest@sha256:16e84a2285119ce02cc6ba45ea7f68181eb1527335de85477614fb9a6b5ecf03"
     controller:
       resources:
         limits:
           memory: "1024Mi"
       # ------------------------------------------------------------------
-      # Agent Substrate integration. The controller dials ate-api-server
-      # with an mTLS PodCertificate bundle (substrate-podidentity volume)
-      # plus the servicedns ClusterTrustBundle CA (substrate-servicedns
-      # volume) — both mounted by the chart when controller.substrate is
-      # enabled. Requires the PodCertificateRequest/ClusterTrustBundle
-      # feature gates (beta, default-off in K8s 1.36), enabled 2026-09-08
-      # via the Omni cluster template, and the substrate-podcert signer
-      # (the CA/JWT pools are bootstrapped imperatively — see the PR's
-      # "User-gated follow-ups").
+      # Agent Substrate integration (1.0.0 line). The controller dials
+      # ate-api-server with mTLS PodCertificate credentials
+      # (substrate-podidentity volume) plus the servicedns trust bundle
+      # (substrate-servicedns volume) — the chart renders both only when
+      # substrateClientCertificate is enabled (the 1.0.1 key that replaces
+      # the alpha11-era controller.substrate.enabled flag). Requires the
+      # PodCertificateRequest/ClusterTrustBundle feature gates (beta,
+      # default-off in K8s 1.36), enabled 2026-09-08 via the Omni cluster
+      # template, and the substrate-podcert signer (the CA/JWT pools are
+      # bootstrapped imperatively — see the PR's "User-gated follow-ups").
       # ------------------------------------------------------------------
-      substrate:
+      substrateClientCertificate:
         enabled: true
-        ateApiEndpoint: "dns:///api.ai-system.svc:443"
-        # Required: the atenet-router Service in ai-system, port 80.
-        atenetRouterURL: "http://atenet-router.ai-system.svc:80"
-      sandbox:
-        guestImage:
-          # kagent-dev/kagent/sandbox-guest:1.0.1 (verified digest).
-          # Without it KAGENT_SANDBOX_GUEST_IMAGE renders "" and standalone
-          # sandbox prep is silently broken.
-          digest: "sha256:16e84a2285119ce02cc6ba45ea7f68181eb1527335de85477614fb9a6b5ecf03"
     # ------------------------------------------------------------------
     # The kagent-default WorkerPool: substrate workers (gVisor actors)
     # that run the Harness workloads. The chart FAILS render if
