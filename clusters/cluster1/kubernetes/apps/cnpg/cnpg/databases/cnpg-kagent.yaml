@@ -1,3 +1,22 @@
+# cnpg-kagent: BYO postgres for the kagent controller (1.0.0-line cutover).
+#
+# The 1.0.0-line kagent chart takes BYO postgres as two connection-string
+# Secrets (kagent-postgres-readwrite / kagent-postgres-owner; rendered by
+# ai-system/kagent/app/kagent-postgres-secrets.yaml) and the controller
+# applies its own migrations at startup as the kagent_owner role. The
+# alpha11-era live cluster predates the role design, and a pre-1.0
+# database cannot be upgraded in place (same rule as the cnpg-substrate
+# 0.7.0 cutover, PR #865): this cutover recreates it.
+#
+# Single-login design (mirrors cnpg-substrate.yaml): the `kagent` login
+# (from the kagent-user-password ClusterExternalSecret) is a member of
+# BOTH kagent_owner and kagent_readwrite NOLOGIN roles; each pool
+# connection SET ROLEs to the matching role (chart config.database:
+# owner.role kagent_owner, readWrite.role kagent_readwrite).
+#
+# To recreate: delete the CNPG Cluster + its PVCs, Flux re-applies this
+# manifest, and initdb + the init.sql below build the fresh schema.
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -12,8 +31,19 @@ spec:
       dataChecksums: true
       secret:
         name: kagent-user-password
-  # Minimal trixie operand + extension images from the official CNPG 1.29 catalog
-  # (../app/postgresql-minimal-trixie-catalog.yaml). Enables pgvector by name only.
+      # Runs once as the postgres superuser in the kagent DB, right after
+      # cluster creation. Carves the two NOLOGIN roles the 1.0.1 kagent
+      # controller's pools SET ROLE to, plus the kagent schema (owned by
+      # kagent_owner so migrations can create objects and the readwrite
+      # pool gets default privileges).
+      postInitApplicationSQLRefs:
+        configMapRefs:
+          - name: cnpg-kagent-init
+            key: init.sql
+  # Minimal trixie operand + extension images from the official CNPG 1.29
+  # catalog (../app/postgresql-minimal-trixie-catalog.yaml). Enables
+  # pgvector by name only; the Database CR (cnpg-kagent-database.yaml)
+  # re-ensures the extension in the kagent database after recreation.
   imageCatalogRef:
     apiGroup: postgresql.cnpg.io
     kind: ClusterImageCatalog
@@ -33,3 +63,23 @@ spec:
       - name: pgvector
     parameters:
       archive_mode: "off"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cnpg-kagent-init
+  namespace: cnpg-system
+data:
+  init.sql: |
+    CREATE ROLE kagent_owner NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+    CREATE ROLE kagent_readwrite NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION;
+    GRANT kagent_owner TO kagent;
+    GRANT kagent_readwrite TO kagent;
+    CREATE SCHEMA IF NOT EXISTS kagent AUTHORIZATION kagent_owner;
+    REVOKE CREATE ON SCHEMA public FROM PUBLIC;
+    REVOKE ALL ON SCHEMA kagent FROM PUBLIC;
+    GRANT USAGE ON SCHEMA kagent TO kagent_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE kagent_owner IN SCHEMA kagent GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO kagent_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE kagent_owner IN SCHEMA kagent GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO kagent_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE kagent_owner IN SCHEMA kagent GRANT EXECUTE ON ROUTINES TO kagent_readwrite;
+    ALTER DEFAULT PRIVILEGES FOR ROLE kagent_owner IN SCHEMA kagent GRANT USAGE ON TYPES TO kagent_readwrite;
