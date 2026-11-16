@@ -185,6 +185,25 @@ spec:
     # implied both go away.
     rustfs:
       enabled: false
+    # kagent 1.0.1 compiles BOTH of these fields into every Agent's
+    # ActorTemplate unconditionally (snapshotConfig.storageLocation and
+    # goldenEgressPolicy), while substrate 1.0.0 rejects a set value unless
+    # the matching preview gate is on: CreateActorTemplate fails with
+    # "actor_template.snapshot_config.storage_location: Forbidden,
+    # actor_template.golden_egress_policy: Forbidden", and the kagent
+    # controller drops that error and does not retry (reconciler.go:
+    # InvalidArgument -> canned Ready=False message, return nil), so all 13
+    # agents stay Ready=False. The chart renders this list as
+    # --preview=<comma-joined> on ate-api-server (and shares it with the
+    # controller/atelet, so the gates stay consistent across components).
+    # GoldenEgressPolicy: admits the golden-actor egress grant kagent
+    # compiles (kagent-controller:8083 actor-JWT replace-header) that the
+    # harness bootstrap needs. PerTemplateSnapshotLocation: lets each
+    # template's storageLocation (the B2 prefix) override the cluster
+    # --snapshot-location flag.
+    preview:
+      - GoldenEgressPolicy
+      - PerTemplateSnapshotLocation
     # substrate 0.7.0-alpha2 chart: when rustfs is disabled, the api server
     # requires an explicit snapshot location (previously implicit via the
     # bundled rustfs store). Every kagent harness already points its
