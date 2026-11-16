@@ -42,8 +42,12 @@ spec:
             - -c
           args:
             - |
-              rm -rf /var/lib/ate/image-cache
-              echo "image cache cleaned on $(hostname)"
+              set -e
+              if [ ! -e /var/lib/ate/.image-cache-cleaned ]; then
+                rm -rf /var/lib/ate/image-cache
+                touch /var/lib/ate/.image-cache-cleaned
+                echo "image cache cleaned on $(hostname)"
+              fi
               exec tail -f /dev/null
           volumeMounts:
             - name: node-ate
