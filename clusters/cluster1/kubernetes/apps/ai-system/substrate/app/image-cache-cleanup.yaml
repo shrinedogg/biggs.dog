@@ -14,6 +14,10 @@
 # chart's own digest pin (values.images.awsCli) and carries a shell;
 # command overrides the aws entrypoint.
 #
+# The sentinel file makes the rm idempotent: a pod that restarts after
+# the cache was already cleaned (and possibly re-populated by running
+# actors) will not wipe a live cache.
+#
 # After every node has logged "image cache cleaned", delete the DaemonSet
 # by hand (kubectl -n ai-system delete daemonset substrate-image-cache-cleanup),
 # then remove this file: the substrate Kustomization (ks.yaml) has
@@ -54,18 +58,26 @@ spec:
           volumeMounts:
             - name: node-ate
               mountPath: /var/lib/ate
-      # nv-01 runs the GPU taint (the kagent workers pin there); the
-      # cleanup must reach that node too, so tolerate it (same as the
-      # chart's atelet DaemonSet).
+      # Mirror the live atelet DaemonSet's toleration set exactly, so
+      # this schedules on every node the atelet runs on:
+      #   - ate.dev/sandboxClass      (chart 1.0.0 template, Exists/NoSchedule)
+      #   - cloud.google.com/compute-class (chart 1.0.0 template, Exists/NoSchedule)
+      #   - nvidia.com/gpu            (substrate HR postRenderer appends it, Exists/NoSchedule)
       tolerations:
-        - key: nvidia.com/gpu
         - key: ate.dev/sandboxClass
           operator: Exists
           effect: NoSchedule
+        - key: cloud.google.com/compute-class
+          operator: Exists
+          effect: NoSchedule
+        - key: nvidia.com/gpu
           operator: Exists
           effect: NoSchedule
       volumes:
         - name: node-ate
           hostPath:
             path: /var/lib/ate
+            # Nodes where the 0.5.0-era atelet never started may not have
+            # the directory; without this the mount fails and the pod
+            # stays in ContainerCreating.
             type: DirectoryOrCreate
