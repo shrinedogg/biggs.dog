@@ -192,6 +192,23 @@ spec:
     # so the api-level default is the same store.
     ateApi:
       snapshotLocation: s3://biggs-dog/substrate/kagent/
+      # kagent 1.0.x: the controller dials ate-api with its podcertificate
+      # workload identity and ate-api's embedded OpenFGA authorizer denies it
+      # (rpc PermissionDenied: principal user:spiffe://cluster.local/ns/
+      # ai-system/sa/kagent-controller lacks can_get on actor_template:<ns>/<agent>-<hash>),
+      # so every Agent's prepared-revision reconcile retries forever and all
+      # agents stay Ready=False/ActorTemplatePending. An empty
+      # bootstrapOwners list silently falls back to the chart's shared
+      # ate-client principal, so make that default explicit and add the
+      # kagent-controller's SPIFFE ID (upstream docs/guides/authorization.md:
+      # bootstrap owners are read from config at startup, not from FGA
+      # state, which also makes this survive cnpg-substrate DB recreates).
+      # The --authz-bootstrap-owners arg change rolls the ate-api-server
+      # replicas; the controller's ActorTemplate reconciles then succeed.
+      authorization:
+        bootstrapOwners:
+          - system:serviceaccount:ai-system:ate-client
+          - spiffe://cluster.local/ns/ai-system/sa/kagent-controller
     # The atelet binary defaults --ateapi-address/--ateapi-server-name to
     # api.ate-system.svc (the substrate canonical namespace). Substrate is
     # installed in ai-system here, so the node-local atelet (which brokers the
