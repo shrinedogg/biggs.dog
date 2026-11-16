@@ -197,7 +197,7 @@ spec:
       create: true
       name: kagent-default
       replicas: 1
-      workerImage: ghcr.io/kagent-dev/substrate/ateworker-gvisor:v1.0.0
+      workerImage: ghcr.io/kagent-dev/substrate/ateworker-gvisor:v1.0.1
       sandboxClass: gvisor
       template:
         # Flat pod-template fragment (the chart pipes this verbatim into
