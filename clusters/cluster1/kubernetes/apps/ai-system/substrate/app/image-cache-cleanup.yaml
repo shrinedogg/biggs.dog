@@ -14,9 +14,11 @@
 # chart's own digest pin (values.images.awsCli) and carries a shell;
 # command overrides the aws entrypoint.
 #
-# After every node has logged "image cache cleaned", remove this file
-# (Flux prunes the DaemonSet) and the atelet pods pick the fresh layout
-# on their next restart.
+# After every node has logged "image cache cleaned", delete the DaemonSet
+# by hand (kubectl -n ai-system delete daemonset substrate-image-cache-cleanup),
+# then remove this file: the substrate Kustomization (ks.yaml) has
+# prune: false, so Flux will NOT prune the DaemonSet when the file goes
+# away. The atelet pods pick the fresh layout on their next restart.
 apiVersion: apps/v1
 kind: DaemonSet
 metadata:
