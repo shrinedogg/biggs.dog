@@ -18,4 +18,4 @@ spec:
     # (runbook in the PR body). Bumps for the whole substrate stack are
     # grouped + automerge:false -- see the substrate-stack rule in
     # renovate.json.
-    tag: "1.0.0"
+    tag: "1.0.1"
