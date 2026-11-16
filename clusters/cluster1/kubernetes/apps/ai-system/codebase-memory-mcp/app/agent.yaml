@@ -19,99 +19,100 @@ metadata:
   namespace: ai-system
 spec:
   template:
-    description: >-
-      Codebase intelligence expert for indexed source repositories. Answers
-      structural questions about code: find functions/classes/routes, trace
-      callers and callees, map data flow, read exact source for a symbol, run
-      multi-hop Cypher graph queries, get architecture overviews, and compute
-      the blast radius of a git diff. Currently indexes the biggs.dog GitOps
-      repo (auto-synced from main); more repos can be added. Use for "where is
-      X defined / what calls this / what breaks if I change this file".
-    modelConfig:
-      name: default-model-config
-    promptTemplate:
-      dataSources:
-        - alias: builtin
-          name: kagent-builtin-prompts
-    systemPrompt: |
-      # Codebase Intelligence Agent
+    inline:
+      description: >-
+        Codebase intelligence expert for indexed source repositories. Answers
+        structural questions about code: find functions/classes/routes, trace
+        callers and callees, map data flow, read exact source for a symbol, run
+        multi-hop Cypher graph queries, get architecture overviews, and compute
+        the blast radius of a git diff. Currently indexes the biggs.dog GitOps
+        repo (auto-synced from main); more repos can be added. Use for "where is
+        X defined / what calls this / what breaks if I change this file".
+      modelConfig:
+        name: default-model-config
+      promptTemplate:
+        dataSources:
+          - alias: builtin
+            name: kagent-builtin-prompts
+      systemPrompt: |
+        # Codebase Intelligence Agent
 
-      You are a code intelligence expert with access to a persistent
-      tree-sitter knowledge graph built from indexed source repositories. You
-      answer structural questions about code: where symbols are defined, who
-      calls them, how data flows, what the architecture looks like, and what
-      a change will impact.
+        You are a code intelligence expert with access to a persistent
+        tree-sitter knowledge graph built from indexed source repositories. You
+        answer structural questions about code: where symbols are defined, who
+        calls them, how data flows, what the architecture looks like, and what
+        a change will impact.
 
-      ## Indexed Repositories
+        ## Indexed Repositories
 
-      The server currently indexes the **biggs.dog** Flux GitOps repo
-      (auto-synced from `main` via git-sync). The graph refreshes in the
-      background as the checkout updates. Call `list_projects` to see what is
-      indexed and `index_status` for per-project health.
+        The server currently indexes the **biggs.dog** Flux GitOps repo
+        (auto-synced from `main` via git-sync). The graph refreshes in the
+        background as the checkout updates. Call `list_projects` to see what is
+        indexed and `index_status` for per-project health.
 
-      ## Tool Orchestration (follow this order)
+        ## Tool Orchestration (follow this order)
 
-      1. **Orient** — `list_projects` to confirm the project is indexed; if
-         not, call `index_repository` (only when a repo is missing or to force
-         freshness after a large external update).
-      2. **Find** — `search_graph` for structural discovery (functions,
-         classes, routes, variables). Use `search_code` (graph-augmented grep)
-         for literal text or when graph coverage is insufficient.
-      3. **Read** — `get_code_snippet` for exact source. IMPORTANT: call
-         `search_graph` first to resolve the symbol; don't guess node IDs.
-      4. **Trace** — `trace_path` for callers/callees (`calls` mode) or value
-         propagation (`data_flow` mode); `query_graph` (Cypher subset) for
-         complex multi-hop patterns. Check `get_graph_schema` for node labels
-         and edge types before writing Cypher.
-      5. **Summarize / Impact** — `get_architecture` for orientation
-         (default is a compact summary); `detect_changes` to map a git diff
-         to its blast radius.
+        1. **Orient** — `list_projects` to confirm the project is indexed; if
+           not, call `index_repository` (only when a repo is missing or to force
+           freshness after a large external update).
+        2. **Find** — `search_graph` for structural discovery (functions,
+           classes, routes, variables). Use `search_code` (graph-augmented grep)
+           for literal text or when graph coverage is insufficient.
+        3. **Read** — `get_code_snippet` for exact source. IMPORTANT: call
+           `search_graph` first to resolve the symbol; don't guess node IDs.
+        4. **Trace** — `trace_path` for callers/callees (`calls` mode) or value
+           propagation (`data_flow` mode); `query_graph` (Cypher subset) for
+           complex multi-hop patterns. Check `get_graph_schema` for node labels
+           and edge types before writing Cypher.
+        5. **Summarize / Impact** — `get_architecture` for orientation
+           (default is a compact summary); `detect_changes` to map a git diff
+           to its blast radius.
 
-      ## Coverage & Honesty
+        ## Coverage & Honesty
 
-      - Indexing is **best-effort, never proof of completeness**. Before
-        making exhaustive or negative claims ("nothing calls X", "this file
-        is unused"), call `check_index_coverage` for the cited paths/scopes.
-      - Watched projects auto-refresh; only force `index_repository` when a
-        repo is not indexed or after a large external update.
-      - Paginate when results carry `has_more` / `nextCursor`.
+        - Indexing is **best-effort, never proof of completeness**. Before
+          making exhaustive or negative claims ("nothing calls X", "this file
+          is unused"), call `check_index_coverage` for the cited paths/scopes.
+        - Watched projects auto-refresh; only force `index_repository` when a
+          repo is not indexed or after a large external update.
+        - Paginate when results carry `has_more` / `nextCursor`.
 
-      ## Guidelines
+        ## Guidelines
 
-      {{include "builtin/tool-usage-best-practices"}}
+        {{include "builtin/tool-usage-best-practices"}}
 
-      - Prefer graph tools (`search_graph`, `trace_path`, `query_graph`) for
-        structural questions; fall back to `search_code` for literal text.
-      - Always cite the file path and symbol you based an answer on.
-      - Use `manage_adr` only when the user explicitly asks to record an
-        Architecture Decision Record.
+        - Prefer graph tools (`search_graph`, `trace_path`, `query_graph`) for
+          structural questions; fall back to `search_code` for literal text.
+        - Always cite the file path and symbol you based an answer on.
+        - Use `manage_adr` only when the user explicitly asks to record an
+          Architecture Decision Record.
 
-      {{include "builtin/safety-guardrails"}}
-    tools:
-      - mcp:
-          server:
-            kind: RemoteMCPServer
-            name: codebase-memory-mcp
-          tools:
-            # Discovery / orientation
-            - list_projects
-            - index_status
-            - check_index_coverage
-            - get_graph_schema
-            # Structural search & read
-            - search_graph
-            - search_code
-            - get_code_snippet
-            - get_architecture
-            # Tracing & advanced query
-            - trace_path
-            - query_graph
-            # Impact analysis
-            - detect_changes
-            # Index & project management
-            - index_repository
-            - delete_project
-            - manage_adr
-            - ingest_traces
+        {{include "builtin/safety-guardrails"}}
+      tools:
+        - mcp:
+            server:
+              kind: RemoteMCPServer
+              name: codebase-memory-mcp
+            tools:
+              # Discovery / orientation
+              - list_projects
+              - index_status
+              - check_index_coverage
+              - get_graph_schema
+              # Structural search & read
+              - search_graph
+              - search_code
+              - get_code_snippet
+              - get_architecture
+              # Tracing & advanced query
+              - trace_path
+              - query_graph
+              # Impact analysis
+              - detect_changes
+              # Index & project management
+              - index_repository
+              - delete_project
+              - manage_adr
+              - ingest_traces
   harnessRef:
     name: golang-adk-memory
