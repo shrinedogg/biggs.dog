@@ -1,0 +1,61 @@
+# STOPGAP (one-shot, delete after it has run on every node -- see the
+# companion removal PR). The 1.0.0 atelet refuses to open the node-local
+# image cache when the on-disk layout is older than what it supports
+# (v1 caches written by the 0.5.0-era atelet that ran 2026-10-10 ->
+# 2026-11-15; the 1.0.0 atelet supports layout 3):
+#   "image cache at /var/lib/ate/image-cache has layout version 1 and this
+#    atelet supports 3, so delete it once no actor runs on this node"
+# No actors can run (the kagent fleet is down), so the deletion is safe
+# and the cache rebuilds automatically when actors run again.
+#
+# This DaemonSet mounts the node-local /var/lib/ate (hostPath), removes
+# the stale image-cache directory, and idles (tail -f) so Flux sees it as
+# Ready and does not re-queue it. The aws-cli image is the substrate
+# chart's own digest pin (values.images.awsCli) and carries a shell;
+# command overrides the aws entrypoint.
+#
+# After every node has logged "image cache cleaned", remove this file
+# (Flux prunes the DaemonSet) and the atelet pods pick the fresh layout
+# on their next restart.
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: substrate-image-cache-cleanup
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/component: image-cache-cleanup
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: image-cache-cleanup
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: image-cache-cleanup
+    spec:
+      containers:
+        - name: cleanup
+          # The chart's own pinned aws-cli (has /bin/sh); override its entrypoint.
+          image: amazon/aws-cli:2.38.5@sha256:c8156a0e74e13929a42d7e60f0d4e14e7d28d980cd21822505d4bff80e5460c1
+          command:
+            - /bin/sh
+            - -c
+          args:
+            - |
+              rm -rf /var/lib/ate/image-cache
+              echo "image cache cleaned on $(hostname)"
+              exec tail -f /dev/null
+          volumeMounts:
+            - name: node-ate
+              mountPath: /var/lib/ate
+      # nv-01 runs the GPU taint (the kagent workers pin there); the
+      # cleanup must reach that node too, so tolerate it (same as the
+      # chart's atelet DaemonSet).
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: node-ate
+          hostPath:
+            path: /var/lib/ate
