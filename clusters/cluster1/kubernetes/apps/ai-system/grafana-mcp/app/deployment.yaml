@@ -83,8 +83,8 @@ spec:
           # rewrites the Host header to the IP form; mcp-grafana's
           # DNS-rebinding guard would otherwise 403 the handshake
           # ("forbidden: host not allowed") and the agent would see zero
-          # tools. The service is headless in-cluster (no external ingress)
-          # and the Grafana token is server-side, so the Host check adds no
+          # tools. The Service is ClusterIP with no external ingress, and the
+          # Grafana token is server-side, so the Host check adds no
           # protection here (the chart documents "*" for exactly this
           # proxy case).
           args:
