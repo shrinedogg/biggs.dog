@@ -1,0 +1,27 @@
+# Headless Service/victoria-logs-single-vls-server for the VictoriaLogs
+# single-node StatefulSet (converted from the HelmRelease, Wave 1 de-Helm).
+# vlagent and VMAgent scrape 9428 through it (see
+# victoria-logs-collector and the vm-agent app).
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/instance: victoria-logs-single
+    app.kubernetes.io/name: vls
+    app.kubernetes.io/version: v1.54.0
+  name: victoria-logs-single-vls-server
+  namespace: observability
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+    - name: http
+      port: 9428
+      protocol: TCP
+      targetPort: http
+  selector:
+    app: server
+    app.kubernetes.io/instance: victoria-logs-single
+    app.kubernetes.io/name: vls

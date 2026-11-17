@@ -1,0 +1,80 @@
+# moonlight-proxy Deployment (fenrir session proxy; serves the pin page and
+# per-session RTP Services), converted from the HelmRelease (Wave 1 de-Helm).
+# Mounts Secret/direwolf-tls (cert-manager, see certificates.yaml).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: moonlight-proxy
+  labels:
+    app.kubernetes.io/controller: moonlight_proxy
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+  namespace: dreamcast
+spec:
+  revisionHistoryLimit: 3
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/controller: moonlight_proxy
+      app.kubernetes.io/name: fenrir
+      app.kubernetes.io/instance: fenrir
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/controller: moonlight_proxy
+        app.kubernetes.io/instance: fenrir
+        app.kubernetes.io/name: fenrir
+    spec:
+      enableServiceLinks: false
+      serviceAccountName: moonlight-proxy
+      automountServiceAccountToken: true
+      securityContext:
+        fsGroup: 100
+        fsGroupChangePolicy: OnRootMismatch
+        runAsGroup: 100
+        runAsNonRoot: true
+        runAsUser: 1000
+      hostIPC: false
+      hostNetwork: false
+      hostPID: false
+      dnsPolicy: ClusterFirst
+      containers:
+        - args:
+          - --tls-cert=/etc/certs/tls.crt
+          - --tls-key=/etc/certs/tls.key
+          env:
+          - name: POD_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: POD_NAMESPACE
+            value: dreamcast
+          image: docker.io/shrinedogg/moonlight-proxy:v0.1.6 # {"$imagepolicy": "flux-system:fenrir-moonlight-proxy"}
+          imagePullPolicy: Always
+          name: proxy
+          resources:
+            limits:
+              cpu: 250m
+              memory: 256Mi
+            requests:
+              cpu: 100m
+              memory: 128Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          volumeMounts:
+          - mountPath: /etc/certs
+            name: tls-cert
+            readOnly: true
+      volumes:
+        - name: tls-cert
+          secret:
+            defaultMode: 256
+            secretName: direwolf-tls

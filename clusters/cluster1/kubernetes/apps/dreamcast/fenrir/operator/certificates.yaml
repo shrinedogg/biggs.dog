@@ -1,0 +1,79 @@
+# cert-manager chain for the moonlight-proxy TLS (Secret/direwolf-tls),
+# converted from the HelmRelease (Wave 1 de-Helm).
+#
+# The chart templates carried no namespace: (they relied on the Helm release
+# namespace), so every object below pins namespace: dreamcast explicitly.
+#
+# Chain: direwolf-self-signed-issuer -> Certificate/direwolf-ca-cert
+# (Secret/direwolf-ca, isCA) -> Issuer/direwolf-ca-issuer ->
+# Certificate/direwolf-cert (Secret/direwolf-tls, mounted by moonlight-proxy).
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: direwolf-self-signed-issuer
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+spec:
+  selfSigned: {}
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: direwolf-ca-cert
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+spec:
+  commonName: ca.direwolf.cert-manager
+  duration: 43800h
+  isCA: true
+  issuerRef:
+    kind: Issuer
+    name: 'direwolf-self-signed-issuer'
+  secretName: 'direwolf-ca'
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: direwolf-ca-issuer
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+spec:
+  ca:
+    secretName: 'direwolf-ca'
+
+---
+
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: direwolf-cert
+  namespace: dreamcast
+  labels:
+    app.kubernetes.io/instance: fenrir
+    app.kubernetes.io/name: fenrir
+    app.kubernetes.io/version: 0.0.1
+spec:
+  dnsNames:
+  - 'direwolf'
+  - 'direwolf.dreamcast'
+  - 'direwolf.dreamcast.svc'
+  duration: 8760h
+  issuerRef:
+    kind: Issuer
+    name: 'direwolf-ca-issuer'
+  secretName: 'direwolf-tls'
+

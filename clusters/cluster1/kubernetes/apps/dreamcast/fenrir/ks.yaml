@@ -19,6 +19,26 @@ spec:
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
+  name: fenrir-operator
+  namespace: flux-system
+spec:
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  path: ./clusters/cluster1/kubernetes/apps/dreamcast/fenrir/operator
+  prune: false
+  wait: true
+  timeout: 3m
+  dependsOn:
+    - name: fenrir-crds
+    - name: cert-manager
+    - name: nv-gpu-operator
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
   name: &app fenrir
   namespace: flux-system
 spec:
@@ -35,5 +55,4 @@ spec:
   retryInterval: 1m
   timeout: 2m
   dependsOn:
-    - name: fenrir-crds
-    - name: nv-gpu-operator
+    - name: fenrir-operator

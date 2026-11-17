@@ -1,3 +1,21 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cnpg-barman-crds
+  namespace: flux-system
+spec:
+  interval: 3m
+  retryInterval: 1m
+  sourceRef:
+    kind: GitRepository
+    name: barman-crds
+  path: ./config/crd/bases
+  prune: false
+  force: true
+  wait: true
+  timeout: 2m
+---
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
@@ -15,7 +33,7 @@ spec:
     kind: GitRepository
     name: flux-system
   # Wait for the CA + leaf Certificates to become Ready (secrets created)
-  # before the plugin HelmRelease rolls its Deployment.
+  # before the plugin rolls its Deployment.
   wait: true
   interval: 3m
   retryInterval: 1m
@@ -28,6 +46,7 @@ metadata:
   namespace: flux-system
 spec:
   dependsOn:
+    - name: cnpg-barman-crds
     - name: cnpg-secrets
     - name: cnpg-barman-certs
   commonMetadata:

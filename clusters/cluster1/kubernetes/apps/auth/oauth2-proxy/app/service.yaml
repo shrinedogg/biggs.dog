@@ -1,0 +1,32 @@
+# oauth2-proxy Service: 80 -> http (4180), 44180 -> metrics. Converted from the
+# HelmRelease (Wave 1 de-Helm); selector preserved so the VMServiceScrape,
+# ReferenceGrant and HTTPRoute keep matching.
+
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: oauth2-proxy
+    app.kubernetes.io/component: authentication-proxy
+    app.kubernetes.io/part-of: oauth2-proxy
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/instance: oauth2-proxy
+    app.kubernetes.io/version: "7.15.6"
+  name: oauth2-proxy
+  namespace: auth
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      appProtocol: http
+      name: http
+    - port: 44180
+      protocol: TCP
+      appProtocol: http
+      targetPort: metrics
+      name: metrics
+  selector:
+    app.kubernetes.io/name: oauth2-proxy
+    app.kubernetes.io/instance: oauth2-proxy

@@ -1,0 +1,43 @@
+# kritika app (Wave 1 de-Helm: replaces the HelmRelease).
+#
+# kritika-config.txt -> ConfigMap/kritika (configMapGenerator, hash-suffixed;
+# kustomize rewrites the Deployment volume reference on every build).
+#
+# CM/kritika-runner-image (runner-image.yaml, local-config) is the IAC anchor:
+# the replacement below copies its data.image over the (only) single-quoted
+# token in the generated config BEFORE the ConfigMap hash suffix is computed,
+# so the $imagepolicy kritika-tools bump lands in the running config on the
+# next build. The local-config object is stripped from the apply set after
+# substitution.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: kritika
+configMapGenerator:
+  - name: kritika
+    files:
+      - config.yaml=kritika-config.txt
+replacements:
+  - source:
+      kind: ConfigMap
+      version: v1
+      name: kritika-runner-image
+      fieldPath: .data.image
+    targets:
+      - select:
+          kind: ConfigMap
+          name: kritika
+        fieldPaths:
+          - data.[config.yaml]
+        options:
+          delimiter: "'"
+          index: 1
+resources:
+  - runner-image.yaml
+  - rbac.yaml
+  - service.yaml
+  - deployment.yaml
+  - pdb.yaml
+  - networkpolicy.yaml
+  - admission-policy.yaml
+  - external-secrets.yaml
+  - http-route.yaml

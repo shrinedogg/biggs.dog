@@ -1,0 +1,19 @@
+# kritika PodDisruptionBudget (Wave 1 de-Helm).
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: kritika
+  namespace: kritika
+  labels:
+    app.kubernetes.io/name: kritika
+    app.kubernetes.io/instance: kritika
+    app.kubernetes.io/version: "0.0.120"
+    app.kubernetes.io/component: server
+spec:
+  maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: kritika
+      app.kubernetes.io/instance: kritika
+      app.kubernetes.io/component: server

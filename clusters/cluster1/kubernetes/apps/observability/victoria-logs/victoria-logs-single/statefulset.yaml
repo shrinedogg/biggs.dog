@@ -1,0 +1,93 @@
+# VictoriaLogs single-node StatefulSet (10Gi PVC on host-path,
+# retentionPeriod=1), converted from the HelmRelease (Wave 1 de-Helm).
+#
+# Immutable fields (serviceName, selector.matchLabels, volumeClaimTemplates)
+# are preserved exactly as the live object. The $imagepolicy marker enrolls
+# the image in the cluster1 IAC (victoria-logs policy, >=1.53.0 <2.0.0); bump
+# the vlagent image in the same commit (see the collector DaemonSet).
+
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: victoria-logs-single-vls-server
+  namespace: observability
+  labels:
+    app.kubernetes.io/component: server
+    app.kubernetes.io/instance: victoria-logs-single
+    app.kubernetes.io/name: vls
+    app.kubernetes.io/version: v1.54.0
+spec:
+  podManagementPolicy: OrderedReady
+  replicas: 1
+  serviceName: victoria-logs-single-vls-server
+  selector:
+    matchLabels:
+      app: server
+      app.kubernetes.io/instance: victoria-logs-single
+      app.kubernetes.io/name: vls
+  template:
+    metadata:
+      labels:
+        app: server
+        app.kubernetes.io/component: server
+        app.kubernetes.io/instance: victoria-logs-single
+        app.kubernetes.io/name: vls
+    spec:
+      securityContext:
+        fsGroup: 2000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+        - name: vlsingle
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          image: docker.io/victoriametrics/victoria-logs:v1.54.0 # {"$imagepolicy": "flux-system:victoria-logs"}
+          imagePullPolicy: IfNotPresent
+          args:
+            - --envflag.enable
+            - --envflag.prefix=VM_
+            - --http.shutdownDelay=15s
+            - --httpListenAddr=:9428
+            - --loggerFormat=json
+            - --retentionPeriod=1
+            - --storageDataPath=/storage
+          ports:
+            - name: http
+              containerPort: 9428
+          readinessProbe:
+            failureThreshold: 3
+            httpGet:
+              path: /health
+              port: http
+              scheme: HTTP
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 5
+          livenessProbe:
+            failureThreshold: 10
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            tcpSocket:
+              port: http
+            timeoutSeconds: 5
+          volumeMounts:
+            - name: server-volume
+              mountPath: /storage
+
+      terminationGracePeriodSeconds: 60
+  volumeClaimTemplates:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
+        name: server-volume
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: host-path

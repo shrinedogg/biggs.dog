@@ -1,0 +1,74 @@
+# agent-sandbox controller Deployment (sigs.k8s.io Sandbox controller),
+# converted from the agent-sandbox HelmRelease (Wave 1 de-Helm).
+#
+# Pinned to the GPU node (nv-01) via nodeSelector + nvidia.com/gpu
+# toleration (the HelmRelease applied this with a kustomize postRenderer).
+# The $imagepolicy marker enrolls the image in the cluster1 IAC
+# (agent-sandbox-controller policy, patch-only ~1.0.10); bump the CRD
+# git tag (agent-sandbox-git.yaml) in the same commit as a minor bump.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agent-sandbox-controller
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: agent-sandbox
+    app.kubernetes.io/instance: agent-sandbox
+    app.kubernetes.io/version: "v0.5.0"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: agent-sandbox
+      app.kubernetes.io/instance: agent-sandbox
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: agent-sandbox
+        app.kubernetes.io/name: agent-sandbox
+    spec:
+      serviceAccountName: agent-sandbox-controller
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      containers:
+      - name: agent-sandbox-controller
+        image: registry.k8s.io/agent-sandbox/agent-sandbox-controller:v1.0.10 # {"$imagepolicy": "flux-system:agent-sandbox-controller"}
+        imagePullPolicy: IfNotPresent
+        args:
+
+        - --leader-elect=true
+        - --extensions=true
+        ports:
+        - name: metrics
+          containerPort: 8080   # Change to 8443 when --metrics-secure-serving is enabled.
+          protocol: TCP
+        - name: healthz
+          containerPort: 8081
+          protocol: TCP
+
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: healthz
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: healthz
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/sandbox-config
+          readOnly: true
+      volumes:
+      - name: config-volume
+        configMap:
+          name: agent-sandbox-config
+          optional: true

@@ -1,0 +1,14 @@
+# Wave 1 de-Helm: IAC policy for plugin-barman-cloud-sidecar.
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImagePolicy
+metadata:
+  name: plugin-barman-cloud-sidecar
+  namespace: flux-system
+spec:
+  imageRepositoryRef:
+    name: plugin-barman-cloud-sidecar
+  filterTags:
+    pattern: '^v[0-9]+\.[0-9]+\.[0-9]+$'
+  policy:
+    semver:
+      range: "~0.16.0"

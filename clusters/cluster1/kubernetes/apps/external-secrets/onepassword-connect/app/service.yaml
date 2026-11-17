@@ -1,0 +1,23 @@
+# Service/onepassword-connect (Wave 1 de-Helm): 8080 -> connect-api, 8081 ->
+# connect-sync. Preserves the ClusterSecretStore URL
+# http://onepassword-connect.external-secrets.svc.cluster.local:8080.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: onepassword-connect
+  namespace: external-secrets
+  labels:
+    app.kubernetes.io/component: connect
+    app.kubernetes.io/name: connect
+    app.kubernetes.io/instance: onepassword-connect
+    app.kubernetes.io/version: "1.8.4"
+spec:
+  type: ClusterIP
+  selector:
+    app: onepassword-connect
+  ports:
+    - port: 8081
+      name: connect-sync
+    - port: 8080
+      name: connect-api

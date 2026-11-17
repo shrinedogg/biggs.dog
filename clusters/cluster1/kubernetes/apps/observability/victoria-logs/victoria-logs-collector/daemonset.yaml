@@ -1,0 +1,83 @@
+# vlagent DaemonSet (victoria-logs collector; ships node logs to VLS on the
+# single-node service), converted from the HelmRelease (Wave 1 de-Helm).
+#
+# The $imagepolicy marker enrolls the image in the cluster1 IAC (vlagent
+# policy, >=1.53.0 <2.0.0, kept in lockstep with the VLS image range).
+
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: victoria-logs-collector-vlc
+  namespace: observability
+  labels:
+    app.kubernetes.io/instance: victoria-logs-collector
+    app.kubernetes.io/name: vlc
+    app.kubernetes.io/version: v1.54.0
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: victoria-logs-collector
+      app.kubernetes.io/name: vlc
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: victoria-logs-collector
+        app.kubernetes.io/name: vlc
+    spec:
+      serviceAccountName: victoria-logs-collector-vlc
+      tolerations:
+        - effect: NoSchedule
+          key: nvidia.com/gpu
+          operator: Exists
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: vlagent
+          image: docker.io/victoriametrics/vlagent:v1.54.0 # {"$imagepolicy": "flux-system:vlagent"}
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 9429
+              protocol: TCP
+          args:
+          - --envflag.enable
+          - --envflag.prefix=VL_
+          - --kubernetesCollector
+          - --kubernetesCollector.includeNodeAnnotations=false
+          - --kubernetesCollector.includeNodeLabels=false
+          - --kubernetesCollector.includePodAnnotations=false
+          - --kubernetesCollector.includePodLabels
+          - --kubernetesCollector.msgField=message,msg,log
+          - --kubernetesCollector.streamFields=kubernetes.container_name,kubernetes.pod_name,kubernetes.pod_namespace
+          - --kubernetesCollector.timeField=time,ts,timestamp
+          - --loggerFormat=json
+          - --remoteWrite.headers="AccountID:0^^ProjectID:0"
+          - --remoteWrite.url=http://victoria-logs-single-vls-server.observability.svc.cluster.local:9428/insert/native
+          - --tmpDataPath=/var/lib/vl-collector
+          volumeMounts:
+            - mountPath: /var/log
+              name: varlog
+              readOnly: true
+            - mountPath: /var/lib
+              name: varlib
+              readOnly: true
+            - name: vl-collector-data
+              mountPath: /var/lib/vl-collector
+
+      volumes:
+        - hostPath:
+            path: /var/log
+          name: varlog
+        - hostPath:
+            path: /var/lib
+          name: varlib
+        - name: vl-collector-data
+          hostPath:
+            path: /var/lib/vl-collector

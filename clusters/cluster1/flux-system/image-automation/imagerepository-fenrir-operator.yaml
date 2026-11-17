@@ -1,0 +1,10 @@
+# Wave 1 de-Helm: IAC enrollment of docker.io/shrinedogg/operator (see the per-app
+# $imagepolicy markers).
+apiVersion: image.toolkit.fluxcd.io/v1
+kind: ImageRepository
+metadata:
+  name: fenrir-operator
+  namespace: flux-system
+spec:
+  image: docker.io/shrinedogg/operator
+  interval: 30m

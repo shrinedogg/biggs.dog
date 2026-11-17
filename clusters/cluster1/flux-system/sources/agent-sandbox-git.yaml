@@ -8,4 +8,4 @@ spec:
   interval: 1h
   url: https://github.com/kubernetes-sigs/agent-sandbox
   ref:
-    tag: v1.0.10
+    tag: v1.0.10 # commit: 0d94fc0bd96c8024d5e7845532d2d7e2a96604ef
