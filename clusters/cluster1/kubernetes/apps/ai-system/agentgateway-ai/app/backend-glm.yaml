@@ -16,7 +16,7 @@
 #
 # Direct dial, no egress forwarder (same decision as #658 for MiniMax and
 # Mistral): the deployed proxy resolves A-first, so the dual-stack endpoint
-# (A 47.245.170.100/47.245.163.4 + 2x AAAA) dials over IPv4, and the SNI
+# (A IP-REDACTED/IP-REDACTED + 2x AAAA) dials over IPv4, and the SNI
 # defaults to the provider host api.z.ai, which is why tls is empty.
 apiVersion: agentgateway.dev/v1alpha1
 kind: AgentgatewayBackend
