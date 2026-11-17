@@ -52,37 +52,18 @@ spec:
     # cr.kagent.dev registry.
     registry: ghcr.io
     # ------------------------------------------------------------------
-    # Grafana MCP subchart (mcp-grafana). The subchart runs
-    # --transport streamable-http and injects the token via envFrom
-    # secretRef, and renders its own api.kagent.dev/v1alpha3
-    # RemoteMCPServer (kagent-grafana-mcp).
-    # Point it at the real Grafana Service (observability ns, port 80 ->
-    # targetPort grafana/3000); egress from ai-system to observability is
-    # allowed by the CNP 'allow-egress-to-observability'.
-    #
-    # allowedHosts "*" — workers reach this service through atenet-egress,
-    # which dials the pod IP directly and rewrites the Host header to the
-    # IP form; mcp-grafana's DNS-rebinding guard would 403 the handshake
-    # ("forbidden: host not allowed") and the agent would see zero tools.
-    # The chart documents "*" as the setting for exactly this proxy case.
-    # The service is headless in-cluster (no external ingress) and the
-    # Grafana token is server-side, so the Host check adds no protection
-    # here.
-    #
-    # The apiKey is NOT stored in git (GitHub secret scanning would block
-    # the push): the runtime token is injected from the existing cluster
-    # Secret kagent-grafana-mcp-token via grafana.secretRef (the subchart
-    # skips creating its own secret when secretRef is set).
-    # ------------------------------------------------------------------
-    grafana-mcp:
-      allowedHosts: "*"
-      grafana:
-        # Bare base URL: mcp-grafana appends "/api/..." to GRAFANA_URL
-        # itself (see tools/datasources.go), so a trailing "/api" would
-        # double up and 404. The chart default (grafana.kagent:3000/api)
-        # has this bug; upstream README shows a bare base.
-        url: "http://grafana.observability:80"
-        secretRef: kagent-grafana-mcp-token
+    # Grafana MCP: the 1.0.1 chart dropped the grafana-mcp subchart that
+    # used to render the proxy Deployment/Service and the
+    # kagent-grafana-mcp RemoteMCPServer (the 1.0.1 upgrade pruned the
+    # release-owned objects; the alpha11-era image reference
+    # ghcr.io/grafana/mcp-grafana never existed on GHCR, so the proxy
+    # never ran). The proxy now lives as the static grafana-mcp app
+    # (../grafana-mcp: deployment + service + RMP) pointed at the real
+    # Grafana Service (observability ns, 80 -> grafana/3000; egress
+    # allowed by the CNP 'allow-egress-to-observability'), with the token
+    # from the kagent-grafana-mcp-token ExternalSecret (subchart's
+    # grafana.secretRef). The old grafana-mcp: values block was inert on
+    # the 1.0.1 chart (no subchart to receive it) and is removed.
     # ------------------------------------------------------------------
     # Default model provider -> local vLLM through agentgateway
     # (OpenAI-compatible). The chart renders a ModelConfig named
