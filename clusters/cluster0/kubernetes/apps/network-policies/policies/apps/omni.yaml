@@ -1,7 +1,7 @@
 # Namespace: omni  (omni + image-factory + image-factory-oauth2 + image-factory-registry)
 #
 # omni: HTTPS (:443), machine-api (:8090), event-sink (:8091), k8s-proxy (:8100),
-#   WireGuard UDP (:50180). SideroLink via node externalIP 87.58.147.51.
+#   WireGuard UDP (:50180). SideroLink via node externalIP IP-REDACTED.
 # image-factory: HTTP (:8080), metrics (:2122).
 # image-factory-oauth2: oauth2-proxy (:4180) fronting the factory UI.
 # image-factory-registry: internal Docker registry (:5000), never external.
@@ -158,7 +158,7 @@ spec:
 # and may also reach dex directly via in-cluster svc. Allow both paths.
 #
 # The gateway egress is required, not optional: dex.biggs.dog resolves (via
-# CoreDNS -> upstream -> Cloudflare) to the WAN IP 87.58.147.51, which is the
+# CoreDNS -> upstream -> Cloudflare) to the WAN IP IP-REDACTED, which is the
 # cluster0-gateway LoadBalancer's external IP. Cilium kube-proxy-replacement
 # recognizes that IP as a local LoadBalancer and DNATs pod traffic to the
 # agentgateway data-plane endpoint -- so it is classified as a CLUSTER
@@ -239,7 +239,7 @@ spec:
               protocol: TCP
 ---
 # SideroLink + WireGuard: omni-siderolink Service uses
-# externalIPs: [87.58.147.51] TCP 8090/8091/8100 + UDP 50180.
+# externalIPs: [IP-REDACTED] TCP 8090/8091/8100 + UDP 50180.
 # Machines dial in from the world; under kube-proxy-replacement the source
 # identity is host (node) for the translated path. Allow host + world.
 apiVersion: cilium.io/v2

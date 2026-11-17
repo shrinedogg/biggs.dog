@@ -93,7 +93,7 @@ spec:
 
       # loadBalancerSourceRanges:
       #   - 10.0.0.0/16
-      #   - 1.84.26.4/32
+      #   - IP-REDACTED/32
 
       # loadBalancerIP:
 
