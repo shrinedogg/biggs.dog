@@ -204,6 +204,16 @@ spec:
     preview:
       - GoldenEgressPolicy
       - PerTemplateSnapshotLocation
+    # The atenet-router (agentgateway) frontend authorizes every actor-ingress
+    # dial by SPIFFE source identity (frontendPolicies.networkAuthorization);
+    # the chart default (empty list) denies all ingress. kagent's a2agateway
+    # dials the router from the controller pod to deliver session inputs
+    # (RuntimeDialer -> ate-target-actor) and presents the substrate podcert
+    # identity the controller already uses against ate-api (the same principal
+    # that appears in the ate-api RPC logs as the mTLS caller).
+    atenetRouter:
+      ingressAllowedSPIFFEIDs:
+        - spiffe://cluster.local/ns/ai-system/sa/kagent-controller
     # substrate 0.7.0-alpha2 chart: when rustfs is disabled, the api server
     # requires an explicit snapshot location (previously implicit via the
     # bundled rustfs store). Every kagent harness already points its
