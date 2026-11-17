@@ -42,7 +42,7 @@ spec:
       containers:
         - name: cleanup
           # The chart's own pinned aws-cli (has /bin/sh); override its entrypoint.
-          image: amazon/aws-cli:2.38.5@sha256:c8156a0e74e13929a42d7e60f0d4e14e7d28d980cd21822505d4bff80e5460c1
+          image: amazon/aws-cli:2.40.4@sha256:eaf444b45380050f920ab07492754aa76223dd90234e51c1f92c2e9391b5ee6b
           command:
             - /bin/sh
             - -c
