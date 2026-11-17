@@ -145,13 +145,21 @@ spec:
       # and were silently ignored). The control plane lives in ai-system,
       # not the chart-default ate-system namespace.
       # apiEndpoint: the ate-api-server gRPC endpoint (mTLS, port 443).
-      # routerUrl: the atenet-router Service in ai-system, port 80.
+      # routerUrl: the atenet-router Service in ai-system, mTLS frontend
+      # (443 -> 8443). Must stay https: the http scheme makes
+      # RouterTransport dial insecure (no SPIFFE client identity), and the
+      # router's networkAuthorization allowlist (substrate values
+      # atenetRouter.ingressAllowedSPIFFEIDs) rejects identity-less and
+      # unlisted sources, so every session send then fails with "input was
+      # not accepted". The https dial presents the substrate podcert client
+      # identity (the substrateClientCertificate volumes set caFile /
+      # clientCertFile in the controller config when enabled).
       # actorJwtIssuer: must match the substrate chart's actor-jwt-issuer
       # (verified in the ate-api-server boot log: https://idp.ai-system.svc).
       # ------------------------------------------------------------------
       substrate:
         apiEndpoint: "dns:///api.ai-system.svc:443"
-        routerUrl: "http://atenet-router.ai-system.svc:80"
+        routerUrl: "https://atenet-router.ai-system.svc:443"
         actorJwtIssuer: "https://idp.ai-system.svc"
       # Standalone sandbox guest image (BYO; the chart default is "" which
       # disables sandbox prep). Digest-pinned: kagent-dev/kagent/
