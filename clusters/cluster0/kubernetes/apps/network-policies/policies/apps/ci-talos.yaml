@@ -31,6 +31,10 @@
 #                         must be allowed separately. Without it, `apk add`
 #                         hangs ~120s per package then fails EACCES (run
 #                         41656613729 attempts 2-3, 2026-11-03/04)
+#   - gcr.io          : the crane CLI image (gcr.io/go-containerregistry/crane:latest)
+#                        pulled by the docker daemon for the catalog job's
+#                        build-catalog.sh; the first (and only) network touch of
+#                        gcr.io -- later crane invocations reuse the local image
 #
 # The allowlist is iterated per observed pull (matching the ci.yaml policy
 # history): if the first CI run is blocked on another host, add it here.
@@ -38,6 +42,11 @@
 # dial-tcp timeouts to the five hosts above (curl probe from the runner
 # pod: exit 28, no HTTP status = policy block; every other build host
 # already allowed returns an HTTP status).
+# 2026-11-17: run 44139839729 (workflow_dispatch, catalog job) failed pulling
+# gcr.io/go-containerregistry/crane:latest (dial tcp i/o timeout, no HTTP status =
+# policy block). ghcr.io and docker.io for the same job are already allowed by
+# the shared ci.yaml registry policy; gcr.io (bare apex host, not matched by
+# ci.yaml's *.gcr.io pattern) was the only missing host.
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
@@ -57,6 +66,7 @@ spec:
         - matchName: archive.ubuntu.com
         - matchName: apk.cgr.dev
         - matchPattern: "*.r2.cloudflarestorage.com"
+        - matchName: gcr.io
       toPorts:
         - ports:
             - port: "443"
