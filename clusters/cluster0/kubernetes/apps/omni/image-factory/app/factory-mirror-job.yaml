@@ -83,6 +83,26 @@
 # - mirror + sign v1.14.6 with --tlog-upload=false, verify with
 #   --insecure-ignore-tlog (private registry, no transparency log)
 #
+# r9 (factory-mirror-v1146-9) completed: all 4 v1.14.6 images mirrored
+# + signed + verified, all 4 v1.14.5 images re-signed (MIRROR-DONE).
+# The factory then started listing v1.14.6, but its on-demand ISO
+# build 500'd: the v1.14.6 schematic pins the amd-ucode extension
+# image by DIGEST (ghcr.io/siderolabs/amd-ucode, pinned
+# sha256:2346cc8b...), and that image was never mirrored into the
+# in-cluster registry, so the signature verification failed with
+# "no valid bundles exist in registry / no signatures found".
+#
+# r10 (factory-mirror-v1146-10): mirror + sign the ucode image so the
+# factory's on-demand metal-installer build can complete. The pinned
+# digest is an OCI IMAGE INDEX (multi-arch), and a crane tar round-trip
+# re-encodes manifests (proven locally: a tar push of the same image
+# produced manifest digest sha256:07e60f45... instead of the pinned
+# 2346cc8b...), so the transfer is byte-exact: raw manifest/index +
+# blob fetch from ghcr (anon token), blob uploads, exact manifest PUTs
+# (digest ref for index + children, tag for the root), cosign sign +
+# verify of the digest ref (the factory's verify path; the tag-based
+# recursive sign is best-effort, not a gate).
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -110,7 +130,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-9
+  name: factory-mirror-v1146-10
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -155,46 +175,95 @@ spec:
               apt-get install -y -qq --no-install-recommends -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false ca-certificates >/dev/null
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends curl >/dev/null
-              echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
+              echo ">> download cosign v2.6.1"
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
               chmod +x cosign
-              curl -fsSL -o gcr.tgz https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz
-              tar xzf gcr.tgz crane && chmod +x crane
               REG=image-factory-registry.omni.svc.cluster.local:5000
-              # src-registry | src-ref | in-cluster dst-ref
-              for entry in \
-                "docker.io|shrinedogg/imager:v1.14.6|siderolabs/imager:v1.14.6" \
-                "docker.io|shrinedogg/extensions:v1.14.6|siderolabs/extensions:v1.14.6" \
-                "ghcr.io|siderolabs/installer-base:v1.14.6|siderolabs/installer-base:v1.14.6" \
-                "ghcr.io|siderolabs/talosctl-all:v1.14.6|siderolabs/talosctl-all:v1.14.6"; do
-                IFS='|' read -r SRC SRCREF DSTREF <<<"$entry"
-                echo ">> mirror $SRC/$SRCREF -> $REG/$DSTREF"
-                # crane has no import; one crane copy invocation cannot mix
-                # a TLS src with an insecure http dst (the global
-                # --insecure would force http on the src too, and port 80
-                # is blocked). Pull over TLS, push over plain http.
-                ./crane pull --platform=linux/amd64 "$SRC/$SRCREF" img.tar
-                ./crane --insecure push img.tar "$REG/$DSTREF"
-                rm -f img.tar
-                echo ">> cosign sign $DSTREF"
-                ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$DSTREF"
-                echo ">> cosign verify $DSTREF"
-                ./cosign verify --key /pub/cosign.pub --allow-http-registry=true --insecure-ignore-tlog "$REG/$DSTREF"
-              done
-              # the sign+verify above fails fast when the mounted key and
-              # pub are not a pair (ESO not reconciled after the rotation):
-              # the first image's verify rejects the signature, so nothing
-              # below runs on a stale mount
-              echo ">> re-sign existing v1.14.5 images (old-key signatures are invalid under the rotated public key)"
-              for ref in siderolabs/imager:v1.14.5 siderolabs/extensions:v1.14.5 siderolabs/installer-base:v1.14.5 siderolabs/talosctl-all:v1.14.5; do
-                if ./crane --insecure manifest "$REG/$ref" >/dev/null 2>&1; then
-                  echo ">> cosign sign (re-sign) $ref"
-                  ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$ref"
+              GHCR=https://ghcr.io
+              UCODE=siderolabs/amd-ucode
+              TAG=20261019
+              # pinned by the v1.14.6 schematic (the factory's 500 names this
+              # digest); it is an OCI image index (multi-arch)
+              UCD=sha256:2346cc8bbe232c5305ce289cf3c14f2d9da923b232cd0cc94792611621fe8da0
+              ACCEPT="application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json"
+              # ghcr anonymous pull token (public repo; same flow the factory itself uses)
+              TOK=$(curl -fsSL "$GHCR/token?scope=repository:$UCODE:pull" | grep -oE '"token":"[^"]*"' | cut -d'"' -f4)
+              ghcr_manifest() { # $1=digest $2=out-file ; prints content-type
+                curl -fsSL -D "hdr-$1" -o "$2" \
+                  -H "Accept: $ACCEPT" -H "Authorization: Bearer $TOK" \
+                  "$GHCR/v2/$UCODE/manifests/$1"
+                grep -i '^Content-Type:' "hdr-$1" | tr -d '\r' | cut -d' ' -f2 | tail -1
+              }
+              ghcr_blob() { # $1=digest $2=out-file
+                curl -fsSL -H "Authorization: Bearer $TOK" -o "$2" "$GHCR/v2/$UCODE/blobs/$1"
+              }
+              upload_blob() { # $1=file $2=digest
+                loc=$(curl -fsS -D - -o /dev/null -X POST "http://$REG/v2/$UCODE/blobs/uploads/" | grep -i '^Location:' | tr -d '\r' | cut -d' ' -f2)
+                [ -n "$loc" ] || { echo "FATAL: no Location on blob upload create ($2)"; exit 1; }
+                # registries return a path-only Location; resolve against the registry host
+                curl -fsS -o /dev/null -X PUT --data-binary @"$1" "http://$REG${loc}?digest=$2"
+                rm -f "$1"
+              }
+              put_manifest() { # $1=file $2=ref (tag or sha256:digest) $3=content-type
+                curl -fsS -o /dev/null -w "manifest PUT $2 -> HTTP %{http_code}\n" \
+                  -X PUT -H "Content-Type: $3" --data-binary @"$1" "http://$REG/v2/$UCODE/manifests/$2"
+              }
+              manifest_digests() { # $1=file ; referenced blob digests (config+layers) or child manifest digests (index)
+                grep -oE '"digest": *"sha256:[0-9a-f]{64}"' "$1" | cut -d'"' -f4 | sort -u
+              }
+              is_index() { grep -q '"manifests":' "$1"; }
+              transfer_manifest() { # $1=digest $2=file $3=content-type
+                ACT=sha256:$(sha256sum "$2" | cut -d' ' -f1)
+                [ "$ACT" = "$1" ] || { echo "FATAL: fetched manifest bytes ($ACT) != expected digest ($1)"; exit 1; }
+                if is_index "$2"; then
+                  echo "  index $1 (verified); transferring children"
+                  put_manifest "$2" "$1" "$3"
+                  for child in $(manifest_digests "$2"); do
+                    cct=$(ghcr_manifest "$child" "m-$child")
+                    echo "  child $child ($cct)"
+                    for b in $(manifest_digests "m-$child"); do
+                      ghcr_blob "$b" "blob-$b"
+                      upload_blob "blob-$b" "$b"
+                      echo "    blob $b uploaded"
+                    done
+                    put_manifest "m-$child" "$child" "$cct"
+                    rm -f "m-$child" "hdr-$child"
+                  done
                 else
-                  echo "WARN: $ref absent from registry - skipping re-sign"
+                  for b in $(manifest_digests "$2"); do
+                    ghcr_blob "$b" "blob-$b"
+                    upload_blob "blob-$b" "$b"
+                    echo "    blob $b uploaded"
+                  done
+                  put_manifest "$2" "$1" "$3"
                 fi
-              done
-              echo "MIRROR-DONE: v1.14.5 re-signed + all 4 v1.14.6 images mirrored + signed + verified"
+              }
+              echo ">> exact-transfer $GHCR/$UCODE@$UCD -> $REG/$UCODE:$TAG"
+              cct=$(ghcr_manifest "$UCD" "ucode.json")
+              echo "root manifest fetched ($UCD, content-type $cct)"
+              transfer_manifest "$UCD" "ucode.json" "$cct"
+              rm -f ucode.json "hdr-$UCD"
+              # also publish the root under the tag so tag-based consumers resolve
+              cct2=$(ghcr_manifest "$UCD" "ucode.json")
+              put_manifest "ucode.json" "$TAG" "$cct2"
+              rm -f ucode.json "hdr-$UCD"
+              code=$(curl -s -o /dev/null -w '%{http_code}' "http://$REG/v2/$UCODE/manifests/$UCD")
+              [ "$code" = "200" ] || { echo "FATAL: pinned digest ref not resolvable (HTTP $code)"; exit 1; }
+              echo "pinned digest ref resolvable (HTTP $code)"
+              echo ">> cosign sign (digest ref - the factory's verify path)"
+              ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$UCODE@$UCD"
+              # tag-based signing recurses over index children; cosign v2.6.1
+              # can reject that ("cannot parse hash") on some registries.
+              # The factory verifies the DIGEST ref, so the tag sign is a
+              # best-effort extra, not a gate.
+              if ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$UCODE:$TAG" 2>/dev/null; then
+                echo ">> cosign sign (tag ref) ok"
+              else
+                echo "WARN: tag-ref sign failed (recursive index signing); digest-ref signature is the factory's verify path - continuing"
+              fi
+              echo ">> cosign verify (digest ref - the gate; also the ESO stale-mount tripwire)"
+              ./cosign verify --key /pub/cosign.pub --allow-http-registry=true --insecure-ignore-tlog "$REG/$UCODE@$UCD"
+              echo "MIRROR-UCODE-DONE: $UCODE:$TAG mirrored byte-exact (index $UCD + children) + signed (digest ref) + verified"
           volumeMounts:
             - name: keys
               mountPath: /keys
