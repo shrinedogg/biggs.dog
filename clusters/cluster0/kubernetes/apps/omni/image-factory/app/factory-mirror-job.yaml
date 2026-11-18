@@ -23,6 +23,19 @@
 # k8s Job specs are immutable, so each fix-forward uses a new Job name
 # (the failed original must not be updated in place).
 #
+# r5: r4's pod had NO world egress at all - the omni ns runs implicit
+# default-deny (allow-egress-dns selects every omni pod, so pods get
+# only DNS + their app grants), and the world:443 grants are tied to
+# app.kubernetes.io/name: omni / image-factory labels the Job pod lacks.
+# So apt-over-https (deb mirrors :443), the GitHub tooling download and
+# the docker.io/ghcr.io crane exports were all dropped. r5 adds a
+# dedicated CNP (allow-egress-factory-mirror, policies/apps/omni.yaml)
+# granting world:443 to pods labeled
+# app.kubernetes.io/component: factory-mirror (this Job; the future
+# tag-triggered automation Job reuses the same label). In-cluster
+# registry :5000 needs no grant: allow-intra-namespace (endpointSelector
+# {}) already covers omni-pod-to-omni-pod :5000.
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -50,12 +63,17 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-4
+  name: factory-mirror-v1146-5
   namespace: omni
+  labels:
+    app.kubernetes.io/component: factory-mirror
 spec:
   ttlSecondsAfterFinished: 3600
   backoffLimit: 1
   template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: factory-mirror
     spec:
       restartPolicy: Never
       containers:
