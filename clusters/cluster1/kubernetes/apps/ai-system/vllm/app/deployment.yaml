@@ -46,7 +46,7 @@ spec:
         - name: vllm
           # Untagged variant = CUDA 13.0 build (v0.33.0 dropped the -cu129
           # CUDA 12.9 images entirely); supports the 5090 (Blackwell, sm_120).
-          image: docker.io/vllm/vllm-openai:v0.33.0
+          image: docker.io/vllm/vllm-openai:v0.34.0
           args:
             # ----------------------------------------------------------------
             # MODEL: Minima NVFP4 W4A4 of Qwen3.8-27B (post-training quant
