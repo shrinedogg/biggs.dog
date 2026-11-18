@@ -15,8 +15,11 @@
 # r2: the first landing (Job factory-mirror-v1146) failed fast - the
 # debian base image ships without curl (the script's first command).
 # r2 added an apt step but the host egress allowlist blocks port 80, so
-# apt (http mirrors) timed out. r3 points apt at the HTTPS mirrors
-# (443 verified reachable to deb.debian.org and security.debian.org).
+# apt (http mirrors) timed out. r3 pointed apt at the HTTPS mirrors but
+# sed-ed the classic /etc/apt/sources.list, which this base image does
+# not have (it uses the deb822 file
+# /etc/apt/sources.list.d/debian.sources). r4 seds whichever layout is
+# present (classic file and/or *.sources files, both mirrors hosts).
 # k8s Job specs are immutable, so each fix-forward uses a new Job name
 # (the failed original must not be updated in place).
 #
@@ -47,7 +50,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-3
+  name: factory-mirror-v1146-4
   namespace: omni
 spec:
   ttlSecondsAfterFinished: 3600
@@ -65,7 +68,12 @@ spec:
               set -euo pipefail
               cd /tmp
               echo ">> apt: curl (HTTPS mirrors: port 80 is blocked at the host egress allowlist)"
-              sed -i 's|http://deb.debian.org|https://deb.debian.org|; s|http://security.debian.org|https://security.debian.org|' /etc/apt/sources.list
+              # classic layout and/or deb822 layout, whichever the base image has
+              for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+                if [ -f "$f" ]; then
+                  sed -i 's|http://deb.debian.org|https://deb.debian.org|; s|http://security.debian.org|https://security.debian.org|' "$f"
+                fi
+              done
               apt-get update -qq && apt-get install -y -qq --no-install-recommends curl >/dev/null
               echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
