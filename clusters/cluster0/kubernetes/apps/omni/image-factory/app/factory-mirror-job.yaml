@@ -45,6 +45,15 @@
 # peer verification disabled, then re-updates with normal verification
 # before installing curl.
 #
+# r7: r6's bootstrap UPDATE fetched the package index fine, but the
+# Acquire::https::Verify-Peer/Host=false flags are per-invocation: the
+# subsequent `apt-get install ca-certificates` ran with verification on
+# and its .deb downloads (ca-certificates + libssl3/openssl deps,
+# security pool) failed the TLS handshake with "The certificate is NOT
+# trusted". r7 carries the same flags onto the bootstrap install; the
+# plain `apt-get update` and the curl install that follow run with
+# normal verification, because by then the CA bundle exists.
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -72,7 +81,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-6
+  name: factory-mirror-v1146-7
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -102,11 +111,13 @@ spec:
                 fi
               done
               # base image ships no system CA store: apt cannot verify the
-              # HTTPS mirror (r5 failed here). One bootstrap update with
-              # TLS peer verification disabled, install ca-certificates,
-              # then re-update with normal verification.
+              # HTTPS mirror (r5 failed here). The bootstrap update AND the
+              # bootstrap install run with TLS peer verification disabled -
+              # the -o flags are per-invocation, so r6's verify-on install
+              # failed the .deb TLS handshake. After the CA bundle lands,
+              # the re-update and the curl install verify normally.
               apt-get update -qq -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false
-              apt-get install -y -qq --no-install-recommends ca-certificates >/dev/null
+              apt-get install -y -qq --no-install-recommends -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false ca-certificates >/dev/null
               apt-get update -qq
               apt-get install -y -qq --no-install-recommends curl >/dev/null
               echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
