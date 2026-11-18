@@ -1,0 +1,102 @@
+# One-shot mirror + cosign-sign Job: v1.14.6 factory bundle.
+#
+# The Image Factory (custom-registry mode) discovers Talos versions from the
+# tags of siderolabs/imager in its in-cluster registry
+# (image-factory-registry.omni.svc:5000) and reads the per-version extension
+# list from siderolabs/extensions:<ver> there. Official extension images
+# (ghcr.io/siderolabs/*) and the custom nvidia images (docker.io/shrinedogg/*)
+# are pulled directly by the factory (world:443 egress); the four core images
+# below must be mirrored + cosign-signed into the in-cluster registry.
+#
+# The ExternalSecret materializes the factory's cosign private key from the
+# 1Password item (biggs-dog vault: image-factory-cosign-key, field "key").
+# The factory itself verifies signatures with image-factory-cosign-pub.
+#
+# TTL: the Job GCs itself an hour after completion.
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: image-factory-cosign-key
+  namespace: omni
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: image-factory-cosign-key
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        cosign.key: "{{ .key }}"
+  data:
+    - secretKey: key
+      remoteRef:
+        key: image-factory-cosign-key
+        property: key
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: factory-mirror-v1146
+  namespace: omni
+spec:
+  ttlSecondsAfterFinished: 3600
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: mirror
+          image: docker.io/library/debian:bookworm
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              cd /tmp
+              echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
+              curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
+              chmod +x cosign
+              curl -fsSL -o gcr.tgz https://github.com/google/go-containerregistry/releases/download/v0.22.1/go-containerregistry_Linux_x86_64.tar.gz
+              tar xzf gcr.tgz crane && chmod +x crane
+              REG=image-factory-registry.omni.svc.cluster.local:5000
+              # src-registry | src-ref | in-cluster dst-ref
+              for entry in \
+                "docker.io|shrinedogg/imager:v1.14.6|siderolabs/imager:v1.14.6" \
+                "docker.io|shrinedogg/extensions:v1.14.6|siderolabs/extensions:v1.14.6" \
+                "ghcr.io|siderolabs/installer-base:v1.14.6|siderolabs/installer-base:v1.14.6" \
+                "ghcr.io|siderolabs/talosctl-all:v1.14.6|siderolabs/talosctl-all:v1.14.6"; do
+                IFS='|' read -r SRC SRCREF DSTREF <<<"$entry"
+                echo ">> mirror $SRC/$SRCREF -> $REG/$DSTREF"
+                ./crane export --platform=linux/amd64 "$SRC/$SRCREF" > img.tar
+                ./crane --insecure import img.tar "$REG/$DSTREF"
+                rm -f img.tar
+                echo ">> cosign sign $DSTREF"
+                ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true "$REG/$DSTREF"
+                echo ">> cosign verify $DSTREF"
+                ./cosign verify --key /pub/cosign.pub --allow-http-registry=true "$REG/$DSTREF"
+              done
+              echo "MIRROR-DONE: all 4 images mirrored + signed + verified"
+          volumeMounts:
+            - name: keys
+              mountPath: /keys
+              readOnly: true
+            - name: pub
+              mountPath: /pub
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "2"
+              memory: 1Gi
+      volumes:
+        - name: keys
+          secret:
+            secretName: image-factory-cosign-key
+        - name: pub
+          secret:
+            secretName: image-factory-cosign-pub
