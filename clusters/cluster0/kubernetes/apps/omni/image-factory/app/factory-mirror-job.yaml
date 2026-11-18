@@ -12,6 +12,11 @@
 # 1Password item (biggs-dog vault: image-factory-cosign-key, field "key").
 # The factory itself verifies signatures with image-factory-cosign-pub.
 #
+# r2: the first landing (Job factory-mirror-v1146) failed fast - the
+# debian base image ships without curl (the script's first command).
+# r2 adds the apt step and uses a new Job name (k8s Job specs are
+# immutable, so the failed original must not be updated in place).
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -39,7 +44,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146
+  name: factory-mirror-v1146-2
   namespace: omni
 spec:
   ttlSecondsAfterFinished: 3600
@@ -56,6 +61,8 @@ spec:
             - |
               set -euo pipefail
               cd /tmp
+              echo ">> apt: curl (debian base image ships without it)"
+              apt-get update -qq && apt-get install -y -qq --no-install-recommends curl >/dev/null
               echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
               chmod +x cosign
