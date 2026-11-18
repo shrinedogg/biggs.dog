@@ -3,10 +3,14 @@
 # The Image Factory (custom-registry mode) discovers Talos versions from the
 # tags of siderolabs/imager in its in-cluster registry
 # (image-factory-registry.omni.svc:5000) and reads the per-version extension
-# list from siderolabs/extensions:<ver> there. Official extension images
-# (ghcr.io/siderolabs/*) and the custom nvidia images (docker.io/shrinedogg/*)
-# are pulled directly by the factory (world:443 egress); the four core images
-# below must be mirrored + cosign-signed into the in-cluster registry.
+# list from siderolabs/extensions:<ver> there. It pulls EVERY image from that
+# registry, extensions included: each catalog line
+# <registry>/<repo>:<tag>@<digest> is fetched as <in-cluster>/<repo>@<digest>
+# and its cosign signature is verified on that digest ref
+# (image-factory internal/artifacts versions.go extractExtensionList,
+# fetch.go fetchImageByDigest; configmap.yaml says the same). So the four
+# core images AND every extension a node schematic uses must be mirrored +
+# cosign-signed here. The factory's world:443 egress does not change that.
 #
 # The ExternalSecret materializes the factory's cosign private key from the
 # 1Password item (biggs-dog vault: image-factory-cosign-key, field "key").
@@ -92,16 +96,31 @@
 # in-cluster registry, so the signature verification failed with
 # "no valid bundles exist in registry / no signatures found".
 #
-# r10 (factory-mirror-v1146-10): mirror + sign the ucode image so the
-# factory's on-demand metal-installer build can complete. The pinned
-# digest is an OCI IMAGE INDEX (multi-arch), and a crane tar round-trip
-# re-encodes manifests (proven locally: a tar push of the same image
-# produced manifest digest sha256:07e60f45... instead of the pinned
-# 2346cc8b...), so the transfer is byte-exact: raw manifest/index +
-# blob fetch from ghcr (anon token), blob uploads, exact manifest PUTs
-# (digest ref for index + children, tag for the root), cosign sign +
-# verify of the digest ref (the factory's verify path; the tag-based
-# recursive sign is best-effort, not a gate).
+# r10 (factory-mirror-v1146-10): mirror + sign the v1.14.6 EXTENSIONS.
+# The factory's 500 names only the first missing extension (amd-ucode);
+# the cluster1 nodes' schematics (live extensions.talos.dev/* node labels
+# on all 6 nodes) need 18 extension images, none mirrored for v1.14.6.
+# Each is transferred at the exact v1.14.6 catalog digest. The
+# kernel-module extensions rebuilt against the custom kernel keep their
+# siderolabs/<name> catalog path, but their bytes live at
+# docker.io/shrinedogg/<name> (the ghcr digest 404s), so the list carries
+# source and destination repos separately.
+# The transfer is byte-exact (raw manifest/index + blob fetch, sha256
+# checks, blob uploads, exact manifest PUTs): a crane tar round-trip
+# re-encodes manifests and changes the digest, so the factory's digest
+# ref would still 404. Registry v3.1.2 rules the transfer honours:
+# children before their index (else 400 MANIFEST_BLOB_UNKNOWN); the
+# blob-upload Location is absolute and already carries ?_state=, so
+# digest= is appended with &; blob PUTs send
+# Content-Type: application/octet-stream (curl's form-urlencoded default
+# makes the registry consume the body as a form: 400 DIGEST_INVALID).
+# An image already present (digest ref 200) is not re-transferred but is
+# still signed: version-stable extensions mirrored for v1.14.5 carry only
+# pre-rotation signatures. Every digest ref is signed + verified in turn;
+# the first verify doubles as the stale-ESO-mount tripwire.
+# The factory reads /cosign.pub once at startup through a subPath mount
+# that never refreshes, so deployment.yaml carries a pod-template
+# annotation that restarts it onto the rotated key.
 #
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
@@ -179,91 +198,133 @@ spec:
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
               chmod +x cosign
               REG=image-factory-registry.omni.svc.cluster.local:5000
-              GHCR=https://ghcr.io
-              UCODE=siderolabs/amd-ucode
-              TAG=20261019
-              # pinned by the v1.14.6 schematic (the factory's 500 names this
-              # digest); it is an OCI image index (multi-arch)
-              UCD=sha256:2346cc8bbe232c5305ce289cf3c14f2d9da923b232cd0cc94792611621fe8da0
-              ACCEPT="application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json"
-              # ghcr anonymous pull token (public repo; same flow the factory itself uses)
-              TOK=$(curl -fsSL "$GHCR/token?scope=repository:$UCODE:pull" | grep -oE '"token":"[^"]*"' | cut -d'"' -f4)
-              ghcr_manifest() { # $1=digest $2=out-file ; prints content-type
-                curl -fsSL -D "hdr-$1" -o "$2" \
-                  -H "Accept: $ACCEPT" -H "Authorization: Bearer $TOK" \
-                  "$GHCR/v2/$UCODE/manifests/$1"
-                grep -i '^Content-Type:' "hdr-$1" | tr -d '\r' | cut -d' ' -f2 | tail -1
+              ACCEPT="application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json"
+              # Every extension the cluster1 nodes' v1.14.6 schematics use, at the
+              # exact digest siderolabs/extensions:v1.14.6 (image-digests) lists.
+              # Columns: source-registry source-repo dest-repo tag digest
+              # (dest-repo = the catalog repo path the factory pulls from here).
+              cat > refs.txt <<'REFS'
+              ghcr.io siderolabs/amd-ucode siderolabs/amd-ucode 20261019 sha256:2346cc8bbe232c5305ce289cf3c14f2d9da923b232cd0cc94792611621fe8da0
+              docker.io shrinedogg/amdgpu siderolabs/amdgpu 20261019-v1.14.6 sha256:06d1f8a04b57f41649c24ead863221896db2842342ffa0dba74db57feed1c265
+              ghcr.io siderolabs/realtek-firmware siderolabs/realtek-firmware 20261019 sha256:619b0249090b526fb624e1bc7e12d5732a2ec8f5ae18138e70feb221c8b90a2a
+              docker.io shrinedogg/uhid siderolabs/uhid v1.14.6 sha256:a20a37186a80b1a658cbdf19f3455f8d6e838b37af8ee08af802972a364bfd22
+              docker.io shrinedogg/uinput siderolabs/uinput v1.14.6 sha256:f82726ac003ae45e27a8ef3d1901ed287854640d6a43f682a8e0bf7597d7bfd0
+              docker.io shrinedogg/usb-audio-drivers siderolabs/usb-audio-drivers v1.14.6 sha256:bac801a212f50b3d021dacae9a69e70c3dd542fdc413472772bfb67c1ede970c
+              ghcr.io siderolabs/nfs-utils siderolabs/nfs-utils v0.1.1 sha256:ab0e015bb6859e2baa3640829ee3793e5a156ffd5157e48ca31ff1fffe36d771
+              docker.io shrinedogg/nfsd siderolabs/nfsd v1.14.6 sha256:92b35a5eab12b99ce760ca98b193e1602ee5a49c3e684631c48757006ac7dada
+              ghcr.io siderolabs/nfsrahead siderolabs/nfsrahead 2.8.4 sha256:ca64e30323dd5523d2258592423d46b9a6b1bca44b16db2b3e92b9cc0b5608e0
+              ghcr.io siderolabs/util-linux-tools siderolabs/util-linux-tools 2.42.2 sha256:f93f23e96b28e00228cf9a006a15c1648bd5975be989adb1bee6c05c046001a1
+              docker.io shrinedogg/zfs siderolabs/zfs 2.4.4-v1.14.6 sha256:405a83a77bae7e48c44c1754b528939709dbb6f722dae0692db3426a01c52803
+              docker.io shrinedogg/i915 siderolabs/i915 20261019-v1.14.6 sha256:890b096756465d68dbe24630720e319cb2a55c5fdfa0a50143d7a32280906ab8
+              ghcr.io siderolabs/intel-ucode siderolabs/intel-ucode 20260812 sha256:94af556dfc8a04aac4acbe9526312bb88bba34b1a0036f66b70ad70f5ed5b334
+              docker.io shrinedogg/mei siderolabs/mei v1.14.6 sha256:a2eeb6f5b99560b91159bfee8275544e0a6fc2c1c1288b5dd9aff493eee3a103
+              docker.io shrinedogg/xe siderolabs/xe 20261019-v1.14.6 sha256:436c9363ef97c5d6add656277b477c18cad26e67d024d44d20f4c871cd513772
+              docker.io shrinedogg/nvidia-open-modules shrinedogg/nvidia-open-modules 620.70.06-v1.14.6 sha256:b2cb3fcabbbe23940548f8133160830185ad70d0647d5fbbd5d6d59e2c4a7f8c
+              docker.io shrinedogg/nvidia-open-firmware shrinedogg/nvidia-open-firmware 620.70.06-v1.14.6 sha256:58e11f40b0a084e0d250f17cbd3e9ec7b6ab6ec804e4673bc0caf8676fe85555
+              docker.io shrinedogg/nvidia-open-toolkit shrinedogg/nvidia-open-toolkit 620.70.06-v1.19.1 sha256:f30f3353f5f055606b6c5ab583c2ccce648ddf4b2af21fded5845bbc1aee4649
+              REFS
+              EXPECTED=18
+              src_api() {
+                case "$1" in
+                  ghcr.io) echo https://ghcr.io ;;
+                  docker.io) echo https://registry-1.docker.io ;;
+                  *) echo "FATAL: unknown source registry $1" >&2; return 1 ;;
+                esac
               }
-              ghcr_blob() { # $1=digest $2=out-file
-                curl -fsSL -H "Authorization: Bearer $TOK" -o "$2" "$GHCR/v2/$UCODE/blobs/$1"
+              src_token() { # $1=registry $2=repo ; anonymous pull token (public repos)
+                local u
+                case "$1" in
+                  ghcr.io) u="https://ghcr.io/token?scope=repository:$2:pull" ;;
+                  docker.io) u="https://auth.docker.io/token?service=registry.docker.io&scope=repository:$2:pull" ;;
+                esac
+                curl -fsSL "$u" | grep -oE '"token":"[^"]*"' | head -1 | cut -d'"' -f4
+              }
+              fetch_manifest() { # $1=digest $2=out-file ; prints content-type
+                curl -fsSL -D "$2.hdr" -o "$2" -H "Accept: $ACCEPT" -H "Authorization: Bearer $TOK" "$API/v2/$SRC/manifests/$1"
+                local act
+                act=sha256:$(sha256sum "$2" | cut -d' ' -f1)
+                [ "$act" = "$1" ] || { echo "FATAL: $SRC manifest bytes ($act) != $1" >&2; return 1; }
+                grep -i '^Content-Type:' "$2.hdr" | tr -d '\r' | cut -d' ' -f2 | tail -1
+                rm -f "$2.hdr"
+              }
+              fetch_blob() { # $1=digest $2=out-file ; fresh token per blob (large layers outlive a token)
+                TOK=$(src_token "$SRCREG" "$SRC")
+                curl -fsSL -H "Authorization: Bearer $TOK" -o "$2" "$API/v2/$SRC/blobs/$1"
+                local act
+                act=sha256:$(sha256sum "$2" | cut -d' ' -f1)
+                [ "$act" = "$1" ] || { echo "FATAL: $SRC blob bytes ($act) != $1"; exit 1; }
+              }
+              reg_has() { # $1=repo $2=ref
+                [ "$(curl -s -o /dev/null -w '%{http_code}' -I -H "Accept: $ACCEPT" "http://$REG/v2/$1/manifests/$2")" = "200" ]
+              }
+              blob_has() { # $1=digest
+                [ "$(curl -s -o /dev/null -w '%{http_code}' -I "http://$REG/v2/$DST/blobs/$1")" = "200" ]
               }
               upload_blob() { # $1=file $2=digest
-                loc=$(curl -fsS -D - -o /dev/null -X POST "http://$REG/v2/$UCODE/blobs/uploads/" | grep -i '^Location:' | tr -d '\r' | cut -d' ' -f2)
-                [ -n "$loc" ] || { echo "FATAL: no Location on blob upload create ($2)"; exit 1; }
-                # registries return a path-only Location; resolve against the registry host
-                curl -fsS -o /dev/null -X PUT --data-binary @"$1" "http://$REG${loc}?digest=$2"
-                rm -f "$1"
+                local loc url sep
+                loc=$(curl -fsS -D - -o /dev/null -X POST "http://$REG/v2/$DST/blobs/uploads/" | grep -i '^Location:' | tr -d '\r' | cut -d' ' -f2)
+                [ -n "$loc" ] || { echo "FATAL: no Location on blob upload create ($DST $2)"; exit 1; }
+                # registry v3 returns an ABSOLUTE Location that already carries ?_state=...
+                case "$loc" in http://*|https://*) url=$loc ;; *) url=http://$REG$loc ;; esac
+                case "$url" in *\?*) sep='&' ;; *) sep='?' ;; esac
+                # octet-stream: curl's form-urlencoded default makes the registry
+                # parse the body as a form (DIGEST_INVALID); -T streams large layers
+                curl -fsS -o /dev/null -X PUT -H "Content-Type: application/octet-stream" -T "$1" "${url}${sep}digest=$2"
               }
               put_manifest() { # $1=file $2=ref (tag or sha256:digest) $3=content-type
-                curl -fsS -o /dev/null -w "manifest PUT $2 -> HTTP %{http_code}\n" \
-                  -X PUT -H "Content-Type: $3" --data-binary @"$1" "http://$REG/v2/$UCODE/manifests/$2"
+                curl -fsS -o /dev/null -w "  manifest PUT $DST:$2 -> HTTP %{http_code}\n" \
+                  -X PUT -H "Content-Type: $3" --data-binary @"$1" "http://$REG/v2/$DST/manifests/$2"
               }
-              manifest_digests() { # $1=file ; referenced blob digests (config+layers) or child manifest digests (index)
+              digests_in() { # $1=file ; config+layer blobs (manifest) or child manifests (index)
                 grep -oE '"digest": *"sha256:[0-9a-f]{64}"' "$1" | cut -d'"' -f4 | sort -u
               }
-              is_index() { grep -q '"manifests":' "$1"; }
-              transfer_manifest() { # $1=digest $2=file $3=content-type
-                ACT=sha256:$(sha256sum "$2" | cut -d' ' -f1)
-                [ "$ACT" = "$1" ] || { echo "FATAL: fetched manifest bytes ($ACT) != expected digest ($1)"; exit 1; }
-                if is_index "$2"; then
-                  echo "  index $1 (verified); transferring children"
-                  put_manifest "$2" "$1" "$3"
-                  for child in $(manifest_digests "$2"); do
-                    cct=$(ghcr_manifest "$child" "m-$child")
-                    echo "  child $child ($cct)"
-                    for b in $(manifest_digests "m-$child"); do
-                      ghcr_blob "$b" "blob-$b"
-                      upload_blob "blob-$b" "$b"
-                      echo "    blob $b uploaded"
-                    done
-                    put_manifest "m-$child" "$child" "$cct"
-                    rm -f "m-$child" "hdr-$child"
+              copy_blobs() { # $1=manifest file
+                local b
+                for b in $(digests_in "$1"); do
+                  if blob_has "$b"; then echo "    blob $b present"; continue; fi
+                  fetch_blob "$b" blob.bin
+                  upload_blob blob.bin "$b"
+                  rm -f blob.bin
+                  echo "    blob $b uploaded"
+                done
+              }
+              transfer() { # $1=digest $2=tag
+                local rct cct child
+                rct=$(fetch_manifest "$1" root.json)
+                if grep -q '"manifests"' root.json; then
+                  # an index is accepted only once every child exists
+                  for child in $(digests_in root.json); do
+                    cct=$(fetch_manifest "$child" child.json)
+                    copy_blobs child.json
+                    put_manifest child.json "$child" "$cct"
                   done
                 else
-                  for b in $(manifest_digests "$2"); do
-                    ghcr_blob "$b" "blob-$b"
-                    upload_blob "blob-$b" "$b"
-                    echo "    blob $b uploaded"
-                  done
-                  put_manifest "$2" "$1" "$3"
+                  copy_blobs root.json
                 fi
+                put_manifest root.json "$1" "$rct"
+                put_manifest root.json "$2" "$rct"
+                rm -f root.json child.json
               }
-              echo ">> exact-transfer $GHCR/$UCODE@$UCD -> $REG/$UCODE:$TAG"
-              cct=$(ghcr_manifest "$UCD" "ucode.json")
-              echo "root manifest fetched ($UCD, content-type $cct)"
-              transfer_manifest "$UCD" "ucode.json" "$cct"
-              rm -f ucode.json "hdr-$UCD"
-              # also publish the root under the tag so tag-based consumers resolve
-              cct2=$(ghcr_manifest "$UCD" "ucode.json")
-              put_manifest "ucode.json" "$TAG" "$cct2"
-              rm -f ucode.json "hdr-$UCD"
-              code=$(curl -s -o /dev/null -w '%{http_code}' "http://$REG/v2/$UCODE/manifests/$UCD")
-              [ "$code" = "200" ] || { echo "FATAL: pinned digest ref not resolvable (HTTP $code)"; exit 1; }
-              echo "pinned digest ref resolvable (HTTP $code)"
-              echo ">> cosign sign (digest ref - the factory's verify path)"
-              ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$UCODE@$UCD"
-              # tag-based signing recurses over index children; cosign v2.6.1
-              # can reject that ("cannot parse hash") on some registries.
-              # The factory verifies the DIGEST ref, so the tag sign is a
-              # best-effort extra, not a gate.
-              if ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$UCODE:$TAG" 2>/dev/null; then
-                echo ">> cosign sign (tag ref) ok"
-              else
-                echo "WARN: tag-ref sign failed (recursive index signing); digest-ref signature is the factory's verify path - continuing"
-              fi
-              echo ">> cosign verify (digest ref - the gate; also the ESO stale-mount tripwire)"
-              ./cosign verify --key /pub/cosign.pub --allow-http-registry=true --insecure-ignore-tlog "$REG/$UCODE@$UCD"
-              echo "MIRROR-UCODE-DONE: $UCODE:$TAG mirrored byte-exact (index $UCD + children) + signed (digest ref) + verified"
+              n=0
+              while read -r SRCREG SRC DST TAG DG <&3; do
+                [ -n "$SRCREG" ] || continue
+                n=$((n+1))
+                echo ">> [$n/$EXPECTED] $SRCREG/$SRC@$DG -> $REG/$DST:$TAG"
+                if reg_has "$DST" "$DG"; then
+                  echo "  digest ref already in the registry; signing only"
+                else
+                  API=$(src_api "$SRCREG")
+                  TOK=$(src_token "$SRCREG" "$SRC")
+                  [ -n "$TOK" ] || { echo "FATAL: no pull token for $SRCREG/$SRC"; exit 1; }
+                  transfer "$DG" "$TAG"
+                  reg_has "$DST" "$DG" || { echo "FATAL: $DST@$DG not resolvable after transfer"; exit 1; }
+                fi
+                ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$DST@$DG"
+                ./cosign verify --key /pub/cosign.pub --allow-http-registry=true --insecure-ignore-tlog "$REG/$DST@$DG" >/dev/null
+                echo "  signed + verified $DST@$DG"
+              done 3< refs.txt
+              [ "$n" = "$EXPECTED" ] || { echo "FATAL: processed $n refs, expected $EXPECTED"; exit 1; }
+              echo "MIRROR-EXT-DONE: $n v1.14.6 extension images mirrored at their catalog digests + signed + verified"
           volumeMounts:
             - name: keys
               mountPath: /keys

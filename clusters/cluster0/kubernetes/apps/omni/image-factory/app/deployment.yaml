@@ -19,6 +19,12 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: image-factory
+      annotations:
+        # The factory reads /cosign.pub ONCE at startup, and the subPath
+        # mount below never refreshes when the Secret changes. Bump this
+        # value after every cosign keypair rotation to restart the pod onto
+        # the new key (rotated 2026-11-18, factory-mirror r9).
+        biggs.dog/cosign-pub-rotated: "2026-11-18"
     spec:
       volumes:
         - name: config
