@@ -36,6 +36,15 @@
 # registry :5000 needs no grant: allow-intra-namespace (endpointSelector
 # {}) already covers omni-pod-to-omni-pod :5000.
 #
+# r6: r5's CNP worked - the TLS handshake now reaches
+# deb.debian.org:443 - but the debian:bookworm base image carries no
+# system CA store (no /etc/ssl/certs, no ca-certificates package), so
+# every apt HTTPS fetch fails certificate verification
+# ("No system certificates available") and curl cannot be installed.
+# r6 bootstraps ca-certificates with a single apt update that has TLS
+# peer verification disabled, then re-updates with normal verification
+# before installing curl.
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -63,7 +72,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-5
+  name: factory-mirror-v1146-6
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -85,14 +94,21 @@ spec:
             - |
               set -euo pipefail
               cd /tmp
-              echo ">> apt: curl (HTTPS mirrors: port 80 is blocked at the host egress allowlist)"
+              echo ">> apt: ca-certificates + curl (base image has no CA store; HTTPS mirrors, port 80 is blocked)"
               # classic layout and/or deb822 layout, whichever the base image has
               for f in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
                 if [ -f "$f" ]; then
                   sed -i 's|http://deb.debian.org|https://deb.debian.org|; s|http://security.debian.org|https://security.debian.org|' "$f"
                 fi
               done
-              apt-get update -qq && apt-get install -y -qq --no-install-recommends curl >/dev/null
+              # base image ships no system CA store: apt cannot verify the
+              # HTTPS mirror (r5 failed here). One bootstrap update with
+              # TLS peer verification disabled, install ca-certificates,
+              # then re-update with normal verification.
+              apt-get update -qq -o Acquire::https::Verify-Peer=false -o Acquire::https::Verify-Host=false
+              apt-get install -y -qq --no-install-recommends ca-certificates >/dev/null
+              apt-get update -qq
+              apt-get install -y -qq --no-install-recommends curl >/dev/null
               echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
               chmod +x cosign
