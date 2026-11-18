@@ -315,3 +315,27 @@ spec:
     - fromEntities:
         - host
         - remote-node
+---
+# One-shot factory-mirror Job (and its future tag-triggered automation
+# twin): the pod needs world:443 for apt-over-HTTPS (deb mirrors), the
+# GitHub tooling download (cosign/crane), and the docker.io/ghcr.io crane
+# source exports. The in-cluster registry :5000 (crane import + cosign
+# sign/verify) needs NO extra grant: allow-intra-namespace (endpointSelector
+# {}) already covers omni-pod -> omni-registry :5000. Rekor/TLog uploads
+# during cosign sign are also world:443.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-factory-mirror
+  namespace: omni
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/component: factory-mirror
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
