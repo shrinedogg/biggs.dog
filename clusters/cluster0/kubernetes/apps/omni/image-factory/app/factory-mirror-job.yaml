@@ -63,6 +63,26 @@
 # `crane pull` (TLS, public registry) + `crane --insecure push`
 # (http, in-cluster registry) through a local tarball.
 #
+# r9: r8 proved the mirror (imager pushed, digest
+# sha256:f7616270...), then cosign sign failed: "Enter password for
+# private key ... inappropriate ioctl for device" - the vault key is an
+# encrypted PEM whose passphrase is stored nowhere, and a Job pod has
+# no TTY. cosign also tries a tlog upload by default (Rekor prompt +
+# external egress, both unavailable in-cluster).
+#
+# Resolution: rotate the factory keypair to an empty-passphrase key.
+# The new key + pub replace the 1Password items; a public-key change
+# invalidates the existing v1.14.5 signatures, so r9 re-signs them.
+# r9 changes:
+# - COSIGN_PASSWORD="" env: the rotated key is encrypted with an EMPTY
+#   passphrase; the explicit env keeps cosign off any prompt
+# - a stale ESO mount after the rotation fails fast: the first
+#   sign+verify pair rejects the signature, so the v1.14.5 re-sign
+#   (which runs after the v1.14.6 loop) never runs on a stale mount
+# - re-sign the 4 v1.14.5 images (skip any absent from the registry)
+# - mirror + sign v1.14.6 with --tlog-upload=false, verify with
+#   --insecure-ignore-tlog (private registry, no transparency log)
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -90,7 +110,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-8
+  name: factory-mirror-v1146-9
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -106,6 +126,12 @@ spec:
       containers:
         - name: mirror
           image: docker.io/library/debian:bookworm
+          env:
+            # rotated keypair (2026-11-18) is encrypted with an EMPTY
+            # passphrase; explicit env keeps cosign off any prompt
+            # (no TTY in a Job pod)
+            - name: COSIGN_PASSWORD
+              value: ""
           command:
             - bash
             - -c
@@ -151,11 +177,24 @@ spec:
                 ./crane --insecure push img.tar "$REG/$DSTREF"
                 rm -f img.tar
                 echo ">> cosign sign $DSTREF"
-                ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true "$REG/$DSTREF"
+                ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$DSTREF"
                 echo ">> cosign verify $DSTREF"
-                ./cosign verify --key /pub/cosign.pub --allow-http-registry=true "$REG/$DSTREF"
+                ./cosign verify --key /pub/cosign.pub --allow-http-registry=true --insecure-ignore-tlog "$REG/$DSTREF"
               done
-              echo "MIRROR-DONE: all 4 images mirrored + signed + verified"
+              # the sign+verify above fails fast when the mounted key and
+              # pub are not a pair (ESO not reconciled after the rotation):
+              # the first image's verify rejects the signature, so nothing
+              # below runs on a stale mount
+              echo ">> re-sign existing v1.14.5 images (old-key signatures are invalid under the rotated public key)"
+              for ref in siderolabs/imager:v1.14.5 siderolabs/extensions:v1.14.5 siderolabs/installer-base:v1.14.5 siderolabs/talosctl-all:v1.14.5; do
+                if ./crane --insecure manifest "$REG/$ref" >/dev/null 2>&1; then
+                  echo ">> cosign sign (re-sign) $ref"
+                  ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true --tlog-upload=false "$REG/$ref"
+                else
+                  echo "WARN: $ref absent from registry - skipping re-sign"
+                fi
+              done
+              echo "MIRROR-DONE: v1.14.5 re-signed + all 4 v1.14.6 images mirrored + signed + verified"
           volumeMounts:
             - name: keys
               mountPath: /keys
