@@ -14,8 +14,11 @@
 #
 # r2: the first landing (Job factory-mirror-v1146) failed fast - the
 # debian base image ships without curl (the script's first command).
-# r2 adds the apt step and uses a new Job name (k8s Job specs are
-# immutable, so the failed original must not be updated in place).
+# r2 added an apt step but the host egress allowlist blocks port 80, so
+# apt (http mirrors) timed out. r3 points apt at the HTTPS mirrors
+# (443 verified reachable to deb.debian.org and security.debian.org).
+# k8s Job specs are immutable, so each fix-forward uses a new Job name
+# (the failed original must not be updated in place).
 #
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
@@ -44,7 +47,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-2
+  name: factory-mirror-v1146-3
   namespace: omni
 spec:
   ttlSecondsAfterFinished: 3600
@@ -61,7 +64,8 @@ spec:
             - |
               set -euo pipefail
               cd /tmp
-              echo ">> apt: curl (debian base image ships without it)"
+              echo ">> apt: curl (HTTPS mirrors: port 80 is blocked at the host egress allowlist)"
+              sed -i 's|http://deb.debian.org|https://deb.debian.org|; s|http://security.debian.org|https://security.debian.org|' /etc/apt/sources.list
               apt-get update -qq && apt-get install -y -qq --no-install-recommends curl >/dev/null
               echo ">> download tooling (cosign v2.6.1, crane v0.22.1)"
               curl -fsSL -o cosign https://github.com/sigstore/cosign/releases/download/v2.6.1/cosign-linux-amd64
