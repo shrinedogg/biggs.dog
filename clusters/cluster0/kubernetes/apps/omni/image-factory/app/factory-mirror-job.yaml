@@ -125,7 +125,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: mirror
-          image: docker.io/library/debian:bookworm
+          image: docker.io/library/debian:trixie
           env:
             # rotated keypair (2026-11-18) is encrypted with an EMPTY
             # passphrase; explicit env keeps cosign off any prompt
