@@ -54,6 +54,15 @@
 # plain `apt-get update` and the curl install that follow run with
 # normal verification, because by then the CA bundle exists.
 #
+# r8: r7 proved the apt bootstrap and the tooling download. The mirror
+# step then failed: pinned crane v0.22.1 has no `import` command
+# (export is a rootfs-tarball op, not an image round-trip), and a
+# single `crane copy` cannot mix a TLS src with an insecure http dst -
+# its one global --insecure flag would force http on the src too, and
+# port 80 is blocked at the host egress allowlist. r8 mirrors with
+# `crane pull` (TLS, public registry) + `crane --insecure push`
+# (http, in-cluster registry) through a local tarball.
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -81,7 +90,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-7
+  name: factory-mirror-v1146-8
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -134,8 +143,12 @@ spec:
                 "ghcr.io|siderolabs/talosctl-all:v1.14.6|siderolabs/talosctl-all:v1.14.6"; do
                 IFS='|' read -r SRC SRCREF DSTREF <<<"$entry"
                 echo ">> mirror $SRC/$SRCREF -> $REG/$DSTREF"
-                ./crane export --platform=linux/amd64 "$SRC/$SRCREF" > img.tar
-                ./crane --insecure import img.tar "$REG/$DSTREF"
+                # crane has no import; one crane copy invocation cannot mix
+                # a TLS src with an insecure http dst (the global
+                # --insecure would force http on the src too, and port 80
+                # is blocked). Pull over TLS, push over plain http.
+                ./crane pull --platform=linux/amd64 "$SRC/$SRCREF" img.tar
+                ./crane --insecure push img.tar "$REG/$DSTREF"
                 rm -f img.tar
                 echo ">> cosign sign $DSTREF"
                 ./cosign sign --key /keys/cosign.key --allow-http-registry=true --insecure-skip-verify=true "$REG/$DSTREF"
