@@ -1,0 +1,25 @@
+---
+# Registers the in-cluster mcp-grafana proxy as a kagent tool source for
+# the observability-agent (see
+# kagent/substrate-agents/observability-agent.yaml, which references
+# RemoteMCPServer/kagent-grafana-mcp).
+#
+# The 1.0.1 kagent chart no longer renders this RMP (the grafana-mcp
+# subchart is gone from the chart; the 1.0.1 upgrade pruned the
+# release-owned RMP), so it lives here as a static manifest.
+apiVersion: api.kagent.dev/v1alpha3
+kind: RemoteMCPServer
+metadata:
+  name: kagent-grafana-mcp
+  namespace: ai-system
+  labels:
+    app.kubernetes.io/name: kagent-grafana-mcp
+spec:
+  description: >-
+    Grafana MCP server — Prometheus metrics, Loki logs, Grafana dashboards,
+    and on-call/incident tools for the observability-agent.
+  protocol: STREAMABLE_HTTP
+  url: http://kagent-grafana-mcp.ai-system:8000/mcp
+  timeout: 30s
+  sseReadTimeout: 5m0s
+  terminateOnClose: true

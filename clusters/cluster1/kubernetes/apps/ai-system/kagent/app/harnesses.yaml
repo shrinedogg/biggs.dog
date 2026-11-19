@@ -1,5 +1,5 @@
 ---
-# Shared Harnesses for the v1alpha3 agent fleet (kagent 1.0.0).
+# Shared Harnesses for the v1alpha3 agent fleet (kagent 1.0.1).
 #
 # A Harness bundles the runtime workload image, the substrate
 # WorkerPool placement, the snapshot location, and the kagent runtime
@@ -13,8 +13,8 @@
 # host=bucket via the substrate parseGCSURL semantics; issue #598 moved
 # the store off ephemeral in-cluster rustfs).
 #
-# workload.image is DIGEST-pinned to the kagent 1.0.0-alpha11 build
-# (the kagent-dev/kagent/golang-adk:1.0.0-alpha11 tag has NO v prefix).
+# workload.image is DIGEST-pinned to the kagent 1.0.1 build
+# (the kagent-dev/kagent/golang-adk:1.0.1 tag has NO v prefix).
 # Bump it in lockstep with the kagent chart (renovate.json
 # substrate-stack group) — kagent vendors a specific substrate and the
 # ADK image must match the chart's expectations.
@@ -26,7 +26,7 @@ metadata:
 spec:
   kagent: {}
   workload:
-    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:d3b1151d39c529a6f921a58a995ff699963012001d2e5075f69bf613abebc24d
   substrate:
     workerPoolRef:
       name: kagent-default
@@ -53,7 +53,7 @@ spec:
         modelConfigRef:
           name: default-model-config
   workload:
-    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:d3b1151d39c529a6f921a58a995ff699963012001d2e5075f69bf613abebc24d
   substrate:
     workerPoolRef:
       name: kagent-default
@@ -81,7 +81,7 @@ spec:
         name: embedding-model
       ttlDays: 30
   workload:
-    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:29409dfe1a030b50da3ff3f72599752cb5824a50f6aa136c16bf2b1678aa89b8
+    image: ghcr.io/kagent-dev/kagent/golang-adk@sha256:d3b1151d39c529a6f921a58a995ff699963012001d2e5075f69bf613abebc24d
   substrate:
     workerPoolRef:
       name: kagent-default

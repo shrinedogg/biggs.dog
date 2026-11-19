@@ -582,3 +582,75 @@ spec:
         - ports:
             - port: "443"
               protocol: TCP
+---
+# Hister (hister ns) dials the Infinity embedding service for opt-in
+# semantic search (the local vLLM serves chat only, not embeddings).
+# Cross-namespace ClusterIP precedent (allow-ingress-from-kritika,
+# allow-ingress-from-mindwtr-cloud): forward request into the embeddings
+# pod is granted here; the client side is the hister CNP set
+# (policies/apps/hister.yaml: allow-egress-to-embeddings + the
+# allow-ingress-from-embeddings return-path grant).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hister
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: embeddings
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
+            app.kubernetes.io/name: hister
+      toPorts:
+        - ports:
+            - port: "7997"
+              protocol: TCP
+---
+# Hister (hister ns) MCP endpoint: the kagent controller reconciles the
+# hister-mcp RemoteMCPServer (url
+# http://hister.hister.svc.cluster.local:4433/mcp) and dials it for
+# initialize + tools/list (the Accepted gate). Cross-namespace ClusterIP
+# precedent (allow-ingress-from-mindwtr-cloud): the forward request into the
+# hister pods is granted here, scoped to the kagent controller pods (the
+# only pod that dials the MCP endpoint); the hister-side forward grant is
+# allow-ingress-from-kagent in policies/apps/hister.yaml. The hister
+# Service VIP reverse-NATs SYN,ACK, so the return path must be allowed as
+# ingress here too (no toPorts), or the dial is dropped after the first
+# round-trip. NOTE: named allow-ingress-from-hister-MCP because the file
+# already has an allow-ingress-from-hister (the hister->embeddings grant).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-hister
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: kagent
+      app.kubernetes.io/component: controller
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
+            app.kubernetes.io/name: hister
+      toPorts:
+        - ports:
+            - port: "4433"
+              protocol: TCP
+---
+# Return path for the MCP dial (see allow-egress-to-hister above).
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hister-mcp
+  namespace: ai-system
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
+            app.kubernetes.io/name: hister

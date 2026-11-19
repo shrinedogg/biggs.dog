@@ -57,7 +57,7 @@ metadata:
 spec:
   replicas: 1
   # renovate: datasource=github-releases depName=kubernetes/kubernetes
-  version: "v1.36.0"
+  version: "v1.37.2"
   # CACPPT v0.6.4 serves v1beta1 (storage) with the modern CAPI v1beta2 KCP
   # layout: the infra reference lives at machineTemplate.spec.infrastructureRef
   # (the v1alpha3 field infrastructureTemplate only exists on the v1alpha3

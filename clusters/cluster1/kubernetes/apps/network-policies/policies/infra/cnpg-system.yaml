@@ -46,6 +46,11 @@ spec:
             k8s:io.kubernetes.pod.namespace: media
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: kritika
+        # hister (this PR): the Hister pods dial the cnpg-hister-rw Service
+        # for index + embeddings storage (allow-egress-to-postgres in
+        # policies/apps/hister.yaml).
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hister
       toPorts:
         - ports:
             - port: "5432"

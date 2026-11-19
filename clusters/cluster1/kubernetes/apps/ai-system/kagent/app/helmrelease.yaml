@@ -52,37 +52,18 @@ spec:
     # cr.kagent.dev registry.
     registry: ghcr.io
     # ------------------------------------------------------------------
-    # Grafana MCP subchart (mcp-grafana). The subchart runs
-    # --transport streamable-http and injects the token via envFrom
-    # secretRef, and renders its own api.kagent.dev/v1alpha3
-    # RemoteMCPServer (kagent-grafana-mcp).
-    # Point it at the real Grafana Service (observability ns, port 80 ->
-    # targetPort grafana/3000); egress from ai-system to observability is
-    # allowed by the CNP 'allow-egress-to-observability'.
-    #
-    # allowedHosts "*" — workers reach this service through atenet-egress,
-    # which dials the pod IP directly and rewrites the Host header to the
-    # IP form; mcp-grafana's DNS-rebinding guard would 403 the handshake
-    # ("forbidden: host not allowed") and the agent would see zero tools.
-    # The chart documents "*" as the setting for exactly this proxy case.
-    # The service is headless in-cluster (no external ingress) and the
-    # Grafana token is server-side, so the Host check adds no protection
-    # here.
-    #
-    # The apiKey is NOT stored in git (GitHub secret scanning would block
-    # the push): the runtime token is injected from the existing cluster
-    # Secret kagent-grafana-mcp-token via grafana.secretRef (the subchart
-    # skips creating its own secret when secretRef is set).
-    # ------------------------------------------------------------------
-    grafana-mcp:
-      allowedHosts: "*"
-      grafana:
-        # Bare base URL: mcp-grafana appends "/api/..." to GRAFANA_URL
-        # itself (see tools/datasources.go), so a trailing "/api" would
-        # double up and 404. The chart default (grafana.kagent:3000/api)
-        # has this bug; upstream README shows a bare base.
-        url: "http://grafana.observability:80"
-        secretRef: kagent-grafana-mcp-token
+    # Grafana MCP: the 1.0.1 chart dropped the grafana-mcp subchart that
+    # used to render the proxy Deployment/Service and the
+    # kagent-grafana-mcp RemoteMCPServer (the 1.0.1 upgrade pruned the
+    # release-owned objects; the alpha11-era image reference
+    # ghcr.io/grafana/mcp-grafana never existed on GHCR, so the proxy
+    # never ran). The proxy now lives as the static grafana-mcp app
+    # (../grafana-mcp: deployment + service + RMP) pointed at the real
+    # Grafana Service (observability ns, 80 -> grafana/3000; egress
+    # allowed by the CNP 'allow-egress-to-observability'), with the token
+    # from the kagent-grafana-mcp-token ExternalSecret (subchart's
+    # grafana.secretRef). The old grafana-mcp: values block was inert on
+    # the 1.0.1 chart (no subchart to receive it) and is removed.
     # ------------------------------------------------------------------
     # Default model provider -> local vLLM through agentgateway
     # (OpenAI-compatible). The chart renders a ModelConfig named
@@ -102,62 +83,100 @@ spec:
         config:
           baseUrl: "http://internal-biggs-dog.networking.svc.cluster.local:8445/v1"
     # ------------------------------------------------------------------
-    # Use the cluster's CNPG operator (cnpg-kagent) instead of a bundled
-    # dev Postgres. The full connection URL (incl. password) comes from the
-    # existing ExternalSecret kagent-database-url (key: url) — no
-    # credentials live in git.
+    # BYO postgres via the cluster's CNPG operator (cnpg-kagent): the
+    # 1.0.0-line chart takes two pre-created connection-string Secrets
+    # (no credentials live in git; both are rendered by the ESOs in
+    # kagent-postgres-secrets.yaml from the kagent-user-password
+    # 1Password item — the same login the CNPG cluster bootstraps with).
     #
-    # role: "" — cnpg-kagent has no kagent_owner role; an empty role skips
-    # SET ROLE after connecting (kagent connect.go).
-    # schema: kagent — the controller runs CREATE SCHEMA IF NOT EXISTS at
-    # migration. Clean 1.0 schema: 0.10.3's tables stay orphaned in the
-    # public schema, untouched but unread by 1.0.
+    # Single-login role design: the `kagent` login is a member of BOTH
+    # the kagent_owner and kagent_readwrite NOLOGIN roles (created by the
+    # cnpg-kagent-init ConfigMap's init.sql at cluster creation). The
+    # owner connection runs the controller's startup migrations (SET ROLE
+    # kagent_owner); the readwrite connection is the runtime pool (SET
+    # ROLE kagent_readwrite, chart config.database defaults).
+    #
+    # schema: kagent — the controller creates/owns its 1.0 tables here;
+    # the pre-1.0 tables (0.10.3 era) stay orphaned in the public schema
+    # of the recreated database, untouched but unread by 1.0.
     # vectorEnabled=true + vectorSchema=public — long-term vector memory.
-    # The Database CR cnpg-kagent-db installs pgvector in `public` (it has
-    # no schema key), so the extensions schema must not be used.
+    # The Database CR cnpg-kagent-database.yaml installs the vector
+    # extension with no schema key, so it lands in `public`; the chart
+    # default (vectorSchema: extensions) would look in the wrong place.
+    # If vector memory is ever dropped, leave vectorEnabled at its
+    # default (false) and the Database CR's extension ensure becomes a
+    # no-op.
     # ------------------------------------------------------------------
     database:
       postgres:
-        connectionStringSecretRef:
-          name: kagent-database-url
-          key: url
-        role: ""
+        readWriteConnectionStringSecretRef:
+          name: kagent-postgres-readwrite
+          key: readWriteConnectionString
+        ownerConnectionStringSecretRef:
+          name: kagent-postgres-owner
+          key: ownerConnectionString
+    config:
+      database:
         schema: kagent
         vectorEnabled: true
         vectorSchema: public
+      # ------------------------------------------------------------------
+      # Substrate control plane wiring (1.0.0-line key paths; the
+      # alpha11-era controller.substrate.* keys are unknown to this chart
+      # and were silently ignored). The control plane lives in ai-system,
+      # not the chart-default ate-system namespace.
+      # apiEndpoint: the ate-api-server gRPC endpoint (mTLS, port 443).
+      # routerUrl: the atenet-router Service in ai-system, mTLS frontend
+      # (443 -> 8443). Must stay https: the http scheme makes
+      # RouterTransport dial insecure (no SPIFFE client identity), and the
+      # router's networkAuthorization allowlist (substrate values
+      # atenetRouter.ingressAllowedSPIFFEIDs) rejects identity-less and
+      # unlisted sources, so every session send then fails with "input was
+      # not accepted". The https dial presents the substrate podcert client
+      # identity (the substrateClientCertificate volumes set caFile /
+      # clientCertFile in the controller config when enabled).
+      # actorJwtIssuer: must match the substrate chart's actor-jwt-issuer
+      # (verified in the ate-api-server boot log: https://idp.ai-system.svc).
+      # ------------------------------------------------------------------
+      substrate:
+        apiEndpoint: "dns:///api.ai-system.svc:443"
+        routerUrl: "https://atenet-router.ai-system.svc:443"
+        actorJwtIssuer: "https://idp.ai-system.svc"
+      # Standalone sandbox guest image (BYO; the chart default is "" which
+      # disables sandbox prep). Digest-pinned: kagent-dev/kagent/
+      # sandbox-guest:1.0.1 (verified in the 1.0.1 pairing; the registry
+      # override mirrors the host to ghcr.io, the digest survives).
+      # 1.0.0-line key: config.sandboxes (the alpha11-era
+      # controller.sandbox.* keys are unknown to this chart and were
+      # silently ignored).
+      sandboxes:
+        guestImage: "ghcr.io/kagent-dev/kagent/sandbox-guest@sha256:16e84a2285119ce02cc6ba45ea7f68181eb1527335de85477614fb9a6b5ecf03"
     controller:
       resources:
         limits:
           memory: "1024Mi"
       # ------------------------------------------------------------------
-      # Agent Substrate integration. The controller dials ate-api-server
-      # with an mTLS PodCertificate bundle (substrate-podidentity volume)
-      # plus the servicedns ClusterTrustBundle CA (substrate-servicedns
-      # volume) — both mounted by the chart when controller.substrate is
-      # enabled. Requires the PodCertificateRequest/ClusterTrustBundle
-      # feature gates (beta, default-off in K8s 1.36), enabled 2026-09-08
-      # via the Omni cluster template, and the substrate-podcert signer
-      # (the CA/JWT pools are bootstrapped imperatively — see the PR's
-      # "User-gated follow-ups").
+      # Agent Substrate integration (1.0.0 line). The controller dials
+      # ate-api-server with mTLS PodCertificate credentials
+      # (substrate-podidentity volume) plus the servicedns trust bundle
+      # (substrate-servicedns volume) — the chart renders both only when
+      # substrateClientCertificate is enabled (the 1.0.1 key that replaces
+      # the alpha11-era controller.substrate.enabled flag). Requires the
+      # PodCertificateRequest/ClusterTrustBundle feature gates (beta,
+      # default-off in K8s 1.36), enabled 2026-09-08 via the Omni cluster
+      # template, and the substrate-podcert signer (the CA/JWT pools are
+      # bootstrapped imperatively — see the PR's "User-gated follow-ups").
       # ------------------------------------------------------------------
-      substrate:
+      substrateClientCertificate:
         enabled: true
-        ateApiEndpoint: "dns:///api.ai-system.svc:443"
-        # Required: the atenet-router Service in ai-system, port 80.
-        atenetRouterURL: "http://atenet-router.ai-system.svc:80"
-      sandbox:
-        guestImage:
-          # kagent-dev/kagent/sandbox-guest:1.0.0-alpha11 (verified digest).
-          # Without it KAGENT_SANDBOX_GUEST_IMAGE renders "" and standalone
-          # sandbox prep is silently broken.
-          digest: "sha256:fb1218d5bdc397ecb514c5aa81d7958843635ca090c1419b191051f7bb01a3e2"
     # ------------------------------------------------------------------
     # The kagent-default WorkerPool: substrate workers (gVisor actors)
     # that run the Harness workloads. The chart FAILS render if
     # workerImage is empty when create=true.
     #
-    # PINNED to the substrate control-plane version (0.5.0-alpha2). The
-    # ateom worker image MUST move in lockstep with
+    # PINNED to the substrate control-plane version (1.0.0). The 1.0 line
+    # renamed the worker image ateom-gvisor -> ateworker-gvisor (v-prefix
+    # tags). The worker MUST move in lockstep with
     # ate-controller/atelet/atenet-router (renovate.json groups the whole
     # substrate stack, automerge:false). Workers get their mTLS
     # credentials (atunnel credential bundle) projected automatically by
@@ -167,7 +186,7 @@ spec:
       create: true
       name: kagent-default
       replicas: 1
-      workerImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.5.0-alpha2
+      workerImage: ghcr.io/kagent-dev/substrate/ateworker-gvisor:v1.0.0
       sandboxClass: gvisor
       template:
         # Flat pod-template fragment (the chart pipes this verbatim into

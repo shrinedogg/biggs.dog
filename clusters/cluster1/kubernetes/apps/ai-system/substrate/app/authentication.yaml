@@ -1,0 +1,34 @@
+# The substrate chart (0.7.0-alpha2 and 1.0.0) mounts a user-provided
+# ConfigMap `ate-api-authentication` (key authentication.yaml) into the
+# ate-api-server pod. No chart generation ever rendered it: it was created
+# by hand at the original 2026-10-10 install and has lived on as an orphan
+# since the Helm release secrets were wiped (the objects outlived the
+# release, the release history did not outlive them).
+#
+# The 0.7.0 cutover added the 1.0-shape jwtProviders list next to the
+# legacy `actorIdentityJWTProvider` field but never removed it. The
+# ateapi:v1.0.0 binary parses this file with a strict unmarshaler and
+# rejects unknown fields, so it crash-loops on startup:
+#   parse authentication config: ... unknown field "actorIdentityJWTProvider"
+# Repo-ize it here so Flux owns the object and a fresh cluster install
+# cannot hit the same missing-volume / stale-schema failure.
+#
+# 1.0.0 schema (upstream internal/apiconfig/authn.go, strict parse +
+# validation): jwtProviders[] entries carry name, issuer (HTTPS, no
+# query or fragment), audiences[] (non-empty), and optional
+# certificateAuthorityFile / discoveryTokenFile (only for the in-cluster
+# issuer, which this is not). The issuer below is the cluster's own OIDC
+# discovery endpoint, the same value the live object has carried since
+# the original install.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ate-api-authentication
+  namespace: ai-system
+data:
+  authentication.yaml: |
+    jwtProviders:
+    - name: kubernetes
+      issuer: "https://[fdae:41e4:649b:9303::1]:10000"
+      audiences:
+      - api.ai-system.svc

@@ -335,21 +335,19 @@ spec:
                 sleep 1
               done
 
-              # Sway fullscreen rule: the GOW base sway config (see
-              # launch-comp.sh) does NOT fullscreen app windows, so Sway tiles
-              # every Xwayland surface it sees. Windrose launches as MULTIPLE
-              # windows (Steam Big Picture class="steam" + the game
-              # class="steam_app_*" + transient launchers), which Sway tiles
-              # side-by-side into the "split / multiple tiles" display. The base
-              # config includes /home/retro/.config/sway/custom-cfg at the top,
-              # which launch-comp's cp does NOT overwrite -- so writing our rule
-              # there is the clean injection point. Fullscreen both Steam BPM and
-              # the game so each takes the whole output (BPM behind, game front).
+              # Sway config hook: the GOW base sway config (see launch-comp.sh)
+              # includes /home/retro/.config/sway/custom-cfg at the top, and
+              # launch-comp's cp does NOT overwrite it, so it lives on the state
+              # PVC. It used to carry `for_window [class="steam_app_*"]` and
+              # `[class="steam"]` fullscreen rules. Those were wrong twice over:
+              # sway criteria are unanchored regexes (both match EVERY window of
+              # the Proton prefix, whose WM_CLASS is always steam_app_<appid>),
+              # and for_window fires at map time, before Xwayland windows set
+              # WM_CLASS. The fullscreen watcher below is now the only place that
+              # fullscreens. Truncate the file so the old rules on existing state
+              # PVCs stop loading.
               mkdir -p /home/retro/.config/sway
-              cat > /home/retro/.config/sway/custom-cfg <<'SWAYEOF'
-              for_window [class="steam_app_*"] fullscreen enable
-              for_window [class="steam"] fullscreen enable
-              SWAYEOF
+              : > /home/retro/.config/sway/custom-cfg
 
               # Do NOT export PULSE_SINK/PULSE_SOURCE here: this image has no
               # pactl, so the old lookup exported PULSE_SINK="" and
@@ -375,51 +373,152 @@ spec:
               # re-emits it as a pad this pod cannot see (menu works, game
               # sees no controller).
 
-              # Focus guard (sway only): Steam's steamwebhelper maps an invisible,
-              # unnamed, class-less notification popup (role "popup",
-              # _NET_WM_WINDOW_TYPE_NOTIFICATION) that grabs X input focus away
-              # from the running game. Gamescope pins focus to the game so it is
-              # immune; sway honors the client-side XSetInputFocus and keyboard +
-              # Steam Input controller routing both break (input lands in the
-              # popup, Steam thinks BPM is foreground). The guard polls X focus
-              # and, while a viewable steam_app_* window exists, returns focus to
-              # it whenever an unnamed/class-less window holds it. Legitimate
-              # focus changes (BPM has WM_CLASS steamwebhelper) are untouched.
+              # Focus guard (sway only): Steam's steamwebhelper maps an
+              # invisible, unnamed, class-less notification popup (role
+              # "popup", _NET_WM_WINDOW_TYPE_NOTIFICATION) that grabs X input
+              # focus away from the running game. Gamescope pins focus to the
+              # game so it is immune; sway honors the client-side
+              # XSetInputFocus and keyboard + Steam Input controller routing
+              # both break (input lands in the popup, Steam thinks BPM is
+              # foreground). The guard polls X focus and, while a viewable
+              # titled steam_app_* window exists, returns focus to it whenever
+              # an unnamed/class-less window holds it. Legitimate focus changes
+              # (BPM has WM_CLASS steamwebhelper) are untouched.
+              # Raw libX11 through ctypes, so the guard does not depend on the
+              # image shipping python3-xlib: on biggs-sz's steam:edge image the
+              # old `from Xlib import ...` version died on import at every
+              # session start and never ran. The X error handler is a no-op
+              # because windows vanish between calls.
               cat > /tmp/focus-guard.py <<'PYEOF'
+              import ctypes
+              import sys
               import time
-              from Xlib import display, X
 
-              def viewable_game(d):
-                  for w in d.screen().root.query_tree().children:
-                      try:
-                          cls = w.get_wm_class()
-                          if cls and cls[0].startswith("steam_app_") \
-                                  and w.get_attributes().map_state == X.IsViewable:
-                              return w
-                      except Exception:
-                          pass
-                  return None
+              DEBUG = "--debug" in sys.argv  # manual runs only
+              x = ctypes.CDLL("libX11.so.6")
+              Window = ctypes.c_ulong
+              IS_VIEWABLE = 2
+              REVERT_TO_PARENT = 2
+
+
+              class XClassHint(ctypes.Structure):
+                  _fields_ = [("res_name", ctypes.c_void_p), ("res_class", ctypes.c_void_p)]
+
+
+              class XWindowAttributes(ctypes.Structure):
+                  _fields_ = [
+                      ("x", ctypes.c_int), ("y", ctypes.c_int),
+                      ("width", ctypes.c_int), ("height", ctypes.c_int),
+                      ("border_width", ctypes.c_int), ("depth", ctypes.c_int),
+                      ("visual", ctypes.c_void_p), ("root", Window),
+                      ("class_", ctypes.c_int), ("bit_gravity", ctypes.c_int),
+                      ("win_gravity", ctypes.c_int), ("backing_store", ctypes.c_int),
+                      ("backing_planes", ctypes.c_ulong), ("backing_pixel", ctypes.c_ulong),
+                      ("save_under", ctypes.c_int), ("colormap", ctypes.c_ulong),
+                      ("map_installed", ctypes.c_int), ("map_state", ctypes.c_int),
+                      ("all_event_masks", ctypes.c_long), ("your_event_mask", ctypes.c_long),
+                      ("do_not_propagate_mask", ctypes.c_long),
+                      ("override_redirect", ctypes.c_int), ("screen", ctypes.c_void_p),
+                  ]
+
+
+              ERROR_HANDLER = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+              ignore_errors = ERROR_HANDLER(lambda d, e: 0)
+              x.XSetErrorHandler(ignore_errors)
+              x.XOpenDisplay.restype = ctypes.c_void_p
+              x.XOpenDisplay.argtypes = [ctypes.c_char_p]
+              x.XDefaultRootWindow.restype = Window
+              x.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+              x.XQueryTree.argtypes = [ctypes.c_void_p, Window, ctypes.POINTER(Window),
+                                       ctypes.POINTER(Window),
+                                       ctypes.POINTER(ctypes.POINTER(Window)),
+                                       ctypes.POINTER(ctypes.c_uint)]
+              x.XGetClassHint.argtypes = [ctypes.c_void_p, Window, ctypes.POINTER(XClassHint)]
+              x.XFetchName.argtypes = [ctypes.c_void_p, Window, ctypes.POINTER(ctypes.c_void_p)]
+              x.XGetWindowAttributes.argtypes = [ctypes.c_void_p, Window,
+                                                 ctypes.POINTER(XWindowAttributes)]
+              x.XGetInputFocus.argtypes = [ctypes.c_void_p, ctypes.POINTER(Window),
+                                           ctypes.POINTER(ctypes.c_int)]
+              x.XSetInputFocus.argtypes = [ctypes.c_void_p, Window, ctypes.c_int, ctypes.c_ulong]
+              x.XSync.argtypes = [ctypes.c_void_p, ctypes.c_int]
+              x.XFree.argtypes = [ctypes.c_void_p]
+
+
+              def take(ptr):
+                  if not ptr:
+                      return ""
+                  s = ctypes.string_at(ptr).decode(errors="replace")
+                  x.XFree(ptr)
+                  return s
+
+
+              def wm_class(d, w):
+                  hint = XClassHint()
+                  if not x.XGetClassHint(d, w, ctypes.byref(hint)):
+                      return None
+                  return take(hint.res_name), take(hint.res_class)
+
+
+              def wm_name(d, w):
+                  p = ctypes.c_void_p()
+                  if not x.XFetchName(d, w, ctypes.byref(p)):
+                      return ""
+                  return take(p.value)
+
+
+              def game_window(d):
+                  # The largest viewable, titled steam_app_* window. Every window of the
+                  # Proton prefix shares the steam_app_* class (the untitled Wine system
+                  # tray, "Default IME" helpers, launchers), so the class alone would
+                  # often pick the tray instead of the game.
+                  root, parent = Window(), Window()
+                  children = ctypes.POINTER(Window)()
+                  n = ctypes.c_uint()
+                  if not x.XQueryTree(d, x.XDefaultRootWindow(d), ctypes.byref(root),
+                                      ctypes.byref(parent), ctypes.byref(children),
+                                      ctypes.byref(n)):
+                      return None
+                  best, best_area = None, 0
+                  for i in range(n.value):
+                      w = children[i]
+                      cls = wm_class(d, w)
+                      if not cls or not cls[0].startswith("steam_app_"):
+                          continue
+                      name = wm_name(d, w)
+                      if not name or name == "Default IME":
+                          continue
+                      attrs = XWindowAttributes()
+                      if not x.XGetWindowAttributes(d, w, ctypes.byref(attrs)):
+                          continue
+                      area = attrs.width * attrs.height
+                      if attrs.map_state == IS_VIEWABLE and area > best_area:
+                          best, best_area = w, area
+                  if children:
+                      x.XFree(children)
+                  return best
+
 
               while True:
-                  try:
-                      d = display.Display()
-                      while True:
-                          game = viewable_game(d)
-                          if game is not None:
-                              f = d.get_input_focus().focus
-                              if getattr(f, "id", None) not in (None, game.id):
-                                  try:
-                                      cls = f.get_wm_class()
-                                      name = f.get_wm_name()
-                                  except Exception:
-                                      cls = name = None
-                                  if not cls and not name:
-                                      d.set_input_focus(game, X.RevertToParent,
-                                                        X.CurrentTime)
-                                      d.sync()
-                          time.sleep(1)
-                  except Exception:
+                  d = x.XOpenDisplay(b":0")
+                  if not d:
                       time.sleep(5)
+                      continue
+                  while True:
+                      game = game_window(d)
+                      if game is not None:
+                          focus, revert = Window(), ctypes.c_int()
+                          x.XGetInputFocus(d, ctypes.byref(focus), ctypes.byref(revert))
+                          f = focus.value
+                          if DEBUG:
+                              print("game", hex(game), repr(wm_name(d, game)),
+                                    "focus", hex(f), flush=True)
+                          # 0 = None, 1 = PointerRoot: nothing to steal back from.
+                          if f not in (0, 1, game.value) and not wm_class(d, f) and not wm_name(d, f):
+                              x.XSetInputFocus(d, game, REVERT_TO_PARENT, 0)
+                              x.XSync(d, 0)
+                              if DEBUG:
+                                  print("refocused", hex(game), flush=True)
+                      time.sleep(1)
               PYEOF
               if [ "$RUN_SWAY" = "true" ]; then
                 (
@@ -428,63 +527,114 @@ spec:
                 ) &
               fi
 
-              # Fullscreen watcher (sway only): for_window [class="steam_app_*"]
-              # in custom-cfg does NOT reliably fire for Xwayland windows because
-              # their WM_CLASS is set AFTER the map event, so the criterion misses
-              # at creation time (verified: the rule is loaded but the game window
-              # stays fullscreen_mode=0). This watcher polls the sway tree and, once
-              # a steam_app_* window exists, runs the fullscreen command directly
-              # (idempotent). Matches the focus-guard pattern above. Also
-              # fullscreens Steam Big Picture (class="steam") so BPM isn't tiled
-              # behind the game. The tree check lives in a script file: an
-              # inline python3 -c with "\n" inside bash double quotes passes
-              # the backslashes literally, so the one-liner was a SyntaxError
-              # every 2s and the watcher never fullscreened anything.
-              cat > /tmp/sway-has-steam.py <<'PYEOF'
+              # Fullscreen watcher (sway only): GOW's sway config tiles every
+              # window, so without this Steam Big Picture and the game sit
+              # side-by-side. Rules, all keyed on sway con ids:
+              # - A game window (X11: class exactly steam_app_<digits>, a
+              #   non-empty title, type normal, not transient; Wayland
+              #   (PROTON_ENABLE_WAYLAND): app_id *.exe with a title) is
+              #   fullscreened ONCE, when it first appears. Every Wine window
+              #   carries the steam_app_* class, including the untitled Wine
+              #   system tray (explorer.exe /desktop, 160x20) and launcher
+              #   dialogs. The old loop fullscreened every match every 2s, so
+              #   with RDR2 the tray (holding the Rockstar tray icon) was
+              #   stretched over the Rockstar Games Launcher (white screen,
+              #   tiny logo top-left), and launcher dialogs such as the cloud
+              #   save prompt were covered again within 2s. Once-per-window
+              #   lets dialogs and popups that open later stay on top.
+              # - Whenever nothing is fullscreen, the newest surviving game
+              #   window is re-fullscreened, else Steam Big Picture (class
+              #   exactly "steam"). Games can drop their own fullscreen after
+              #   start (NieR:Automata in windowed mode does): without the
+              #   game-first fallback BPM took the screen and the game was
+              #   left tiled and hidden behind it. BPM also fills the output
+              #   again after a game exits.
+              # - A Wayland game is re-focused if BPM takes focus: an occluded
+              #   Wayland game pauses rendering (DXGI occlusion), which reads as
+              #   a black/frozen stream. sway 1.11 has no color management, so
+              #   these games stay SDR even with PROTON_ENABLE_HDR set.
+              # Debug by hand: python3 /tmp/fs-watcher.py --debug
+              cat > /tmp/fs-watcher.py <<'PYEOF'
               import json
+              import re
+              import subprocess
               import sys
+              import time
 
-              tree = json.load(sys.stdin)
-              found = False
+              SOCK = "/tmp/.X11-unix/sway.socket"
+              GAME_CLASS = re.compile(r"^steam_app_\d+$")
+              DEBUG = "--debug" in sys.argv  # manual runs only
 
-              def walk(node):
-                  global found
-                  if not isinstance(node, dict):
-                      return
-                  props = node.get("window_properties") or {}
-                  cls = props.get("class") or ""
-                  appid = node.get("app_id") or ""
-                  # X11 games carry WM_CLASS (steam_app_*). PROTON_ENABLE_WAYLAND
-                  # games are native xdg_shell clients whose app_id is the .exe
-                  # name and have NO window_properties at all.
-                  if node.get("type") == "con" and (cls.startswith("steam") or appid.endswith(".exe")):
-                      found = True
+
+              def sway(*args):
+                  return subprocess.run(["swaymsg", "-s", SOCK, *args],
+                                        capture_output=True, text=True, timeout=5)
+
+
+              def views(node):
                   for key in ("nodes", "floating_nodes"):
                       for child in node.get(key) or []:
-                          walk(child)
+                          if "shell" in child:
+                              yield child
+                          yield from views(child)
 
-              walk(tree)
-              sys.exit(0 if found else 1)
+
+              def is_bpm(v):
+                  props = v.get("window_properties") or {}
+                  return props.get("class") == "steam"
+
+
+              def is_game(v):
+                  if not v.get("name"):
+                      return False
+                  if v.get("shell") == "xdg_shell":
+                      return (v.get("app_id") or "").endswith(".exe")
+                  props = v.get("window_properties") or {}
+                  return (GAME_CLASS.match(props.get("class") or "") is not None
+                          and props.get("window_type") in (None, "normal")
+                          and not props.get("transient_for"))
+
+
+              games = []  # game con ids, first-seen order
+              last_wayland_game = None
+              while True:
+                  try:
+                      vs = list(views(json.loads(sway("-t", "get_tree").stdout)))
+                      ids = {v["id"] for v in vs}
+                      games = [g for g in games if g in ids]
+                      for v in vs:
+                          if v["id"] in games or not is_game(v):
+                              continue
+                          sway(f"[con_id={v['id']}] fullscreen enable")
+                          games.append(v["id"])
+                          if v.get("shell") == "xdg_shell":
+                              sway(f"[con_id={v['id']}] focus")
+                              last_wayland_game = v["id"]
+                          if DEBUG:
+                              print("fullscreen", v["id"], repr(v.get("name")), flush=True)
+                      if not any(v.get("fullscreen_mode") for v in vs):
+                          # Nothing fullscreen: a game dropped its own fullscreen (NieR
+                          # does right after start), or the game exited. Prefer the
+                          # newest surviving game window, else Big Picture.
+                          target = games[-1] if games else next(
+                              (v["id"] for v in vs if is_bpm(v)), None)
+                          if target is not None:
+                              sway(f"[con_id={target}] fullscreen enable")
+                              if DEBUG:
+                                  print("refullscreen", target, flush=True)
+                      if last_wayland_game in ids:
+                          focused = next((v for v in vs if v.get("focused")), None)
+                          if focused is not None and is_bpm(focused):
+                              sway(f"[con_id={last_wayland_game}] focus")
+                  except Exception as exc:
+                      if DEBUG:
+                          print("error", exc, flush=True)
+                  time.sleep(2)
               PYEOF
               if [ "$RUN_SWAY" = "true" ]; then
                 (
                   while [ ! -S /tmp/.X11-unix/sway.socket ]; do sleep 2; done
-                  while true; do
-                    if SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg -t get_tree 2>/dev/null | \
-                       python3 /tmp/sway-has-steam.py; then
-                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam_app_*"] fullscreen enable' >/dev/null 2>&1 || true
-                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[class="steam"] fullscreen enable' >/dev/null 2>&1 || true
-                      # Wayland-native games (PROTON_ENABLE_WAYLAND): match by
-                      # app_id and keep the game focused -- an occluded Wayland
-                      # game pauses rendering (DXGI occlusion), which reads as a
-                      # black/frozen stream. sway 1.11 has no color management
-                      # (no wp_color_management_v1), so these games stay SDR even
-                      # with PROTON_ENABLE_HDR set.
-                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[app_id=".*\.exe"] fullscreen enable' >/dev/null 2>&1 || true
-                      SWAYSOCK=/tmp/.X11-unix/sway.socket swaymsg '[app_id=".*\.exe"] focus' >/dev/null 2>&1 || true
-                    fi
-                    sleep 2
-                  done
+                  exec runuser -u ${UNAME:-retro} -- python3 /tmp/fs-watcher.py
                 ) &
               fi
 

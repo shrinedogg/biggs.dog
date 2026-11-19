@@ -10,15 +10,15 @@ This document contains detailed architectural decisions, engineering notes, and 
 
 ### Forked Images
 
-Getting the GPU-accelerated game streaming stack working end-to-end required forking the Games on Whales operator ([shrinedogg/fenrir](https://github.com/shrinedogg/fenrir)) plus several cluster-specific config decisions. Images are built locally and published to Docker Hub with semver tags.
+Getting the GPU-accelerated game streaming stack working end-to-end required forking the Games on Whales operator ([shrinedogg/fenrir](https://github.com/shrinedogg/fenrir)) plus several cluster-specific config decisions. Images are built locally and published to Docker Hub; tags advance with each release, so the table describes the features instead of the version pins.
 
-| Image | Tag | Reason |
-| ----- | --- | ------ |
-| `docker.io/shrinedogg/operator` | `v0.1.7` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent is not up on the first try) and prunes stale `trackedSessions` entries that spam logs. v0.1.1 adds the user controller, which publishes the proxy pin URL into `User.Status.PublicPinURL` for multi-user pairing. v0.1.2 allocates a per-session port block for concurrent sessions; v0.1.3 gives each session pod a pod-private `/dev/input`. v0.1.4 sends `client_settings.motion_controller_override`: wolf parses `client_settings` strictly (every field required once the object is present), and wolf v0.2.0 picked up that field from upstream PR #442, so older operators fail every `AddSession` and the reaper kills the session pod ~60s after launch. v0.1.5 gates stream setup on a ready session pod (a fresh Deployment's transient 0/0 status used to pass) and puts a 5s connect / 30s request timeout on wolf API calls; without both, the first dial could hit a ClusterIP the CNI had not programmed yet and hang ~130s, past the reaper. v0.1.7 adds per-App `NVIDIA_VISIBLE_DEVICES` GPU pinning (joey's steam app pinned to GPU 0 for the cross-GPU import test). |
-| `docker.io/shrinedogg/moonlight-proxy` | `v0.1.6` | Raises the `/launch` wait from 25s to 120s; a cold start (image pull + Wolf boot + agent readiness) exceeds 25s, so upstream returned 500 and the client cancelled the session. v0.1.2 adds multi-user pairing: the pin page collects a username and binds the pairing to that `User` CR (replaces the hardcoded `alex`). v0.1.6 advertises HEVC Main10 for HDR streaming. |
-| `docker.io/shrinedogg/wolf-agent` | `v0.1.3` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers. |
-| `docker.io/shrinedogg/wolf` | `v0.2.9` | Built from [shrinedogg/wolf](https://github.com/shrinedogg/wolf) branch `feat/hdr-hevc-main10`: upstream v2026.11 (db709cf, Fedora base, C++20) plus the HDR/HEVC Main10 chain, with `gst-wayland-display` built from [shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display) @ 1a1d765 (upstream stable 016b4fc + 10-bit HDR chain, wl_drm conditional-advertise fix preserved) and the fork's Dockerfile customizations re-applied on the Fedora base (gst fork pin, `ninja -j2` QEMU OOM fix, `GST_WAYLAND_DISPLAY_ENABLE_10BIT=1`). v0.1.0 was the `wolf:stable` + wl_drm-fix overlay; v0.2.0 adds the upstream stable fixes (RTSP crash on client reset, resume instead of relaunch, input isolation) and the dormant HDR path (active only with `WOLF_ENABLE_HDR`). Requires operator >= v0.1.4 (see the operator row). |
-| `docker.io/shrinedogg/gpu-arbiter-operator` | `v0.1.1` | Go/controller-runtime port of the original bash `gpu-arbiter`; scales `vllm` to 0 during sessions and lifts the VRAM scheduling gate. v0.1.x fixed scaling to use the `deployments/scale` subresource (a backwards merge patch had emitted `replicas:null`, defaulting back to 1) and switched status writes to a full `Status().Update()` so zero-valued fields clear. |
+| Image | Notes |
+| ----- | ----- |
+| `docker.io/shrinedogg/operator` | Retries stream reconciliation (upstream stalls the session until the 1-minute reaper kills it whenever the agent is not up on the first try) and prunes stale `trackedSessions` entries that spam logs. The user controller publishes the proxy pin URL into `User.Status.PublicPinURL` for multi-user pairing; each concurrent session gets a per-session port block and a pod-private `/dev/input`; sends `client_settings.motion_controller_override` (wolf parses `client_settings` strictly, so operators without the field fail every `AddSession` and the reaper kills the session pod ~60s after launch); gates stream setup on a ready session pod (a fresh Deployment's transient 0/0 status used to pass) with a 5s connect / 30s request timeout on wolf API calls (without both, the first dial could hit a ClusterIP the CNI had not programmed yet and hang ~130s, past the reaper); and per-App `NVIDIA_VISIBLE_DEVICES` GPU pinning (joey's steam app pinned to GPU 0 for the cross-GPU import test). |
+| `docker.io/shrinedogg/moonlight-proxy` | Raises the `/launch` wait from 25s to 120s (a cold start — image pull + Wolf boot + agent readiness — exceeds 25s, so upstream returned 500 and the client cancelled the session). Multi-user pairing: the pin page collects a username and binds the pairing to that `User` CR (replaces the hardcoded `alex`); advertises HEVC Main10 for HDR streaming. |
+| `docker.io/shrinedogg/wolf-agent` | Implements Wolf's `fake-udev` mechanism in Go: on device hotplug it writes `/run/udev/data` entries and broadcasts synthetic libudev netlink events in the pod netns so SDL/Steam detect controllers. |
+| `docker.io/shrinedogg/wolf` | Built from [shrinedogg/wolf](https://github.com/shrinedogg/wolf) branch `feat/hdr-hevc-main10` (Fedora base, C++20) plus the HDR/HEVC Main10 chain, with `gst-wayland-display` built from [shrinedogg/gst-wayland-display](https://github.com/shrinedogg/gst-wayland-display) (10-bit HDR chain, wl_drm conditional-advertise fix preserved) and the fork's Dockerfile customizations re-applied on the Fedora base (gst fork pin, `ninja -j2` QEMU OOM fix, `GST_WAYLAND_DISPLAY_ENABLE_10BIT=1`). Early builds were a `wolf:stable` + wl_drm-fix overlay; later releases add the upstream stable fixes (RTSP crash on client reset, resume instead of relaunch, input isolation) and the dormant HDR path (active only with `WOLF_ENABLE_HDR`). Requires the operator's motion-controller-override support (see the operator row). |
+| `docker.io/shrinedogg/gpu-arbiter-operator` | Go/controller-runtime port of the original bash `gpu-arbiter`; scales `vllm` to 0 during sessions and lifts the VRAM scheduling gate. Scaling uses the `deployments/scale` subresource (a backwards `client.MergeFrom` merge patch had emitted `replicas:null`, defaulting back to 1) and status is written with a full `Status().Update()` so zero-valued fields clear. |
 
 ### Defined Apps Detail
 
@@ -105,17 +105,17 @@ Both clusters run **Cilium** as the CNI (replaces kube-proxy) and **Gateway API*
 
 ### Storage Layers
 
-- **Rook-Ceph** - distributed block storage (`ceph-block` StorageClass, pool `ceph-blockpool` size 3) on four OSDs, one Micron 7450 960 GB NVMe per worker. Rook v1.20 (chart `v1.20.6`) no longer deploys CSI itself: the `Driver`/`OperatorConfig` CRs for the ceph-csi-operator live in `rook-ceph/csi-rbac/drivers.yaml` next to the driver RBAC; without them no provisioner or nodeplugin runs. OSD devices are named by `/dev/disk/by-id/nvme-Micron_7450_..._<serial>`, never `/dev/nvmeXn1` (see Storage pitfalls). Cluster fsid `37a406cf-68c2-4131-96e7-f7b7c050b2c4` survived the 2026-09-07 rebuild via the mon-store adoption procedure in `.omni/cluster1/` (plan `2026-09-07_000000-cluster1-rebuild-selfhosted-omni-ceph-preserved`).
-- **OpenEBS** - local container-attached storage (ZFS and local disk via localpv host-path provisioner, chart `4.6.0` on both clusters).
-- **Volsync** - bidirectional backup and replication of PVs (chart `0.16.0`) to Backblaze B2. Cache PVCs pinned to `ceph-block`.
-- **Snapshot Controller** - CSI volume snapshots (chart `5.2.0`).
-- **NFS CSI** - NFS provisioner for shared namespaces (chart `4.13.4`).
+- **Rook-Ceph** - distributed block storage (`ceph-block` StorageClass, pool `ceph-blockpool` size 3) on four OSDs, one Micron 7450 960 GB NVMe per worker. Rook Ceph no longer deploys CSI itself: the `Driver`/`OperatorConfig` CRs for the ceph-csi-operator live in `rook-ceph/csi-rbac/drivers.yaml` next to the driver RBAC; without them no provisioner or nodeplugin runs. OSD devices are named by `/dev/disk/by-id/nvme-Micron_7450_..._<serial>`, never `/dev/nvmeXn1` (see Storage pitfalls). Cluster fsid `37a406cf-68c2-4131-96e7-f7b7c050b2c4` survived the 2026-09-07 rebuild via the mon-store adoption procedure in `.omni/cluster1/` (plan `2026-09-07_000000-cluster1-rebuild-selfhosted-omni-ceph-preserved`).
+- **OpenEBS** - local container-attached storage (ZFS and local disk via localpv host-path provisioner on both clusters).
+- **Volsync** - bidirectional backup and replication of PVs to Backblaze B2. Cache PVCs pinned to `ceph-block`.
+- **Snapshot Controller** - CSI volume snapshots.
+- **NFS CSI** - NFS provisioner for shared namespaces.
 - **ZFS** - volume management on nodes with ZFS pools.
 
 ### Database and Caching
 
-- **CNPG** - PostgreSQL operator managing in-cluster Postgres clusters (chart `0.29.0`, used by Pocket ID, kagent, and others; PG18 minimal Trixie image catalog).
-- **Barman Cloud** - CNPG plugin (`0.7.1`) for backup/recovery to object storage.
+- **CNPG** - PostgreSQL operator managing in-cluster Postgres clusters (used by Pocket ID, kagent, hister, and others; PG18 minimal Trixie image catalog).
+- **Barman Cloud** - CNPG plugin for backup/recovery to object storage.
 - **Dragonfly** - Redis-compatible in-memory store (used by OAuth2 Proxy for session storage and other services).
 
 ### Security Model
@@ -123,8 +123,8 @@ Both clusters run **Cilium** as the CNI (replaces kube-proxy) and **Gateway API*
 Secrets follow a three-tier model:
 
 1. **SOPS + age** - Git-encrypted secrets (for config that can be committed, e.g., Cilium policies, app defaults).
-2. **External Secrets + 1Password** - Runtime secrets synced from 1Password vaults (chart `2.9.0` with 1Password Connect chart `v2.4.1`).
-3. **cert-manager** - Automatic certificate issuance and renewal (chart `v1.21.1`, ACME Let's Encrypt, CA issuer for self-signed).
+2. **External Secrets + 1Password** - Runtime secrets synced from 1Password vaults (External Secrets with the 1Password Connect chart).
+3. **cert-manager** - Automatic certificate issuance and renewal (ACME Let's Encrypt, CA issuer for self-signed).
 
 ### Mindwtr (Notes App)
 
@@ -157,7 +157,7 @@ This two-tier approach allows staged rollouts and rapid rollback without affecti
 The two clusters run different identity stacks (a deliberate split: the management cluster needs an always-on IdP reachable before any on-prem dependency is up; the workload cluster uses the passkey-first stack for its apps).
 
 **Dex** (`cluster0`, `dex.biggs.dog`) - root OIDC IdP for the management plane:
-- `ghcr.io/dexidp/dex:v2.45.1`, stateless (`storage.type: memory`, single replica; tokens do not survive restarts, fine for interactive logins).
+- `ghcr.io/dexidp/dex` (tag renovate-tracked), stateless (`storage.type: memory`, single replica; tokens do not survive restarts, fine for interactive logins).
 - `enablePasswordDB: true` with a static admin user; clients/secrets templated into the config from 1Password.
 - Static clients: `omni` (Omni OIDC login), `image-factory` (Image Factory UI).
 - **Omni's OIDC callback** - the actual callback path is `/oidc/consume` (not `/Callback` or `/callback`).
@@ -165,12 +165,12 @@ The two clusters run different identity stacks (a deliberate split: the manageme
 - `connectors: []` - Dex is the root IdP here, not a federator in front of Pocket ID.
 
 **Pocket ID** (`cluster1`, `id.biggs.dog`) - passkey-first OIDC for workload apps:
-- Passkey-first OIDC provider (`v2.14.0`, FIDO2 WebAuthn).
+- Passkey-first OIDC provider (FIDO2 WebAuthn; image tag renovate-tracked).
 - Postgres backend via CNPG (user database, secret storage).
 - File uploads stored in the same database.
 
 **OAuth2 Proxy** (`cluster1`, `auth.biggs.dog`):
-- OIDC client to Pocket ID (image `v7.15.4`, chart `10.7.0`).
+- OIDC client to Pocket ID (image and chart tags renovate-tracked).
 - Provides forward-auth for browser apps (agentgateway `AgentgatewayPolicy` with `traffic.extAuth`).
 - Uses **Dragonfly (Redis)** for session storage (small session ticket instead of large cookie).
 - Protected apps attach a `ReferenceGrant` to reach the OAuth2 Proxy service in the `auth` namespace.
@@ -186,9 +186,9 @@ The two clusters run different identity stacks (a deliberate split: the manageme
 
 ### Observability Stack
 
-- **VictoriaMetrics** - metrics storage (`victoria-metrics-k8s-stack` chart `0.91.2`).
-- **VictoriaLogs** - log aggregation and storage (chart `0.13.9` single, `0.3.7` collector).
-- **Grafana Operator** - Grafana deployment and dashboard management (chart `10.5.15`, dashboards stored as CRDs).
+- **VictoriaMetrics** - metrics storage (`victoria-metrics-k8s-stack`).
+- **VictoriaLogs** - log aggregation and storage (single + collector charts).
+- **Grafana Operator** - Grafana deployment and dashboard management (dashboards stored as CRDs).
 
 The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-arbiter-operator` queries it via the VictoriaMetrics HTTP API.
 
@@ -196,16 +196,16 @@ The DCGM exporter (NVIDIA GPU metrics) feeds into VictoriaMetrics, and the `gpu-
 
 - **NFD** (Node Feature Discovery) - detects hardware capabilities (GPU models, CPU flags, etc.) and labels nodes.
 - **Intel GPU Plugin** - enables Intel iGPU device plugin for media transcoding on worker nodes.
-- **NVIDIA GPU Operator** - device plugin with time-slicing (chart `v26.7.0`; driver and toolkit provided by Talos system extensions).
-- **Omni (Sidero)** - run in-cluster on `cluster0` (`apps/omni/`, image `ghcr.io/siderolabs/omni:v1.10.5`) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `192.168.2.31:50180`). Sole manager of `cluster1` (the hosted Sidero SaaS Omni is retired). Node join is via the generic ISO from `factory.biggs.dog` (control-01 needs the `control-01-bond` media preset because its switch ports are a static LACP aggregate). Machine templates and per-machine patches: `.omni/cluster1/self-hosted/` (git-ignored, `omnictl cluster template sync -f cluster-template.yaml`). Hardware template tracks `nv-01`'s dual RTX 5090 topology (ASRock X870E Taichi Lite x8/x8 bifurcation, ASUS TUF in slot 1, Zotac AMP Extreme Infinity upright in slot 2 via 900mm riser, Lian Li O11D EVO XL, 1600W PSU, Sidero kernel-signed open GPU modules 595.71.05). LAN clients must resolve `omni.biggs.dog` to `192.168.2.31`: both `k8s-gateway` and `lan-dns` carry a `hosts` block for edge names because the Cloudflare-proxied public answer 403s gRPC. Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy`. Backed by embedded etcd + SQLite PVCs on OpenEBS; OIDC login via Dex.
-- **Talos Image Factory** - builds and signs custom Talos Linux images with cosign (`ghcr.io/siderolabs/image-factory:v1.6.0`). Stateless HTTP service on `:8080` behind an `oauth2-proxy` authenticated against Dex at `factory.biggs.dog`. Durable state lives in a registry PVC. cosign signing key and public key are mounted as Secrets. Rate-limit policy and an embedded OCI registry (`registry-deployment`) are also deployed.
-- **Cluster API (CAPI) on `cluster0`** - CAPI operator (`0.28.0`), core CAPI `v1.14`, CABPT `v0.7.6`, CACPPT `v0.6.4`, and CAPT `v0.7.1` (Tinkerbell) manage the management node. Manifests live in `clusters/cluster0/capi/`.
-- **`nv-01` Dual-GPU Node Hardware** - AMD Ryzen 7 7800X3D (8C / 16T), 64 GB DDR5 RAM, dual NVIDIA GeForce RTX 5090 dGPUs (ASUS TUF in PCIe slot 1 + Zotac AMP Extreme Infinity upright in PCIe slot 2 via 900mm riser, 64 GB total GDDR7 VRAM), ASRock X870E Taichi Lite motherboard (PCIe 5.0 x8/x8 bifurcation), Lian Li O11D EVO XL chassis, 1600W PSU, Samsung 9100 PRO 1TB install disk, Realtek RTL8126 5GbE NIC (`enp9s0`), and Sidero Talos kernel-signed open GPU modules (`595.71.05`).
+- **NVIDIA GPU Operator** - device plugin with time-slicing (driver and toolkit provided by Talos system extensions).
+- **Omni (Sidero)** - run in-cluster on `cluster0` (`apps/omni/`, the `ghcr.io/siderolabs/omni` image) as the full Talos management plane (UI at `omni.biggs.dog`, machine API `:8090`, event sink `:8091`, K8s proxy `:8100`, Siderolink WireGuard `:50180/udp` advertised at `192.168.2.31:50180`). Sole manager of `cluster1` (the hosted Sidero SaaS Omni is retired). Node join is via the generic ISO from `factory.biggs.dog` (control-01 needs the `control-01-bond` media preset because its switch ports are a static LACP aggregate). Machine templates and per-machine patches: `.omni/cluster1/self-hosted/` (git-ignored, `omnictl cluster template sync -f cluster-template.yaml`). Hardware template tracks `nv-01`'s dual RTX 5090 topology (ASRock X870E Taichi Lite x8/x8 bifurcation, ASUS TUF in slot 1, Zotac AMP Extreme Infinity upright in slot 2 via 900mm riser, Lian Li O11D EVO XL, 1600W PSU). LAN clients must resolve `omni.biggs.dog` to `192.168.2.31`: both `k8s-gateway` and `lan-dns` carry a `hosts` block for edge names because the Cloudflare-proxied public answer 403s gRPC. Runs privileged with `/dev/net/tun`; double-TLS via `BackendTLSPolicy`. Backed by embedded etcd + SQLite PVCs on OpenEBS; OIDC login via Dex.
+- **Talos Image Factory** - builds and signs custom Talos Linux images with cosign (the `ghcr.io/siderolabs/image-factory` image). Stateless HTTP service on `:8080` behind an `oauth2-proxy` authenticated against Dex at `factory.biggs.dog`. Durable state lives in a registry PVC. cosign signing key and public key are mounted as Secrets. Rate-limit policy and an embedded OCI registry (`registry-deployment`) are also deployed.
+- **Cluster API (CAPI) on `cluster0`** - the CAPI operator, core CAPI, CABPT, CACPPT, and CAPT (Tinkerbell) manage the management node. Manifests live in `clusters/cluster0/capi/`.
+- **`nv-01` Dual-GPU Node Hardware** - AMD Ryzen 7 7800X3D (8C / 16T), 64 GB DDR5 RAM, dual NVIDIA GeForce RTX 5090 dGPUs (ASUS TUF in PCIe slot 1 + Zotac AMP Extreme Infinity upright in PCIe slot 2 via 900mm riser, 64 GB total GDDR7 VRAM), ASRock X870E Taichi Lite motherboard (PCIe 5.0 x8/x8 bifurcation), Lian Li O11D EVO XL chassis, 1600W PSU, Samsung 9100 PRO 1TB install disk, Realtek RTL8126 5GbE NIC (`enp9s0`), and Sidero Talos kernel-signed open GPU modules.
 - **Per-machine Omni `ConfigPatch`es** - node-level config lives in Omni as per-machine `ConfigPatch`es (each node carries a `10-<machine-id>` user patch: hostname, NIC rings, node-specific tweaks). Local copies live under `.omni/cluster1/self-hosted/` (git-ignored). Inspect/apply with `omnictl` (`omnictl get configpatch`, `omnictl apply -f ...`). CoreDNS is configured cluster-wide via the `coredns-custom` inline-manifest patch (scoped to the cluster, not per node). When setting an explicit `HostnameConfig.hostname` on a directly-scaled node, also `$patch: delete` the default `auto` field, or Talos rejects the config (`'auto' and 'hostname' cannot be set at the same time`).
 
 ### Automation
 
-- **Renovate** - automated dependency updates for HelmRelease chart versions and container images referenced in Kubernetes manifests (`ghcr.io/mend/renovate-ce:15.4.0`). Configured in `renovate.json`.
+- **Renovate** - automated dependency updates for HelmRelease chart versions and container images referenced in Kubernetes manifests (the `ghcr.io/mend/renovate-ce` image). Configured in `renovate.json`.
 
 ## AI and Agents Architecture
 
@@ -214,7 +214,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 ### vLLM Deployment
 
 - **Model**: [`minima-ai/mnma_qwen3.8_27b_nvfp4`](https://huggingface.co/minima-ai/mnma_qwen3.8_27b_nvfp4) (served as `qwen 3.8 - local`) - the Minima NVFP4 W4A4 post-training quant of the **27B dense** Gated-DeltaNet / gated-attention hybrid (only 16 of 64 layers keep paged KV): all 496 linear layers at NVFP4 (group 16, FP8 scales) plus calibrated static FP8 KV scales, single `model.safetensors` ~17.5 GiB incl. the MTP draft head, ~8.75 GiB weights per card (vs ~14.4 GiB for the previous FP8 checkpoint). **Full native 262K context** served (`--max-model-len=262144`).
-- **Version**: `docker.io/vllm/vllm-openai:v0.33.0` (untagged = CUDA 13.0 build for Blackwell GPU support on RTX 5090; v0.33.0 dropped the `-cu129` CUDA 12.9 variants entirely).
+- **Image**: `docker.io/vllm/vllm-openai` (untagged = CUDA 13.0 build for Blackwell GPU support on RTX 5090; the current untagged build dropped the `-cu129` CUDA 12.9 variants entirely; the tag is renovate-tracked).
 - **GPU**: Tensor-parallel 2 across BOTH of `nv-01`'s RTX 5090s (~8.75 GiB NVFP4 weights per card, estimated ~15.5 GiB fp8 KV pool per card, ~31 GiB total at 0.92 util, up from ~20 GiB under the FP8 checkpoint). The CDI device plugin injects only the allocated card and ignores a pod-level `NVIDIA_VISIBLE_DEVICES=all`, so the pod requests 5 of the 8 time-sliced `nvidia.com/gpu` replicas to pigeonhole across both cards (verified 2026-09-09 with throwaway pods).
 - **Scaling**: Idle = 1 replica; gaming session = 0 replicas (managed by `gpu-arbiter-operator`).
 - **API**: OpenAI-compatible (`/v1/chat/completions`, etc.) at `http://vllm.ai-system.svc:8000`.
@@ -231,7 +231,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 - **`--gpu-memory-utilization 0.92`** - ~3 GB free per card; deliberately below the old single-card 0.96 ceiling (0.97 contributed to a node lockup when embeddings also ran on GPU).
 - **`--max-num-batched-tokens 8192`** - reduces prefill scheduling rounds for medium tool prompts.
 - **`--kv-cache-dtype fp8`**.
-- **MTP speculative decoding** - `--speculative-config {"method":"mtp","num_speculative_tokens":2}` using the draft head shipped in the checkpoint.
+- **MTP speculative decoding** - removed 2026-11-15 (measured 0.009% acceptance on the NVFP4 checkpoint; see the REMOVED note in `deployment.yaml`). The draft head still ships in the checkpoint; re-enable `--speculative-config` only with a checkpoint whose MTP head is healthy.
 - **Quantization**: auto-detected NVFP4 (compressed-tensors, nvfp4-pack-quantized) from the checkpoint's `quantization_config`; no `--quantization` flag is passed.
 - **Tool-call parser**: `--tool-call-parser qwen3_coder` + `--reasoning-parser qwen3` (with `--enable-auto-tool-choice`), paired with the model's built-in chat template.
 - **`--language-model-only`** - skips the vision encoder on this checkpoint, preserving VRAM for KV cache.
@@ -245,7 +245,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 5. `unsloth/Qwen3.6-27B-NVFP4` (dense quant with BF16 vision/embeddings, ~23 GiB resident, 177184 ceiling with 5.71 GiB KV).
 6. `unsloth/Qwen3.8-27B-NVFP4` (Unsloth Dynamic V3.0, ~19.9 GB disk / ~18 GiB resident on one card, Gated-DeltaNet hybrid attention with only 16 of 64 layers keeping paged KV, 173K context at util 0.96 and 8-way concurrency; weights stay cached on the PVC as the single-card fallback).
 7. `Qwen/Qwen3.8-27B-FP8` (previous: official W8A8 FP8, tensor-parallel 2 across both 5090s, full 262K window, 16-way, util 0.92, MTP-2).
-8. `minima-ai/mnma_qwen3.8_27b_nvfp4` (current: Minima NVFP4 W4A4 post-training quant, ~17.5 GiB single safetensors, ~8.75 GiB weights per card, estimated ~31 GiB aggregate fp8 KV pool, ~3.5 concurrent full-length 262K sessions; vLLM `v0.33.0`). The old FP8 weights stay cached on the PVC as the single-card fallback.
+8. `minima-ai/mnma_qwen3.8_27b_nvfp4` (current: Minima NVFP4 W4A4 post-training quant, ~17.5 GiB single safetensors, ~8.75 GiB weights per card, estimated ~31 GiB aggregate fp8 KV pool, ~3.5 concurrent full-length 262K sessions). The old FP8 weights stay cached on the PVC as the single-card fallback.
 
 ### Embeddings Service
 
@@ -258,7 +258,7 @@ The `ai-system` namespace runs a fully local, GPU-accelerated agentic-ops stack.
 
 ### kagent Agents
 
-All 12 agents are `kind: Agent` CRs (`api.kagent.dev/v1alpha3`) running on the shared golang-adk `Harness`es defined in `kagent/app/harnesses.yaml`, invocable via the kagent MCP server:
+All 13 agents are `kind: Agent` CRs (`api.kagent.dev/v1alpha3`) running on the shared golang-adk `Harness`es defined in `kagent/app/harnesses.yaml`, invocable via the kagent MCP server:
 
 **MCP custom agents** (each backed by its own MCP server or static definition):
 - `flux-agent` (read-only) - Flux GitOps inspection (custom, `clusters/cluster1/kubernetes/apps/ai-system/flux-mcp/`).
@@ -268,6 +268,7 @@ All 12 agents are `kind: Agent` CRs (`api.kagent.dev/v1alpha3`) running on the s
 - `cilium-policy-agent` - Cilium policy authoring (static, `clusters/cluster1/kubernetes/apps/ai-system/kagent/cilium-agents/`; carries generic `k8s_*` tools).
 - `codebase-agent` - Structural code intelligence over indexed repos (custom, `clusters/cluster1/kubernetes/apps/ai-system/codebase-memory-mcp/`).
 - `mindwtr-agent` - Mindwtr task management (custom, `clusters/cluster1/kubernetes/apps/ai-system/mindwtr-mcp/`).
+- `hister-agent` - personal-history search over the pages you visit and the files you keep, served by the `hister` app (custom, `clusters/cluster1/kubernetes/apps/ai-system/hister-mcp/`).
 
 **Cluster-ops agents** (`clusters/cluster1/kubernetes/apps/ai-system/kagent/substrate-agents/`, gVisor-sandboxed via the substrate `WorkerPool`):
 - `k8s-agent` - general Kubernetes inspection/troubleshooting.
@@ -276,34 +277,34 @@ All 12 agents are `kind: Agent` CRs (`api.kagent.dev/v1alpha3`) running on the s
 - `helm-agent` - Helm release management.
 - `cilium-manager-agent` - Cilium install/config/upgrade.
 
-These five are the former substrate `SandboxAgent`s, ported to plain `Agent` CRs with the 2026-10-10 kagent 1.0.0-alpha11 + substrate 0.5.0-alpha2 migration (issue #594): the kagent 1.0.0 controller materializes agent config into the current ActorTemplate API, which resolves the `ReconcileFailed` state of 2026-09-11 (root cause and history under [Substrate and kagent ActorTemplate env incompatibility](#substrate-and-kagent-actortemplate-env-incompatibility)). The old MCP-listing gap for `SandboxAgent`s (which listed only `v1alpha2.Agent` with `DeploymentReady`) no longer applies: kagent 1.0.0 exposes every `Agent` CR, including the gVisor-sandboxed ones, on its MCP/A2A session surface.
+These five are the former substrate `SandboxAgent`s, ported to plain `Agent` CRs with the 2026-10-10 1.0-line migration (issue #594): the 1.0-line kagent controller materializes agent config into the current ActorTemplate API, which resolves the `ReconcileFailed` state of 2026-09-11 (root cause and history under [Substrate and kagent ActorTemplate env incompatibility](#substrate-and-kagent-actortemplate-env-incompatibility)). The old MCP-listing gap for `SandboxAgent`s (which listed only `v1alpha2.Agent` with `DeploymentReady`) no longer applies: the 1.0-line kagent controller exposes every `Agent` CR, including the gVisor-sandboxed ones, on its MCP/A2A session surface.
 
 ### Agent Sandbox and Code Execution
 
 There are two sandboxing mechanisms deployed in `ai-system`:
 
-1. **SIG-Apps `Sandbox` CRD + controller** (`agents.x-k8s.io`, GitRepository ref `v1.0.11` with `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks`. All classic agents are configured with code execution enabled.
+1. **SIG-Apps `Sandbox` CRD + controller** (`agents.x-k8s.io`, `controller.extensions: true`), which provides isolated, stateful single-pod runtimes for classic `kind: Agent` CRs that opt into `executeCodeBlocks`. All classic agents are configured with code execution enabled.
 2. **kagent substrate runtime (ATE / actor runtime)** - a separate control plane for sandboxed code execution via **gVisor**, used by `kind: SandboxAgent` CRs. See [Substrate Runtime](#substrate-runtime) below.
 
 **Two hard requirements**:
 
 1. **Ingress from the kube-apiserver to the conversion webhook (`:9443`) must be allowed.** `ai-system` runs implicit Cilium default-deny ingress (`allow-intra-namespace` selects `endpointSelector: {}`), and the apiserver runs host-network on a remote control-plane node, so it is not covered by Cilium's allow-localhost exemption. Without an explicit allow, every Sandbox conversion the apiserver issues is silently dropped: the controller crash-loops on cache-sync, `kubectl get sandboxes` hangs, and anything creating a `Sandbox` stalls to a 30s timeout. Handled by the `allow-ingress-apiserver-to-sandbox-webhook` CiliumNetworkPolicy in `clusters/cluster1/kubernetes/apps/network-policies/policies/infra/ai-system.yaml` (`fromEntities: [kube-apiserver]` -> `:9443`).
-2. **SandboxAgent MCP-listing gap - resolved by the 1.0.0 pairing.** Historically, upstream kagent's `MCPHandler.listReadyAgents` listed only `v1alpha2.AgentList` and hard-coded `condition.Reason == "DeploymentReady"`; substrate agents reported `WorkloadReady`, so they were excluded from `list_agents` and `invoke_agent` returned "agent not found or not ready". With kagent 1.0.0-alpha11 (2026-10-10), those agents are plain `Agent` CRs exposed on the MCP/A2A session surface, so the gap no longer applies.
+2. **SandboxAgent MCP-listing gap - resolved by the 1.0-line pairing.** Historically, upstream kagent's `MCPHandler.listReadyAgents` listed only `v1alpha2.AgentList` and hard-coded `condition.Reason == "DeploymentReady"`; substrate agents reported `WorkloadReady`, so they were excluded from `list_agents` and `invoke_agent` returned "agent not found or not ready". With the 1.0-line kagent (2026-10-10), those agents are plain `Agent` CRs exposed on the MCP/A2A session surface, so the gap no longer applies.
 
 ### Substrate Runtime
 
 The kagent **substrate** (ATE / actor runtime) is deployed in `clusters/cluster1/kubernetes/apps/ai-system/substrate/` (CRDs nested in `substrate/substrate-crds/`) and backs the 5 cluster-ops `Agent` CRs (gVisor-sandboxed actors). It was re-enabled on 2026-10-10 with the substrate-stack migration (issue #594) after the 2026-10-09 teardown; the full layout, B2 snapshot-store details, and history live in `clusters/cluster1/kubernetes/apps/ai-system/substrate/README.md`.
-- **Charts**: `substrate` and `substrate-podcert` (OCI, `sources/substrate-oci.yaml` / `sources/substrate-podcert-oci.yaml`, both `0.5.0-alpha2`) and `substrate-crds` (git-sourced from `kagent-dev/substrate` at v1.0.1, `sources/substrate-crds-git.yaml`; see the pinned tags in the substrate-stack lockstep rule in renovate.json).
-- **Worker pool**: `kagent-default`, `sandboxClass: gvisor`, `ateomImage: ghcr.io/kagent-dev/substrate/ateom-gvisor:v0.5.0-alpha2` in the kagent HelmRelease, pinned in lockstep with the substrate control plane.
+- **Charts**: `substrate` and `substrate-podcert` (OCI, `sources/substrate-oci.yaml` / `sources/substrate-podcert-oci.yaml`) and `substrate-crds` (git-sourced from `kagent-dev/substrate`, `sources/substrate-crds-git.yaml`; the substrate-stack lockstep rule in renovate.json pins the tags in lockstep with kagent).
+- **Worker pool**: `kagent-default`, `sandboxClass: gvisor`, gVisor worker image (`ghcr.io/kagent-dev/substrate/ateworker-gvisor`) in the kagent HelmRelease, pinned in lockstep with the substrate control plane.
 - **Components**: `ate-controller`, `ate-api-server`, the `atelet` worker DaemonSet (re-pointed at the release-local `api` service, `api.ai-system.svc:443`, instead of the chart's default `ate-system` namespace), and `atenet-router`/atenet egress. Pod identity is mTLS via the `substrate-podcert` podcertificate controller (PodCertificate bundle + servicedns ClusterTrustBundle mounted into kagent when `controller.substrate` is enabled); the old digest-pinned `ateapi` fork with `--client-jwt-jwks-url` is gone.
 - **Storage**: Postgres is BYO via CNPG `cnpg-substrate` (the chart no longer bundles Postgres). Snapshots and the gVisor runtime asset live on durable Backblaze B2 (shared `s3.eu-central-003.backblazeb2.com` endpoint, `biggs-dog/substrate/...` prefix); the chart's default in-cluster rustfs store is disabled.
 - **Assets**: the gVisor runtime tarball (`s3://biggs-dog/substrate/gvisor.tar.zstd`, seeded once from the 2026-09-02 upstream nightly, pinned by the chart's own sha256) is downloaded by the golden actors from B2 rather than staged in-cluster.
 
-**Drift correction** was part of the 0.0.21-era stack (`driftDetection: {mode: enabled}` on the substrate HelmRelease); it was dropped when the 0.5.0-alpha2 stack landed (commit 284bee80).
+**Drift correction** was part of the 0.0.21-era stack (`driftDetection: {mode: enabled}` on the substrate HelmRelease); it was dropped when the 1.0-line stack landed (commit 284bee80).
 
 ### Substrate and kagent ActorTemplate env incompatibility
 
-**Status: resolved.** The 2026-10-10 migration to kagent 1.0.0-alpha11 + substrate 0.5.0-alpha2 (resolution path (a) below, issue #594) removed this incompatibility: the kagent 1.0.0 controller materializes actor config into the current ActorTemplate API, and the five agents are now plain `Agent` CRs that reconcile and run. The root-cause detail below is retained as history.
+**Status: resolved.** The 2026-10-10 migration to the 1.0-line kagent + substrate pairing (resolution path (a) below, issue #594) removed this incompatibility: the 1.0-line kagent controller materializes actor config into the current ActorTemplate API, and the five agents are now plain `Agent` CRs that reconcile and run. The root-cause detail below is retained as history.
 
 The 5 `SandboxAgent` CRs were `ACCEPTED=False` (`ReconcileFailed`) from 2026-09-11 until the 2026-10-10 migration. The kagent 0.10.x controller could not create their ActorTemplates:
 
@@ -317,7 +318,7 @@ Root cause (verified at the Go type level, 2026-10-05):
 - substrate removed `valueFrom` from the ActorTemplate API between 0.0.10 and 0.0.15. The v0.0.21 type states "envFrom and valueFrom are not supported" (`pkg/api/v1alpha1/actortemplate_types.go`), and the shipped CRD requires `env[].value` and drops `valueFrom`. Because the removal is in the control-plane types (not just the CRD schema), patching the CRD would not help: unknown fields get pruned and the runtime cannot resolve secrets.
 - Therefore no SandboxAgent can be created on any kagent 0.10.x + substrate >= 0.0.15 combination. This cluster's pin (kagent 0.10.2 + substrate 0.0.21, chosen in #485 as the last WorkerPool-compatible pair) sits inside the broken window; the WorkerPool check simply missed the ActorTemplate CRD.
 
-Resolution paths: (a) the planned paired upgrade to kagent 1.0.0 + substrate >= 0.3.0 (#553; renovate substrate-stack pinned `<0.0.22`) - **executed 2026-10-10 as kagent 1.0.0-alpha11 + substrate 0.5.0-alpha2 (issue #594)**, with the static agent fleet ported to `Agent` + `Harness` CRs; (b) downgrade the whole substrate stack to <= 0.0.10 (last valueFrom-capable release; matches the v0.0.10-based ateapi fork), viable but a helm-release wipe/reinstall, not pursued; (c) the MCP-listing gap noted under [Agent Sandbox and Code Execution](#agent-sandbox-and-code-execution) was also closed by the 1.0.0 pairing, which exposes every `Agent` CR on its MCP/A2A session surface.
+Resolution paths: (a) the planned paired upgrade to kagent 1.0.0 + substrate >= 0.3.0 (#553; renovate substrate-stack pinned `<0.0.22`) - **executed 2026-10-10 as the 1.0-line pairing (issue #594)**, with the static agent fleet ported to `Agent` + `Harness` CRs; (b) downgrade the whole substrate stack to <= 0.0.10 (last valueFrom-capable release; matches the v0.0.10-based ateapi fork), viable but a helm-release wipe/reinstall, not pursued; (c) the MCP-listing gap noted under [Agent Sandbox and Code Execution](#agent-sandbox-and-code-execution) was also closed by the 1.0.0 pairing, which exposes every `Agent` CR on its MCP/A2A session surface.
 
 ### Long-Term Memory
 
@@ -330,13 +331,15 @@ kagent is configured with vectorized memory backed by CNPG Postgres + pgvector, 
 - **Exa MCP** (`exa-agent`) - Web search, code discovery, company research.
 - **codebase-memory-mcp** (`codebase-agent`) - code intelligence over indexed repos (tree-sitter -> SQLite knowledge graph + bundled semantic search; 15 tools). Wrapped in `mcp-proxy` bridge with git-sync native sidecar.
 - **mindwtr-mcp** (`mindwtr-agent`) - GTD task management against the Mindwtr SQLite database.
+- **Hister MCP** (`hister-agent`) - personal-history search against the Hister index (pages you visited + files you keep, via the `hister` app's access-token-gated MCP endpoint).
+- **Grafana MCP** (`observability-agent`) - the `grafana-mcp` static app (dashboards, metrics, on-call) backing the `RemoteMCPServer`; restored as a static app after the 1.0-line kagent chart dropped the grafana-mcp subchart (PR #888), token from the `kagent-grafana-mcp-token` ExternalSecret.
 - **Kubernetes API** (all agents) - native k8s API via controller-runtime client.
 
 ### MCP Exposure and Routing
 
 The MCP endpoint is the `kagent-mcp` HTTPRoute (`https://mcp.biggs.dog/mcp`) on the internal gateway `internal-biggs-dog` (VIP `192.168.6.15`). k8s-gateway split-horizon resolves `mcp.biggs.dog` to `.6.15` for LAN/VPN clients; TLS terminates at the gateway with the wildcard cert. WAN clients hitting the public gateway get a 404 (no route).
 
-The model routes (minimax, mistral, glm) and the kagent actor routes (model-actors, model-actors-glm, model-actors-vllm) are served WITHOUT authentication by agentgateway 0.12.0 / controller v2.2.1 while the ExternalSecret `model-api-keys` is not SecretSynced: the controller drops the `AgentgatewayPolicy` from xDS instead of failing closed (fail-open, issue #704; the upstream fix is agentgateway#1245, controller >= v1.0.1, which the in-progress 1.7.0 canary will carry). Guard before assuming a model route is closed: `kubectl -n ai-system get externalsecret model-api-keys` (must be READY/SecretSynced) and the policy `Attached` condition (`kubectl -n ai-system get agentgatewaypolicy`), because the `agentgateway-ai` Flux Kustomization's `wait: true` does not gate on this (AgentgatewayPolicy has no Ready condition and is not health-checked).
+The model routes (minimax, mistral, glm) and the kagent actor routes (model-actors, model-actors-glm, model-actors-vllm) are served WITHOUT authentication by the legacy agentgateway data plane while the ExternalSecret `model-api-keys` is not SecretSynced: the controller drops the `AgentgatewayPolicy` from xDS instead of failing closed (fail-open, issue #704; the upstream fix is agentgateway#1245, which the in-progress 1.x canary will carry). Guard before assuming a model route is closed: `kubectl -n ai-system get externalsecret model-api-keys` (must be READY/SecretSynced) and the policy `Attached` condition (`kubectl -n ai-system get agentgatewaypolicy`), because the `agentgateway-ai` Flux Kustomization's `wait: true` does not gate on this (AgentgatewayPolicy has no Ready condition and is not health-checked).
 
 ## Cluster Bootstrapping
 
@@ -420,6 +423,7 @@ Things that worked on the old cluster only because objects already existed, fixe
 
 - **Do not hardcode secrets** - use SOPS + age for Git-stored secrets, and External Secrets + 1Password for runtime-only secrets.
 - **Session storage** - OAuth2 Proxy's session cookie can exceed 4 KB and get chunked, breaking ext-authz subrequests. Use Dragonfly (Redis) to store the session server-side and reduce the cookie to a small ticket.
+- **Keep operator public (WAN) IPs out of the repo** - as of the 2026-11-17 scrub the operator's own public addresses read `IP-REDACTED` (the livekit WAN endpoint, the Omni Siderolink externalIP, and the 1Password connect source IP in comments); the real values live in the UDM/ISP configuration, not in the repo. Functional third-party endpoints stay as-is: NextDNS/Cloudflare resolver endpoints (45.90.28.x, 45.90.30.x, 1.1.1.1), the Valve Steam CM server IPs in the games policy comment, and the Z.ai (GLM) A records in the agentgateway-ai comment. If a scan turns up a new operator public IP, redact it in place.
 
 ### Agents and MCP
 
@@ -436,5 +440,5 @@ Things that worked on the old cluster only because objects already existed, fixe
 - **Cilium Egress Gateway** - route outbound traffic through a dedicated node to stabilize external IPs.
 - **Distributed Tracing** - add Jaeger or Tempo for end-to-end tracing across game streaming and agent operations.
 - **GPU Metrics Dashboard** - Grafana dashboard for DCGM metrics, game session lifecycle, vLLM scaling events.
-- **Substrate agents via MCP (#553)** - DONE: the 2026-10-10 kagent 1.0.0-alpha11 + substrate 0.5.0-alpha2 pairing (issue #594) ported the 5 cluster-ops agents to plain `Agent` CRs, and kagent 1.0.0 exposes them on its MCP/A2A session surface.
+- **Substrate agents via MCP (#553)** - DONE: the 2026-10-10 1.0-line pairing (issue #594) ported the 5 cluster-ops agents to plain `Agent` CRs, and the 1.0-line kagent exposes them on its MCP/A2A session surface.
 - **Agent hardening** - de-privilege and add `securityContext` to remaining classic agents.

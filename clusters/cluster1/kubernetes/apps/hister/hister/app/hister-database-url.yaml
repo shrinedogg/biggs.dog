@@ -1,0 +1,48 @@
+---
+# DSN for Hister's external Postgres (the cnpg-hister CNPG cluster, database
+# "hister"). 1Password item hister-user-password (biggs-dog vault: username +
+# password — the CNPG bootstrap credential, created by the operator
+# post-merge, same as hister-access-token) is templated into a libpq
+# key=value DSN for HISTER__SERVER__DATABASE.
+#
+# The key=value form (not a bare postgres:// URL) is what Hister's code
+# expects: it selects Postgres only when the database value contains "=",
+# otherwise the value is treated as a SQLite filename.
+#
+# The password must be alphanumeric — libpq key=value DSNs do not quote
+# values, so anything else breaks parsing (generate it like the
+# hister-access-token: cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' |
+# fold -w 40 | head -n 1).
+apiVersion: external-secrets.io/v1
+kind: ExternalSecret
+metadata:
+  name: hister-database-url
+  namespace: hister
+  labels:
+    app.kubernetes.io/name: hister
+spec:
+  refreshInterval: 1h
+  secretStoreRef:
+    kind: ClusterSecretStore
+    name: onepassword-connect
+  target:
+    name: hister-database-url
+    creationPolicy: Owner
+    template:
+      engineVersion: v2
+      data:
+        dsn: >-
+          host=cnpg-hister-rw.cnpg-system.svc.cluster.local
+          port=5432
+          user={{ .username }}
+          password={{ .password }}
+          dbname=hister
+  data:
+    - secretKey: username
+      remoteRef:
+        key: hister-user-password
+        property: username
+    - secretKey: password
+      remoteRef:
+        key: hister-user-password
+        property: password

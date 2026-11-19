@@ -58,8 +58,9 @@ spec:
             # BF16 parity within seed noise; fastest prefill of the recipes
             # the paper compares (+14-19% vs partial quants). Single
             # model.safetensors = 18,788,354,104 bytes (~17.5GiB) incl. the
-            # MTP draft head; global scales are harmonized for vLLM's fused
-            # in_proj GEMMs, so it serves correctly out of the box. Built
+            # MTP draft head (inert without --speculative-config); global
+            # scales are harmonized for vLLM's fused in_proj GEMMs, so it
+            # serves correctly out of the box. Built
             # with llm-compressor (compressed-tensors, nvfp4-pack-quantized);
             # the card requires vLLM >= 0.27 on SM120/Blackwell -- this image
             # is v0.33.0 (CUDA 13.0), so no image bump is needed.
@@ -81,9 +82,7 @@ spec:
             # KEPT, and why: --tensor-parallel-size=2 (KV math above),
             # --kv-cache-dtype=fp8 (now picks up the checkpoint's calibrated
             # static scales -- performance-free, no dynamic-scaling drift),
-            # MTP speculative decode (the draft head is IN this checkpoint
-            # too, mtp_num_hidden_layers=1; the main decode speedup for agent
-            # traffic), qwen3_coder tool + qwen3 reasoning parsers (verified
+            # qwen3_coder tool + qwen3 reasoning parsers (verified
             # for this family), the 262144 window, 0.92 util, 16-way batch
             # caps, prefix caching. Quantization is AUTO-DETECTED from the
             # checkpoint's quantization_config (compressed-tensors) -- do
@@ -107,7 +106,8 @@ spec:
             - --served-model-name=qwen 3.8 - local
             # Split the model across both 5090s. PCIe-only (PHB topology, no
             # NVLink, no GeForce P2P), so the per-layer allreduce rides host
-            # memory via NCCL; the MTP speed-up below is what pays for it.
+            # memory via NCCL; the doubled fp8 KV pool (~31GiB total
+            # across both cards, ~3.5 full 262K sessions) is what pays for it.
             # If NCCL hangs at startup on this consumer board, the first thing
             # to try is env NCCL_P2P_DISABLE=1 (forces the host-memory path
             # explicitly instead of letting NCCL probe P2P).
@@ -159,16 +159,15 @@ spec:
             - --max-num-seqs=16
             - --max-cudagraph-capture-size=16
             - --enable-prefix-caching
-            # MTP speculative decoding using the draft head shipped IN the
-            # checkpoint (no separate draft model). Method string per the vLLM
-            # Qwen3.5/3.6/3.8 recipes: "mtp" (NOT qwen3_next_mtp, that is the
-            # Qwen3-Next MoE). The recipe default is 3 speculative tokens; we
-            # start at 2 as a balance: each speculative token costs KV/batch
-            # capacity and the recipes note MTP lowers throughput under high
-            # concurrency while cutting per-token latency at low concurrency,
-            # which matches agent traffic (few long sessions). Measure
-            # acceptance rate in the vLLM metrics before moving to 3 or 1.
-            - --speculative-config={"method":"mtp","num_speculative_tokens":2}
+            # MTP speculative decoding REMOVED 2026-11-15: measured acceptance
+            # on this NVFP4 checkpoint was 0.009% (2,480 accepted of
+            # 26,829,250 draft tokens over 13.4M steps; position 1 never
+            # accepted) -- the 4-bit-quantized 1-layer draft head is
+            # effectively random, so every step pays for 2 draft passes and a
+            # 3-candidate verify with ~zero payoff. Re-enable
+            # --speculative-config only with a checkpoint whose MTP head is
+            # healthy (e.g. an FP8 checkpoint experiment), and re-measure
+            # vllm:spec_decode_num_accepted_tokens vs num_draft_tokens.
             # Kept from the previous checkpoint for this model family. The
             # Minima config.json does NOT set trust_remote_code (natively
             # supported as Qwen3_5ForCausalLM), so nothing executes here --

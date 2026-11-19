@@ -17,90 +17,91 @@ metadata:
   namespace: ai-system
 spec:
   template:
-    description: >-
-      GTD task management expert with full access to the Mindwtr task system.
-      Creates, lists, updates, and completes tasks; processes inbox items with
-      the 2-minute rule; manages projects with sections and next actions;
-      tracks Waiting For items; and runs weekly review workflows. Reads and
-      writes the live self-hosted Mindwtr Cloud sync store — the same data the
-      desktop and mobile clients sync against.
-    modelConfig:
-      name: default-model-config
-    promptTemplate:
-      dataSources:
-        - alias: builtin
-          name: kagent-builtin-prompts
-    systemPrompt: |
-      # Mindwtr GTD Agent
+    inline:
+      description: >-
+        GTD task management expert with full access to the Mindwtr task system.
+        Creates, lists, updates, and completes tasks; processes inbox items with
+        the 2-minute rule; manages projects with sections and next actions;
+        tracks Waiting For items; and runs weekly review workflows. Reads and
+        writes the live self-hosted Mindwtr Cloud sync store — the same data the
+        desktop and mobile clients sync against.
+      modelConfig:
+        name: default-model-config
+      promptTemplate:
+        dataSources:
+          - alias: builtin
+            name: kagent-builtin-prompts
+      systemPrompt: |
+        # Mindwtr GTD Agent
 
-      You are a GTD (Getting Things Done) expert with full access to the
-      Mindwtr task management system via MCP tools. You help users manage
-      their tasks, projects, inbox, and review workflows.
+        You are a GTD (Getting Things Done) expert with full access to the
+        Mindwtr task management system via MCP tools. You help users manage
+        their tasks, projects, inbox, and review workflows.
 
-      ## Available Tools
+        ## Available Tools
 
-      - Task CRUD: create, list, update, and delete tasks
-      - Inbox: process inbox items, apply the 2-minute rule
-      - Projects: manage projects, sections, and next actions
-      - Focus: show next actions, scheduled items, and today's agenda
-      - Waiting For: track delegated items and follow-ups
-      - Search: find tasks by keyword, context, or filter
+        - Task CRUD: create, list, update, and delete tasks
+        - Inbox: process inbox items, apply the 2-minute rule
+        - Projects: manage projects, sections, and next actions
+        - Focus: show next actions, scheduled items, and today's agenda
+        - Waiting For: track delegated items and follow-ups
+        - Search: find tasks by keyword, context, or filter
 
-      ## GTD Workflow
+        ## GTD Workflow
 
-      1. **Capture** — Tasks go to the Inbox first
-      2. **Clarify** — Process inbox: do it (2-min), delegate, or defer
-      3. **Organize** — Assign to projects, contexts, and schedules
-      4. **Engage** — Focus on next actions, one at a time
-      5. **Reflect** — Weekly review to catch loose ends
+        1. **Capture** — Tasks go to the Inbox first
+        2. **Clarify** — Process inbox: do it (2-min), delegate, or defer
+        3. **Organize** — Assign to projects, contexts, and schedules
+        4. **Engage** — Focus on next actions, one at a time
+        5. **Reflect** — Weekly review to catch loose ends
 
-      ## Guidelines
+        ## Guidelines
 
-      {{include "builtin/tool-usage-best-practices"}}
+        {{include "builtin/tool-usage-best-practices"}}
 
-      - Always cite task IDs and project names in responses
-      - For inbox processing, suggest concrete next actions
-      - For weekly reviews, summarize across all categories
-      - Respect the user's context and project organization
+        - Always cite task IDs and project names in responses
+        - For inbox processing, suggest concrete next actions
+        - For weekly reviews, summarize across all categories
+        - Respect the user's context and project organization
 
-      {{include "builtin/safety-guardrails"}}
-    tools:
-      - mcp:
-          server:
-            kind: RemoteMCPServer
-            name: mindwtr-mcp
-          # Tool names as exposed by mindwtr-mcp v1.1.3 (Cloud mode, --write):
-          # the server prefixes every tool with "mindwtr_". An earlier revision
-          # of this list used the unprefixed names (create_task, list_tasks,
-          # ...) which do not exist — kagent matched nothing and the agent ran
-          # with zero tools.
-          tools:
-            - mindwtr_list_tasks
-            - mindwtr_get_task
-            - mindwtr_add_task
-            - mindwtr_update_task
-            - mindwtr_complete_task
-            - mindwtr_delete_task
-            - mindwtr_restore_task
-            - mindwtr_list_projects
-            - mindwtr_get_project
-            - mindwtr_add_project
-            - mindwtr_update_project
-            - mindwtr_delete_project
-            - mindwtr_list_sections
-            - mindwtr_get_section
-            - mindwtr_add_section
-            - mindwtr_update_section
-            - mindwtr_delete_section
-            - mindwtr_list_areas
-            - mindwtr_add_area
-            - mindwtr_update_area
-            - mindwtr_delete_area
-            - mindwtr_list_people
-            - mindwtr_get_person
-            - mindwtr_add_person
-            - mindwtr_update_person
-            - mindwtr_rename_person
-            - mindwtr_delete_person
+        {{include "builtin/safety-guardrails"}}
+      tools:
+        - mcp:
+            server:
+              kind: RemoteMCPServer
+              name: mindwtr-mcp
+            # Tool names as exposed by mindwtr-mcp v1.1.3 (Cloud mode, --write):
+            # the server prefixes every tool with "mindwtr_". An earlier revision
+            # of this list used the unprefixed names (create_task, list_tasks,
+            # ...) which do not exist — kagent matched nothing and the agent ran
+            # with zero tools.
+            tools:
+              - mindwtr_list_tasks
+              - mindwtr_get_task
+              - mindwtr_add_task
+              - mindwtr_update_task
+              - mindwtr_complete_task
+              - mindwtr_delete_task
+              - mindwtr_restore_task
+              - mindwtr_list_projects
+              - mindwtr_get_project
+              - mindwtr_add_project
+              - mindwtr_update_project
+              - mindwtr_delete_project
+              - mindwtr_list_sections
+              - mindwtr_get_section
+              - mindwtr_add_section
+              - mindwtr_update_section
+              - mindwtr_delete_section
+              - mindwtr_list_areas
+              - mindwtr_add_area
+              - mindwtr_update_area
+              - mindwtr_delete_area
+              - mindwtr_list_people
+              - mindwtr_get_person
+              - mindwtr_add_person
+              - mindwtr_update_person
+              - mindwtr_rename_person
+              - mindwtr_delete_person
   harnessRef:
     name: golang-adk-memory
