@@ -11,11 +11,13 @@ spec:
     # Paired lockstep with kagent 1.0.1, whose go/go.mod replaces
     # go.ate.dev/substrate with kagent-dev/substrate v1.0.0 (the 1.0 GA
     # line). renovate.json's substrate-stack gate wants the chart to match
-    # the replace version, so this lands 1.0.0; the 1.0.1 chart (a
-    # chart-only patch over the same v1.0 generation) follows next cycle.
+    # the replace version, so this chart stays at 1.0.0 until a kagent tag
+    # vendors substrate v1.0.1 (none as of 2026-11-19: kagent v1.0.1, the
+    # current pin, replaces v1.0.0); the 1.0.1 chart (a chart-only patch
+    # over the same v1.0 generation) follows that cycle.
     # 1.0.0 renders the gvisor-default SandboxConfig at defaultVersion v7
     # (gVisor 20261102.0) -- reseed the B2 gvisor object BEFORE merging
     # (runbook in the PR body). Bumps for the whole substrate stack are
     # grouped + automerge:false -- see the substrate-stack rule in
     # renovate.json.
-    tag: "1.0.1"
+    tag: "1.0.0"
