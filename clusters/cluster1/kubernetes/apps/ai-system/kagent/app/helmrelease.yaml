@@ -185,7 +185,9 @@ spec:
     # that run the Harness workloads. The chart FAILS render if
     # workerImage is empty when create=true.
     #
-    # PINNED to the substrate control-plane version (1.0.0). The 1.0 line
+    # Tracks the substrate release the image was built from (v1.0.1 is a
+    # tooling/chart-only patch: no ateworker changes vs v1.0.0; the
+    # control-plane chart is still 1.0.0). The 1.0 line
     # renamed the worker image ateom-gvisor -> ateworker-gvisor (v-prefix
     # tags). The worker MUST move in lockstep with
     # ate-controller/atelet/atenet-router (renovate.json groups the whole
