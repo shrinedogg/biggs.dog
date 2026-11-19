@@ -34,7 +34,7 @@ spec:
         #    envFrom surface).
         #    Token is stripped from the stored remote URL afterwards.
         - name: vault-clone
-          image: docker.io/alpine/git:v2.54.0
+          image: docker.io/alpine/git:v2.54.1
           command:
             - /bin/sh
             - -c
