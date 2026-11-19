@@ -109,8 +109,6 @@ spec:
               value: "0.0.0.0"
             - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
               value: ""
-            - name: CONTINUWUITY_ALLOW_LEGACY_MEDIA
-              value: "true"
             # MatrixRTC / LiveKit — tells clients where to find the SFU backend.
             # Value MUST be TOML syntax (not JSON): figment's Env provider parses
             # env values as TOML; JSON stays a string and fails sequence coercion.
