@@ -63,7 +63,7 @@ spec:
             # serves correctly out of the box. Built
             # with llm-compressor (compressed-tensors, nvfp4-pack-quantized);
             # the card requires vLLM >= 0.27 on SM120/Blackwell -- this image
-            # is v0.33.0 (CUDA 13.0), so no image bump is needed.
+            # is v0.34.0 (CUDA 13.0).
             #
             # WHY NVFP4 + TP=2 (2026-11-08): TP=2 is kept unchanged -- a 262K
             # sequence needs ~8.5GiB of fp8 KV, which does not fit a single
@@ -158,6 +158,11 @@ spec:
             # "assert num_cache_lines >= batch" at startup on this arch.
             - --max-num-seqs=16
             - --max-cudagraph-capture-size=16
+            # v0.34.0 changed the default --block-size from 16 to 64 (upstream
+            # "Before you upgrade"); pin 16 to keep the KV sizing and prefix-cache
+            # granularity the comments above were measured at. Re-measure before
+            # adopting 64.
+            - --block-size=16
             - --enable-prefix-caching
             # MTP speculative decoding REMOVED 2026-11-15: measured acceptance
             # on this NVFP4 checkpoint was 0.009% (2,480 accepted of
