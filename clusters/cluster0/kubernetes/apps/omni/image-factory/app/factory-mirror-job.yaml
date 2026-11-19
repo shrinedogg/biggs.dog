@@ -83,6 +83,10 @@
 # - mirror + sign v1.14.6 with --tlog-upload=false, verify with
 #   --insecure-ignore-tlog (private registry, no transparency log)
 #
+# r10: base image bookworm -> trixie (the renovate debian 13 bump changed
+# the pod template, so the revision name bumps per the convention above;
+# the r9 object must not be updated in place).
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -110,7 +114,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-9
+  name: factory-mirror-v1146-10
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
