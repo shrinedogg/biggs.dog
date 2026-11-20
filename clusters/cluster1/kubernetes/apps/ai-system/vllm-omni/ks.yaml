@@ -1,0 +1,29 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app vllm-omni
+  namespace: flux-system
+spec:
+  dependsOn:
+    # vllm owns the kagent-vllm Secret (ExternalSecret from the 1Password
+    # item vllm-api-key) that this app reuses for its VLLM_API_KEY; order it
+    # first so the Secret exists before this Kustomization runs.
+    - name: vllm
+    # agentgateway (networking ns) owns the internal-biggs-dog Gateway that
+    # is this app's HTTPRoute parentRef.
+    - name: agentgateway
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/vllm-omni/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  # Pulling the image + downloading ~27.6 GiB of weights on first start is
+  # slow; give the reconcile generous headroom.
+  timeout: 10m
