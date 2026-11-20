@@ -1,0 +1,35 @@
+---
+# LAN-only HTTPS plane via the internal gateway, same plane as
+# vllm.biggs.dog. Exposes the vLLM-Omni text-to-video API (/v1/videos*)
+# at vllm-omni.biggs.dog on the internal gateway. Reachable only from the
+# LAN or a Wireguard session into the UDM; the public wildcard gateway
+# does not carry this route.
+#
+# Auth is the Bearer key from the kagent-vllm Secret (vLLM enforces it on
+# all /v1/* endpoints):
+#   kubectl -n ai-system get secret kagent-vllm \
+#     -o jsonpath='{.data.VLLM_API_KEY}' | base64 -d
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: vllm-omni
+  namespace: ai-system
+spec:
+  hostnames:
+    - vllm-omni.biggs.dog
+  parentRefs:
+    - name: internal-biggs-dog
+      namespace: networking
+  rules:
+    - backendRefs:
+        - name: vllm-omni
+          port: 8000
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+      # Sync video generation blocks for the full generation; async job
+      # creation returns immediately.
+      timeouts:
+        request: 600s
+        backendRequest: 600s

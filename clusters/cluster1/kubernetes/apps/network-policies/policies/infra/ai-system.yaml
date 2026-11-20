@@ -654,3 +654,24 @@ spec:
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: hister
             app.kubernetes.io/name: hister
+---
+# vllm-omni downloads model weights from Hugging Face on first boot of a
+# new model; HF serves bytes from rotating Xet/LFS CDN hosts with no stable
+# FQDN set, so this is a broad :443 egress scoped to the single vllm-omni
+# pod.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-vllm-omni-huggingface
+  namespace: ai-system
+spec:
+  endpointSelector:
+    matchLabels:
+      app: vllm-omni
+  egress:
+    - toEntities:
+        - world
+      toPorts:
+        - ports:
+            - port: "443"
+              protocol: TCP
