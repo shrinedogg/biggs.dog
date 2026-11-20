@@ -1,0 +1,27 @@
+---
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: &app vllm-omni
+  namespace: flux-system
+spec:
+  dependsOn:
+    # vllm owns the kagent-vllm Secret (1Password item vllm-api-key) this app
+    # reuses for VLLM_API_KEY; agentgateway is the parent of the HTTPRoute
+    # (the internal-biggs-dog data plane it lands on).
+    - name: vllm
+    - name: agentgateway
+  commonMetadata:
+    labels:
+      app.kubernetes.io/name: *app
+  path: ./clusters/cluster1/kubernetes/apps/ai-system/vllm-omni/app
+  prune: false
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  wait: true
+  interval: 3m
+  retryInterval: 1m
+  # First boot pulls a multi-GB image and downloads ~27.6 GiB of Wan2.1
+  # weights before /health answers; slow starts are expected.
+  timeout: 10m

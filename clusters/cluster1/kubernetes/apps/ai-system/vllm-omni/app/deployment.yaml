@@ -1,0 +1,169 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-omni
+  namespace: ai-system
+  labels:
+    app: vllm-omni
+spec:
+  # ON-DEMAND video generator, NOT an always-on service: replicas is 0 so
+  # this app is dormant by default and never contends with the Qwen vLLM
+  # deployment for the GPU cards (it requests a whole card, see the
+  # WHOLE-CARD TRICK on resources).
+  #
+  # Ops flow (run on the cluster host):
+  #   1. kubectl -n ai-system scale deploy vllm --replicas=0
+  #   2. kubectl -n ai-system scale deploy vllm-omni --replicas=1
+  #   3. kubectl -n ai-system wait --for=condition=available deploy/vllm-omni --timeout=45m
+  #   4. Generate (example): curl -X POST https://vllm-omni.biggs.dog/v1/videos/sync -H "Authorization: Bearer <key from kagent-vllm>" -F prompt=A corgi surfing a wave at sunset -F size=832x480 -F num_frames=33 -F fps=16 -o out.mp4
+  #   5. kubectl -n ai-system scale deploy vllm-omni --replicas=0
+  #      kubectl -n ai-system scale deploy vllm --replicas=1
+  #
+  # HAZARD: the gpu-arbiter operator (gpu.biggs.dog GPUArbiter CR in
+  # dreamcast/gpu-arbiter-instance) restores vLLM to 1 replica after gaming
+  # sessions. If it does so while vllm-omni is still running, vLLM cannot
+  # reschedule (vllm-omni holds the whole card) and the text endpoint stays
+  # down until vllm-omni is scaled back to 0. Fit video sessions between
+  # gaming sessions.
+  replicas: 0
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: vllm-omni
+  template:
+    metadata:
+      labels:
+        app: vllm-omni
+    spec:
+      # The Service is named "vllm-omni", so Kubernetes would inject the
+      # legacy service-link env var VLLM_OMNI_PORT=tcp://<ip>:8000, which
+      # collides with vLLM's own config namespace (same reason the vllm
+      # deployment disables the VLLM_PORT injection). Disable it.
+      enableServiceLinks: false
+      # Pin to the GPU node (nv-01) by capability label rather than hostname,
+      # matching the rest of the ai-system stack.
+      nodeSelector:
+        nvidia.com/gpu.present: "true"
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      # Short grace (mirror vllm): when the ops flow scales vllm-omni back to
+      # 0 to hand the card to vLLM, VRAM must be released fast so vLLM can
+      # reschedule; the app is stateless (weights on the PVC).
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: vllm-omni
+          # tag v0.32.0-x86_64 = vLLM-Omni v0.32.0, the latest stable release,
+          # aligned with vLLM 0.32.0; amd64 single-arch manifest. The node
+          # driver already runs CUDA 13.0 builds for the vLLM deployment, so
+          # the runtime is forward-compatible.
+          # ASSUMPTION (stated in the PR): the image's torch build supports
+          # sm_120 (RTX 5090, Blackwell consumer); first-boot pod log is the
+          # authority.
+          image: docker.io/vllm/vllm-omni@sha256:6b44ee504a0dc3a21eacf72e7dc5da318b7bcc8ed0e349dc928e67278414430c
+          args:
+            # vLLM-Omni serve for the Wan2.1-T2V 1.3B diffusers checkpoint
+            # (Wan-AI/Wan2.1-T2V-1.3B-Diffusers). Wan2.1-T2V uses
+            # flow-shift 3.0 and boundary-ratio 0.0 (vLLM-Omni docs / PR
+            # #1920). Port 8000 matches the Service and the route.
+            #
+            # vLLM-Omni text-to-video API surface: POST /v1/videos (async:
+            # returns a job id; poll GET /v1/videos/{id}, download
+            # GET /v1/videos/{id}/content) and POST /v1/videos/sync
+            # (blocks and returns raw mp4 bytes).
+            - vllm
+            - serve
+            - Wan-AI/Wan2.1-T2V-1.3B-Diffusers
+            - --omni
+            - --host=0.0.0.0
+            - --port=8000
+            - --flow-shift=3.0
+            - --boundary-ratio=0.0
+          env:
+            # Weights cache on the shared vllm-models PVC; first boot
+            # downloads Wan-AI/Wan2.1-T2V-1.3B-Diffusers, ~27.6 GiB
+            # (~21.7 GiB umT5 text encoder + ~5.4 GiB DiT transformer + VAE).
+            - name: HF_HOME
+              value: /models
+            # Separate from the vLLM app's /models/.cache/vllm so torch
+            # compile caches do not collide.
+            - name: VLLM_CACHE_ROOT
+              value: /models/.cache/vllm-omni
+            # Secures the /v1/* endpoints. Reuses the EXISTING kagent-vllm
+            # Secret (owned by the vllm app's ExternalSecret from the
+            # 1Password item vllm-api-key). No new 1Password item, no new
+            # ExternalSecret.
+            - name: VLLM_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: kagent-vllm
+                  key: VLLM_API_KEY
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+          resources:
+            requests:
+              nvidia.com/gpu: 4
+              memory: 32Gi
+            limits:
+              # WHOLE-CARD TRICK: the GPU device plugin runs time-sliced CDI
+              # (4 virtual nvidia.com/gpu per physical card, 8 on nv-01).
+              # The Qwen vLLM deployment requests 5, spanning both cards and
+              # reserving ~29.4 GiB of each 32.6 GiB card
+              # (gpu-memory-utilization 0.92). While vLLM runs, only 3
+              # virtual GPUs remain, so this 4-GPU request stays Pending and
+              # only schedules when vLLM is at 0 replicas: then one whole
+              # physical card (32.6 GiB VRAM) is free and the ~13.7 GiB
+              # runtime footprint of the 1.3B model fits with headroom.
+              # A 1-GPU request would instead schedule on a shared card and
+              # OOM (only ~3 GiB free per card), so 4 is deliberate.
+              nvidia.com/gpu: 4
+              # ~27.6 GiB weight load (the mmap page-cache read is charged to
+              # the cgroup) plus the ~13.7 GiB runtime; 32Gi keeps the pod
+              # inside the node's memory budget. Node has 64GB.
+              memory: 32Gi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            # 45 min: 27.6 GiB weight download plus first-boot compile; on
+            # restart the weights are already on the PVC.
+            periodSeconds: 15
+            failureThreshold: 180
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            # /health shares the inference event loop (same rationale as the
+            # vllm deployment): give real headroom so liveness only fires on
+            # a genuine deadlock.
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 6
+          volumeMounts:
+            - name: models
+              mountPath: /models
+            - name: shm
+              mountPath: /dev/shm
+      volumes:
+        # Shared with the vllm app: 100Gi host-path RWO on nv-01,
+        # WaitForFirstConsumer (vllm/app/pvc.yaml). Do NOT create a new PVC.
+        - name: models
+          persistentVolumeClaim:
+            claimName: vllm-models
+        # Shared memory for the diffusion pipelines.
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 8Gi

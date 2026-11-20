@@ -10,6 +10,9 @@ resources:
   # substrate-crds in ./substrate/ks.yaml — so each CRD document applies
   # before its consuming app document within that file.
   - ./vllm/ks.yaml
+  # vllm-omni: on-demand text-to-video generation (Wan2.1-T2V-1.3B via
+  # vLLM-Omni); dormant by default (replicas 0) so it never contends with vllm.
+  - ./vllm-omni/ks.yaml
   # The substrate-stack migration (2026-10-10, issue #594) re-added the
   # substrate control plane: CRDs first, then the podcertificate signer,
   # then the control plane itself (dependsOn substrate-crds,
