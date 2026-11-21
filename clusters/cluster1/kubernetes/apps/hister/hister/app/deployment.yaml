@@ -83,7 +83,7 @@ spec:
           # Upstream has not published a versioned tag since v0.5.0, so a
           # digest pin is the only immutable way to pin v0.21.0. Anonymous
           # pull verified.
-          image: ghcr.io/asciimoo/hister@sha256:4dab1cbd7aabe8ade8e696e4085ecd3254e1170467c4502debec792a904abdbc
+          image: ghcr.io/asciimoo/hister@sha256:d1b427c7f876e64e6212e000df60d33c2e418b60372582b56cfee719eafd4107
           # ASSUMPTION: no upstream resource guidance; 100m/256Mi requests
           # cover the search API and crawl jobs, 500m/1Gi leaves headroom for
           # bulk indexing spikes.
