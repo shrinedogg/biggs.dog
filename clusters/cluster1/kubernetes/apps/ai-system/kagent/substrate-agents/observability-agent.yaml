@@ -47,7 +47,10 @@ spec:
               - query_loki_stats
               - query_loki_logs
               - list_teams
-              - list_sift_investigations
+              # list_sift_investigations removed with the Sift tools when
+              # mcp-grafana moved to the v2 line (grafana/mcp-grafana#1191);
+              # the server silently drops pinned names it no longer exposes,
+              # so the dead pin is deleted, not kept.
               - list_prometheus_metric_names
               - list_prometheus_metric_metadata
               - list_prometheus_label_values

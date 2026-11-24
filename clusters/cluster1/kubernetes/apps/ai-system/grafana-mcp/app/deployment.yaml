@@ -21,9 +21,14 @@ metadata:
 # ran, and the observability-agent sat Ready=False on the missing RMP.
 # This static app restores all three.
 #
-# Image pinned to docker.io/grafana/mcp-grafana:1.6.3 — the same tag the
-# subchart pinned (verified pullable on Docker Hub), docker.io direct pull
-# (same pattern as exa-mcp).
+# Image pinned to docker.io/grafana/mcp-grafana:2.3.0 — docker.io direct
+# pull (same pattern as exa-mcp). The v2 line is a breaking change: v2.0.0
+# removed the Sift tools (grafana/mcp-grafana#1191; the pinned
+# list_sift_investigations was dropped from the observability-agent tool
+# list in the same series), and v2 enables anonymous usage-statistics
+# reporting by default (usagestats DefaultMode=ModeEnabled, periodic POSTs
+# to stats.grafana.org) — this deployment opts out via --usage-stats
+# disabled in the args below.
 #
 # The Grafana service-account token (Admin role; the agent uses
 # update_dashboard, create_incident, and friends) comes from the
@@ -41,7 +46,7 @@ metadata:
   namespace: ai-system
   labels:
     app.kubernetes.io/name: kagent-grafana-mcp
-    app.kubernetes.io/version: "1.6.3"
+    app.kubernetes.io/version: "2.3.0"
 spec:
   replicas: 1
   selector:
@@ -51,7 +56,7 @@ spec:
     metadata:
       labels:
         app.kubernetes.io/name: grafana-mcp
-        app.kubernetes.io/version: "1.6.3"
+        app.kubernetes.io/version: "2.3.0"
     spec:
       serviceAccountName: kagent-grafana-mcp
       # Pin to the GPU node (nv-01), matching the rest of the ai-system
@@ -86,6 +91,12 @@ spec:
             - streamable-http
             - -allowed-hosts
             - "*"
+            # v2 defaults usage-stats to ModeEnabled (periodic POSTs to
+            # stats.grafana.org); opt out explicitly. The flag outranks the
+            # GRAFANA_USAGE_STATS and DO_NOT_TRACK env vars (unrecognised
+            # values resolve to disabled, so a typo cannot re-enable).
+            - --usage-stats
+            - disabled
           env:
             # Bare base URL: mcp-grafana appends "/api/..." to GRAFANA_URL
             # itself, so a trailing "/api" would double up and 404.
