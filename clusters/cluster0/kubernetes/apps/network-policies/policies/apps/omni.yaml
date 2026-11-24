@@ -112,7 +112,7 @@ spec:
 # Intra-namespace flows:
 #   oauth2-proxy -> image-factory :8080 (upstream after OIDC)
 #   image-factory -> registry :5000 (internal registry pulls)
-#   omni -> image-factory :8080 (--image-factory-address config)
+#   omni -> image-factory :8080 (--primary-factory-url config)
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
