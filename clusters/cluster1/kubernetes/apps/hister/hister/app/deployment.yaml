@@ -2,15 +2,18 @@
 # Hister — self-hosted personal search engine over pages you visit and files
 # you keep (ghcr.io/asciimoo/hister, single-binary Go server + terminal client).
 #
-# Image pin: the v0.21.0 image, pinned by digest. Upstream publishes versioned
-# GHCR tags only through v0.5.0 (no versioned tag exists for v0.6.0-v0.21.0),
-# and :latest is the v0.21.0 release image — verified 2026-11-15 from the
-# image config labels (org.opencontainers.image.version=v0.21.0 and
-# org.opencontainers.image.revision=161bd84e..., the v0.21.0 git-tag commit).
-# The digest below is that image's multi-arch index, so the pin is immutable.
-# v0.5.0 (the previous pin) predates semantic search, the /mcp endpoint and
-# the access-token auth entirely — it could never serve this release's MCP
-# acceptance gate. Re-pin when a versioned tag >= v0.21.0 appears.
+# Image pin: the v0.22.0 image (first release under the "Nogon" name —
+# upstream renamed Hister to Nogon after a trademark complaint; existing
+# config and data are reused, no data move or reindex), pinned by digest.
+# :latest is the v0.22.0 release image — verified 2026-11-24: the :latest
+# index digest equals the pin below, and the upstream v0.22.0 release page
+# documents the rename (this build carries no OCI revision/version labels
+# in its config, so identity is release page + :latest pointer, unlike the
+# v0.21.0 build whose org.opencontainers.image.version/revision labels were
+# read 2026-11-15). The digest is the image's multi-arch index, so the pin
+# is immutable. A versioned GHCR tag now exists (v0.22.0 manifest fetch 200,
+# 2026-11-24), so a tag pin would be possible; the digest pin is kept
+# because renovate's digest manager re-cuts this line.
 #
 # Config is env-first per the docs: HISTER__<SECTION>__<KEY> overrides,
 # HISTER_DATA_DIR points at the data dir. The image runs the server by
@@ -77,12 +80,13 @@ spec:
         fsGroup: 65532
       containers:
         - name: hister
-          # v0.21.0 image pinned by digest (see header): the multi-arch index
-          # that :latest points at is the v0.21.0 release build — verified
-          # 2026-11-15 via the image config's OCI revision/version labels.
-          # Upstream has not published a versioned tag since v0.5.0, so a
-          # digest pin is the only immutable way to pin v0.21.0. Anonymous
-          # pull verified.
+          # v0.22.0 image pinned by digest (see header): the multi-arch index
+          # that :latest points at is the v0.22.0 release build (the "Nogon"
+          # rename release, 2026-11-19) — verified 2026-11-24: the :latest
+          # index digest equals the pin below, and the upstream v0.22.0
+          # release page documents the rename (this build carries no OCI
+          # revision/version labels, so identity is release page + :latest
+          # pointer). Anonymous pull verified.
           image: ghcr.io/asciimoo/hister@sha256:d1b427c7f876e64e6212e000df60d33c2e418b60372582b56cfee719eafd4107
           # ASSUMPTION: no upstream resource guidance; 100m/256Mi requests
           # cover the search API and crawl jobs, 500m/1Gi leaves headroom for
