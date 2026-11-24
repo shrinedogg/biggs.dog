@@ -69,7 +69,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: grafana-mcp
-          image: docker.io/grafana/mcp-grafana:1.6.3
+          image: docker.io/grafana/mcp-grafana:2.3.0
           imagePullPolicy: IfNotPresent
           # --transport streamable-http matches the RemoteMCPServer protocol.
           # -allowed-hosts "*" is required: workers dial this service
