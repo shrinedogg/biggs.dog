@@ -122,6 +122,11 @@
 # that never refreshes, so deployment.yaml carries a pod-template
 # annotation that restarts it onto the rotated key.
 #
+# r11 (factory-mirror-v1146-11): base image bookworm -> trixie (the
+# renovate debian 13 bump changed the pod template, so the revision name
+# bumps per the immutability convention; the r10 object must not be
+# updated in place).
+#
 # TTL: the Job GCs itself an hour after completion.
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
@@ -149,7 +154,7 @@ spec:
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: factory-mirror-v1146-10
+  name: factory-mirror-v1146-11
   namespace: omni
   labels:
     app.kubernetes.io/component: factory-mirror
@@ -164,7 +169,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: mirror
-          image: docker.io/library/debian:bookworm
+          image: docker.io/library/debian:trixie
           env:
             # rotated keypair (2026-11-18) is encrypted with an EMPTY
             # passphrase; explicit env keeps cosign off any prompt
