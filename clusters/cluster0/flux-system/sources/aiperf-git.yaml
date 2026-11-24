@@ -14,4 +14,4 @@ spec:
   interval: 1h
   url: https://github.com/ai-dynamo/aiperf
   ref:
-    tag: "v0.13.0"
+    tag: "v0.14.0"
