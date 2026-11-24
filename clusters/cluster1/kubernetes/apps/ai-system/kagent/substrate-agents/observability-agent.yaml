@@ -47,7 +47,12 @@ spec:
               - query_loki_stats
               - query_loki_logs
               - list_teams
-              - list_sift_investigations
+              # All three Sift pins (list_sift_investigations,
+              # get_sift_investigation, get_sift_analysis) removed with the
+              # Sift tools when mcp-grafana moved to the v2 line
+              # (grafana/mcp-grafana#1191); the server silently drops pinned
+              # names it no longer exposes, so the dead pins are deleted,
+              # not kept.
               - list_prometheus_metric_names
               - list_prometheus_metric_metadata
               - list_prometheus_label_values
@@ -61,8 +66,6 @@ spec:
               - list_datasources
               - list_contact_points
               - list_alert_rules
-              - get_sift_investigation
-              - get_sift_analysis
               - get_oncall_shift
               - get_incident
               - get_datasource
