@@ -36,7 +36,7 @@ spec:
         # Rolling :main is deliberate (renovate.json "Track floating tags by digest"):
         # digest bumps carry upstream main commits without release notes, so evaluation
         # is by the digest delta, not release notes.
-        - image: ghcr.io/continuwuity/continuwuity:main@sha256:fd51e203c467ecfbfe73ce340542a96839e6f07ecc1c081616da244ba3178f67
+        - image: ghcr.io/continuwuity/continuwuity:main@sha256:a27ab40094be19d7e7ae1cee82bffc10f3f8e9e9f611566e3c70fa2614ef1edd
           imagePullPolicy: Always
           name: continuwuity
           env:
@@ -109,8 +109,6 @@ spec:
               value: "0.0.0.0"
             - name: CONTINUWUITY_NEW_USER_DISPLAYNAME_SUFFIX
               value: ""
-            - name: CONTINUWUITY_ALLOW_LEGACY_MEDIA
-              value: "true"
             # MatrixRTC / LiveKit — tells clients where to find the SFU backend.
             # Value MUST be TOML syntax (not JSON): figment's Env provider parses
             # env values as TOML; JSON stays a string and fails sequence coercion.
