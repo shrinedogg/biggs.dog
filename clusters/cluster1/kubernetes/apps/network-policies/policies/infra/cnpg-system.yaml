@@ -51,6 +51,8 @@ spec:
         # policies/apps/hister.yaml).
         - matchLabels:
             k8s:io.kubernetes.pod.namespace: hister
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: hermes
       toPorts:
         - ports:
             - port: "5432"

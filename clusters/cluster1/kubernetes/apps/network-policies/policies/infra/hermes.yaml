@@ -237,6 +237,36 @@ spec:
             k8s:io.kubernetes.pod.namespace: cnpg-system
             cnpg.io/cluster: cnpg-hermes-memory
 ---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-egress-to-hermes-state
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  egress:
+    - toEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hermes-state
+      toPorts:
+        - ports:
+            - port: "5432"
+              protocol: TCP
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: allow-ingress-from-hermes-state
+  namespace: hermes
+spec:
+  endpointSelector: {}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: cnpg-system
+            cnpg.io/cluster: cnpg-hermes-state
+---
 # VictoriaMetrics scraping (house pattern).
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
