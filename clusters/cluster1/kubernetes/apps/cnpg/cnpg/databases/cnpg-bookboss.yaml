@@ -8,6 +8,11 @@ spec:
   # Temporary drain override (#604): accept full DB downtime during maintenance.
   # Re-enable after API readiness, CNPG recovery, and replication are verified.
   enablePDB: false
+  failoverDelay: 60
+  # The operator-default 1h startDelay kept the demoted primary out of
+  # the cluster after the 2026-11-24 OOMKilled failover: drop both to 5min
+  startDelay: 300
+  switchoverDelay: 300
   bootstrap:
     initdb:
       database: bookboss
@@ -18,10 +23,10 @@ spec:
   imageName: ghcr.io/cloudnative-pg/postgresql:18.1
   resources:
     requests:
-      memory: 300Mi
+      memory: 1Gi
       cpu: 150m
     limits:
-      memory: 300Mi
+      memory: 1Gi
   storage:
     storageClass: host-path
     size: 5Gi

@@ -11,6 +11,11 @@ metadata:
   name: cnpg-hister
   namespace: cnpg-system
 spec:
+  failoverDelay: 60
+  # The operator-default 1h startDelay kept the demoted primary out of
+  # the cluster after the 2026-11-24 OOMKilled failover: drop both to 5min
+  startDelay: 300
+  switchoverDelay: 300
   instances: 3
   bootstrap:
     initdb:
@@ -29,10 +34,10 @@ spec:
     major: 18
   resources:
     requests:
-      memory: 300Mi
+      memory: 1Gi
       cpu: 150m
     limits:
-      memory: 300Mi
+      memory: 1Gi
   storage:
     storageClass: host-path
     size: 5Gi
