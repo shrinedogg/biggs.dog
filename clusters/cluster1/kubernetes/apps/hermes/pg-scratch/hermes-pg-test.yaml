@@ -1,0 +1,280 @@
+# Route-B scratch-pod test manifest (plan section 7.5, hermes PostgreSQL state
+# backend). HAND-APPLIED ONLY:
+#   kubectl -n hermes apply -f clusters/cluster1/kubernetes/apps/hermes/pg-scratch/hermes-pg-test.yaml
+# Deliberately OUTSIDE the hermes Flux Kustomization inventory (hermes/ks.yaml
+# path apps/hermes/hermes/app with prune: true): Flux never applies or prunes
+# this directory. Do not move it into app/.
+#
+# hermes-pg-test = a copy of ../app/deployment.yaml with the six changes of
+# plan 7.5:
+#   1. image -> pg-port-52aa143 (hermes-agent fork branch pg-backend-port @
+#      52aa14301f2eae8310f72790c0b9d6bb3df5ea77; build via the fork's
+#      dockerhub-custom-build workflow, see ROUTEB-handoff.md step 0)
+#   2. name + app.kubernetes.io/name -> hermes-pg-test, so the production
+#      Service and HTTPRoute (both select app.kubernetes.io/name=hermes) keep
+#      targeting the production pod only
+#   3. data volume -> own PVC hermes-pg-test-data (the test never mounts the
+#      production hermes-data volume)
+#   4. vault-clone init container + OBSIDIAN_VAULT_PATH dropped
+#   5. HERMES_DATABASE_URL added from the hermes-state-db secret (key
+#      HERMES_DATABASE_URL, created by the hermes-state-db ExternalSecret,
+#      PR #927). The production hermes-gateway envFrom surface is NOT carried
+#      over: per the plan's 7.5 warning, a second gateway holding the
+#      production bot tokens (SLACK_BOT_TOKEN, MATRIX_*, ...) would answer
+#      messages twice; the model comes from pocketid-model-jwt +
+#      model-routes-init instead (change 6)
+#   6. pocketid-model-jwt + model-routes-init kept (without them the pod has
+#      no model)
+#
+# hermes-pg-test-2 = the second-writer variant for plan 7.5 step 5: same
+# image and env, its own name and its own PVC (hermes-pg-test-2-data). Both
+# writers run the same default profile from the same home path string, so
+# they resolve to one PG schema.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-pg-test-data
+  namespace: hermes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes-pg-test
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes-pg-test
+spec:
+  replicas: 1
+  # RWO PVC: never let two pods attach during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes-pg-test
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes-pg-test
+    spec:
+      hostUsers: false
+      automountServiceAccountToken: false
+      containers:
+        - name: gateway
+          # Test build from github.com/shrinedogg/hermes-agent branch
+          # pg-backend-port @ 52aa14301f2eae8310f72790c0b9d6bb3df5ea77
+          # (stage-1 PG state backend + pool-cascade fix), pushed by the
+          # dockerhub-custom-build workflow as pg-port-52aa143.
+          image: docker.io/shrinedogg/hermes-agent:pg-port-52aa143
+          env:
+            # Dashboard on, bound 0.0.0.0 by image default; public URL pinned
+            # so the OIDC redirect URI = https://hermes.biggs.dog/auth/callback.
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_PUBLIC_URL
+              value: "https://hermes.biggs.dog"
+            - name: HERMES_DASHBOARD_OIDC_ISSUER
+              value: "https://id.biggs.dog"
+            # PostgreSQL state backend DSN (test-only secret; the production
+            # hermes-gateway envFrom is deliberately NOT carried over).
+            - name: HERMES_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-state-db
+                  key: HERMES_DATABASE_URL
+          ports:
+            - name: http-dashboard
+              containerPort: 9119
+              protocol: TCP
+          # tcpSocket probes: every /api/ route is session-token gated, so an
+          # HTTP probe would fight the auth gate; s6 restarts the gateway if
+          # the process dies, liveness only catches a wedged listener.
+          readinessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE"]
+            seccompProfile:
+              type: RuntimeDefault
+          # NOTE: image boots as root and drops privileges in the entrypoint
+          # (s6 + setuid), so runAsNonRoot is NOT set (would break boot).
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
+            - name: pocketid-model-jwt
+              mountPath: /var/run/secrets/pocketid-model-jwt
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/cont-init.d/018-reconcile-model-routes
+              subPath: 018-reconcile-model-routes
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/hermes-init
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-pg-test-data
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        # Refreshed every 15m by CronJob/pocketid-model-jwt-refresher. Directory
+        # mount (no subPath) so kubelet updates rotated tokens in place without
+        # restarting the pod; optional: true so Recreate rollouts never block on
+        # ContainerCreating before the CronJob's first */15 tick; 0444 (292) so
+        # UID 10000 (hermes) can read the root-owned Secret projection.
+        - name: pocketid-model-jwt
+          secret:
+            secretName: pocketid-model-jwt
+            defaultMode: 292
+            optional: true
+        - name: model-routes-init
+          configMap:
+            name: hermes-model-routes-init
+            defaultMode: 365
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: hermes-pg-test-2-data
+  namespace: hermes
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: ceph-block
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hermes-pg-test-2
+  namespace: hermes
+  labels:
+    app.kubernetes.io/name: hermes-pg-test-2
+spec:
+  replicas: 1
+  # RWO PVC: never let two pods attach during a rollout.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: hermes-pg-test-2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: hermes-pg-test-2
+    spec:
+      hostUsers: false
+      automountServiceAccountToken: false
+      containers:
+        - name: gateway
+          # Second writer (plan 7.5 step 5): same test build, own volume;
+          # both writers resolve to one PG schema.
+          image: docker.io/shrinedogg/hermes-agent:pg-port-52aa143
+          env:
+            - name: HERMES_DASHBOARD
+              value: "1"
+            - name: HERMES_DASHBOARD_PUBLIC_URL
+              value: "https://hermes.biggs.dog"
+            - name: HERMES_DASHBOARD_OIDC_ISSUER
+              value: "https://id.biggs.dog"
+            - name: HERMES_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: hermes-state-db
+                  key: HERMES_DATABASE_URL
+          ports:
+            - name: http-dashboard
+              containerPort: 9119
+              protocol: TCP
+          readinessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            tcpSocket:
+              port: http-dashboard
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 5
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+            limits:
+              cpu: "2"
+              memory: 4Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+              add: ["SETUID", "SETGID", "CHOWN", "DAC_OVERRIDE"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: data
+              mountPath: /opt/data
+            - name: tmp
+              mountPath: /tmp
+            - name: run
+              mountPath: /run
+            - name: pocketid-model-jwt
+              mountPath: /var/run/secrets/pocketid-model-jwt
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/cont-init.d/018-reconcile-model-routes
+              subPath: 018-reconcile-model-routes
+              readOnly: true
+            - name: model-routes-init
+              mountPath: /etc/hermes-init
+              readOnly: true
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: hermes-pg-test-2-data
+        - name: tmp
+          emptyDir: {}
+        - name: run
+          emptyDir: {}
+        - name: pocketid-model-jwt
+          secret:
+            secretName: pocketid-model-jwt
+            defaultMode: 292
+            optional: true
+        - name: model-routes-init
+          configMap:
+            name: hermes-model-routes-init
+            defaultMode: 365
