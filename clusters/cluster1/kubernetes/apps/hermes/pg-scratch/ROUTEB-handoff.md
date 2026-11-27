@@ -25,7 +25,8 @@ so the test image has to be built first. It builds the fork's
 pg-backend-port tip (52aa14301f2eae8310f72790c0b9d6bb3df5ea77, the
 pool-cascade fix) via the manual-dispatch build workflow, which can sit
 queued on the self-hosted runner for a while (normal, not a fault). The
-report job of the run prints the digest line you can pin later.
+run's report job writes the pin line to its step summary on the run
+page (not the job log); the digest command below records it directly.
 
 ```
 gh workflow run dockerhub-custom-build.yml --repo shrinedogg/hermes-agent --ref build/dockerhub-catalog-harness2 -f commit=52aa14301f2eae8310f72790c0b9d6bb3df5ea77 -f tag=pg-port-52aa143
@@ -40,6 +41,16 @@ Wait for the run to succeed, then confirm the tag exists (an HTTP 404 means it i
 ```
 curl -s https://hub.docker.com/v2/repositories/shrinedogg/hermes-agent/tags/pg-port-52aa143
 ```
+
+Then fetch the tag's digest. It is the same Docker Hub endpoint the
+report job reads; it errors until the build has pushed the tag:
+
+```
+curl -s https://hub.docker.com/v2/repositories/shrinedogg/hermes-agent/tags/pg-port-52aa143 | python3 -c 'import json,sys; print(json.load(sys.stdin)["digest"])'
+```
+
+Record the digest as step 0's key output: the pin for the image line
+is docker.io/shrinedogg/hermes-agent:pg-port-52aa143@<digest>.
 
 ## Step 1 - read-only checks (plan section 10 G)
 
